@@ -1,0 +1,10 @@
+# Local helper files (not part of the project)
+ghtoken.txt
+gh_status.txt
+
+# Local Claude Code config
+.claude/
+
+# Windows
+Thumbs.db
+Desktop.ini
