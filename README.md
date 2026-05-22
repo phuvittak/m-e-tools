@@ -16,7 +16,7 @@ A small collection of personal command-line tools for Windows.
 
 ## Status
 
-This repository is a work in progres — more tools will be added over time.
+This repository is a work in progress — more tools will be added over time.
 
 ## License
 
