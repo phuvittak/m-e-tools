@@ -161,10 +161,22 @@
   }
 
   /* ---------- chat widget (rule-based "AI", owner-configurable) ---------- */
+  // accept either strict JSON or the JS-object form copied straight from the Firebase console
+  function parseFbConfig(raw) {
+    raw = (raw || "").trim(); if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) {}
+    try {
+      var j = raw.replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":').replace(/,(\s*[}\]])/g, "$1").replace(/'/g, '"');
+      return JSON.parse(j);
+    } catch (e) {}
+    return null;
+  }
+  global.parseFbConfig = parseFbConfig;
+
   /* ---------- MEChat: real online chat (Firebase) with localStorage fallback ---------- */
   var MEChat = (function () {
     var db = null, ready = false, loading = false, q = [];
-    function rawCfg() { try { var r = (S.getSettings().firebaseConfig || "").trim(); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+    function rawCfg() { return parseFbConfig(S.getSettings().firebaseConfig); }
     function enabled() { return !!rawCfg(); }
     function mode() { return enabled() ? "online" : "local"; }
     function loadScript(src, ok, err) { if (document.querySelector('script[src="' + src + '"]')) { ok(); return; } var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = err || ok; document.head.appendChild(s); }
