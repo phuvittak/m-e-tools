@@ -1,0 +1,294 @@
+/* ============================================================
+   M.E.Tools ท่ารั่ว เชียงใหม่ — Color + Type Foundations
+   Brand: DEWALT-authorized dealer + pro tool shop, Chiang Mai
+   ============================================================ */
+
+/* ---- Webfonts ----
+   Loaded from Google Fonts. If you self-host, drop ttf/woff2
+   into /fonts and swap the imports. Substitutions noted in README.
+*/
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Kanit:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Roboto+Slab:wght@500;700;900&family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* ============================================================
+     CORE PALETTE — DEWALT-derived industrial system
+     ============================================================ */
+
+  /* DEWALT yellow family — the brand's signature. */
+  --dw-yellow:        #FEBD17;  /* DEWALT primary yellow (signage, hi-vis) */
+  --dw-yellow-deep:   #E8A800;  /* hover / pressed / aged sign */
+  --dw-yellow-soft:   #FFD75A;  /* highlight, gradient stops */
+  --dw-yellow-pale:   #FFF1C4;  /* tint backgrounds, callout fills */
+
+  /* Black + concrete neutrals */
+  --ink:              #0B0B0B;  /* near-black — body type, rules, frames */
+  --ink-soft:         #1C1C1C;  /* secondary surface ink */
+  --concrete-900:    #2A2A2A;
+  --concrete-700:    #4A4A4A;
+  --concrete-500:    #7A7A7A;
+  --concrete-300:    #BFBDB8;
+  --concrete-200:    #DAD7D1;
+  --concrete-100:    #ECEAE4;  /* paper / cool off-white */
+  --paper:            #F7F4EC;  /* warm paper, signage backdrop */
+
+  /* Tradesman accents — pulled from the M.E.Tools mascot */
+  --safety-orange:   #F26A1F;   /* vest, "OPEN" tags */
+  --price-red:       #D7261E;   /* SALE / price tags / wordmark accents */
+  --price-red-deep:  #A91C16;
+  --workboot-blue:   #1E3A5F;   /* jeans / overalls accent */
+  --tape-green:      #2E8540;   /* approved / in-stock */
+
+  /* Functional / semantic */
+  --ok:              var(--tape-green);
+  --warn:            var(--dw-yellow-deep);
+  --danger:          var(--price-red);
+  --info:            var(--workboot-blue);
+
+  /* Foreground / background semantic tokens */
+  --fg-1:            var(--ink);             /* default text */
+  --fg-2:            var(--concrete-700);    /* secondary text */
+  --fg-3:            var(--concrete-500);    /* tertiary / captions */
+  --fg-inverse:      var(--paper);           /* text on dark */
+  --fg-on-yellow:    var(--ink);             /* always ink, never white */
+
+  --bg-1:            var(--paper);           /* default page surface */
+  --bg-2:            var(--concrete-100);    /* card surface */
+  --bg-3:            #FFFFFF;                /* elevated surface */
+  --bg-dark:         var(--ink);             /* hero / footer / banners */
+  --bg-brand:        var(--dw-yellow);       /* DEWALT yellow surface */
+
+  --border-1:        var(--ink);             /* heavy 2–4px frames */
+  --border-2:        var(--concrete-300);    /* subtle dividers */
+  --border-3:        var(--concrete-200);
+
+  /* ============================================================
+     TYPE — Display + Body system
+     ============================================================ */
+
+  /* Family stacks */
+  --font-display-en: 'Anton', 'Bebas Neue', 'Oswald', 'Impact', sans-serif;
+  --font-display-th: 'Kanit', 'Bai Jamjuree', 'Sarabun', sans-serif;
+  --font-wordmark:   'Roboto Slab', 'PT Serif', Georgia, serif;
+  --font-body:       'Sarabun', 'IBM Plex Sans Thai', 'Noto Sans Thai', -apple-system, system-ui, sans-serif;
+  --font-mono:       'IBM Plex Mono', 'Roboto Mono', ui-monospace, Menlo, monospace;
+
+  /* Default font is body (handles Thai + Latin) */
+  --font-default:    var(--font-body);
+
+  /* Type scale — assertive, signage-friendly */
+  --fs-display-xl:   clamp(64px, 8vw, 128px);
+  --fs-display-lg:   clamp(48px, 6vw, 88px);
+  --fs-h1:           clamp(36px, 4.4vw, 64px);
+  --fs-h2:           clamp(28px, 3vw, 44px);
+  --fs-h3:           22px;
+  --fs-h4:           18px;
+  --fs-body:         16px;
+  --fs-body-lg:      18px;
+  --fs-small:        14px;
+  --fs-caption:      12px;
+  --fs-overline:     11px;
+
+  /* Line heights */
+  --lh-tight:        0.95;
+  --lh-display:      1.02;
+  --lh-heading:      1.15;
+  --lh-body:         1.55;
+  --lh-loose:        1.7;
+
+  /* Letterspacing */
+  --ls-display:      -0.01em;
+  --ls-overline:     0.16em;
+  --ls-stamp:        0.04em;
+
+  /* ============================================================
+     SPACING — 4px base
+     ============================================================ */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  20px;
+  --s-6:  24px;
+  --s-8:  32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+  --s-20: 80px;
+  --s-24: 96px;
+
+  /* ============================================================
+     RADII — mostly squared (signage / industrial feel)
+     ============================================================ */
+  --radius-0: 0px;       /* default: hard corners */
+  --radius-1: 2px;       /* tiny softening */
+  --radius-2: 4px;       /* inputs */
+  --radius-3: 8px;       /* cards */
+  --radius-pill: 999px;  /* badges only */
+
+  /* ============================================================
+     SHADOWS / ELEVATION — physical, sign-on-wall feel
+     ============================================================ */
+  --shadow-stamp:   0 0 0 2px var(--ink);                 /* hard ink frame */
+  --shadow-heavy:   4px 4px 0 0 var(--ink);               /* offset block shadow */
+  --shadow-card:    0 2px 0 0 var(--concrete-300), 0 8px 18px -8px rgba(0,0,0,.18);
+  --shadow-lifted:  0 12px 28px -10px rgba(0,0,0,.28);
+  --shadow-inset:   inset 0 -3px 0 0 var(--dw-yellow-deep);
+
+  /* ============================================================
+     MOTION
+     ============================================================ */
+  --ease-snap:   cubic-bezier(.2, .8, .2, 1);
+  --ease-stand:  cubic-bezier(.4, 0, .2, 1);
+  --t-fast:      120ms;
+  --t-base:      200ms;
+  --t-slow:      360ms;
+
+  /* ============================================================
+     HAZARD STRIPES — signature pattern
+     ============================================================ */
+  --hazard-stripes: repeating-linear-gradient(
+    -45deg,
+    var(--dw-yellow) 0 22px,
+    var(--ink) 22px 38px
+  );
+  --hazard-stripes-tight: repeating-linear-gradient(
+    -45deg,
+    var(--dw-yellow) 0 12px,
+    var(--ink) 12px 20px
+  );
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT STYLES
+   ============================================================ */
+
+html, body {
+  font-family: var(--font-default);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--fg-1);
+  background: var(--bg-1);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display — bilingual headline lockup.
+   Latin renders in Anton (condensed industrial caps).
+   Thai renders in Kanit (paired industrial-feel Thai).
+   Both fall back gracefully through the family stack. */
+.display, h1.display, .display-xl {
+  font-family: var(--font-display-th), var(--font-display-en);
+  font-weight: 900;
+  font-style: italic;     /* DEWALT-style forward slant */
+  font-size: var(--fs-display-lg);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-display);
+  text-transform: uppercase;
+  color: var(--fg-1);
+}
+
+.display-xl {
+  font-size: var(--fs-display-xl);
+}
+
+h1, .h1 {
+  font-family: var(--font-display-th), var(--font-display-en);
+  font-weight: 800;
+  font-style: italic;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-display);
+  letter-spacing: var(--ls-display);
+  text-transform: uppercase;
+  margin: 0 0 var(--s-4);
+}
+
+h2, .h2 {
+  font-family: var(--font-display-th), var(--font-display-en);
+  font-weight: 800;
+  font-style: italic;
+  font-size: var(--fs-h2);
+  line-height: var(--lh-heading);
+  text-transform: uppercase;
+  margin: 0 0 var(--s-3);
+}
+
+h3, .h3 {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: var(--fs-h3);
+  line-height: var(--lh-heading);
+  margin: 0 0 var(--s-2);
+}
+
+h4, .h4 {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: var(--fs-h4);
+  line-height: var(--lh-heading);
+  margin: 0 0 var(--s-2);
+}
+
+/* Wordmark — the slab-serif "M.E.Tools" word, used sparingly */
+.wordmark {
+  font-family: var(--font-wordmark);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+/* Overline / stamp text — chip labels, captions on signage */
+.overline, .stamp {
+  font-family: var(--font-display-th), var(--font-display-en);
+  font-weight: 700;
+  font-size: var(--fs-overline);
+  letter-spacing: var(--ls-overline);
+  text-transform: uppercase;
+}
+
+p {
+  margin: 0 0 var(--s-3);
+  text-wrap: pretty;
+}
+
+small, .small { font-size: var(--fs-small); color: var(--fg-2); }
+.caption { font-size: var(--fs-caption); color: var(--fg-3); }
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+a:hover { background: var(--dw-yellow); text-decoration: none; }
+
+hr {
+  border: none;
+  height: 4px;
+  background: var(--ink);
+  margin: var(--s-6) 0;
+}
+
+/* ============================================================
+   UTILITY ATOMS
+   ============================================================ */
+
+.bg-yellow   { background: var(--dw-yellow); color: var(--fg-on-yellow); }
+.bg-ink      { background: var(--ink); color: var(--fg-inverse); }
+.bg-paper    { background: var(--paper); color: var(--fg-1); }
+.bg-hazard   { background: var(--hazard-stripes); }
+
+.text-ink     { color: var(--ink); }
+.text-yellow  { color: var(--dw-yellow); }
+.text-red     { color: var(--price-red); }
+.text-muted   { color: var(--fg-2); }
+
+.frame-heavy {
+  border: 3px solid var(--ink);
+}
+.frame-stamp {
+  box-shadow: var(--shadow-stamp);
+}

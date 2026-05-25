@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP / บัญชี — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css">
+</head>
+<body data-admin="erp">
+  <div class="admin" data-shell>
+    <main class="main">
+      <div class="topbar">
+        <div><h1>ระบบ ERP / บัญชี</h1><div class="sub">กำไรขาดทุน · รายรับ-รายจ่าย · ผู้จัดจำหน่าย · รับสินค้าเข้า · ลูกค้า</div></div>
+      </div>
+
+      <div class="kpis" data-pnl></div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>บันทึกรายรับ–รายจ่าย</h2></div>
+        <div class="search-admin">
+          <select data-led-type>
+            <option value="expense">รายจ่าย</option>
+            <option value="income">รายรับ</option>
+          </select>
+          <input data-led-cat type="text" placeholder="หมวด เช่น ค่าเช่า, เงินเดือน, ค่าน้ำไฟ" style="flex:1">
+          <input data-led-note type="text" placeholder="รายละเอียด (ไม่บังคับ)" style="flex:1.4">
+          <input data-led-amt type="number" placeholder="จำนวนเงิน" style="width:140px">
+          <button class="btn" data-led-add>บันทึก</button>
+        </div>
+        <div class="table-wrap" data-ledger></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><h2>ผู้จัดจำหน่าย (Suppliers)</h2></div>
+          <div class="search-admin">
+            <input data-sup-name type="text" placeholder="ชื่อผู้จัดจำหน่าย" style="flex:1">
+            <input data-sup-phone type="text" placeholder="โทร" style="width:120px">
+            <button class="btn" data-sup-add>เพิ่ม</button>
+          </div>
+          <input data-sup-note type="text" placeholder="หมายเหตุ (ไม่บังคับ)" style="width:100%;border:2px solid var(--ink);padding:9px 12px;font-family:var(--font-body);margin-bottom:12px">
+          <div class="table-wrap" data-suppliers></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>รับสินค้าเข้าสต็อก (Purchase)</h2></div>
+          <div class="field"><label>ผู้จัดจำหน่าย</label><select data-po-supplier></select></div>
+          <div class="field"><label>สินค้า</label><select data-po-product></select></div>
+          <div class="f2">
+            <div class="field"><label>จำนวนที่รับเข้า</label><input data-po-qty type="number" min="1" value="1"></div>
+            <div class="field"><label>ต้นทุน/ชิ้น</label><input data-po-cost type="number" min="0"></div>
+          </div>
+          <button class="btn" data-po-add>รับเข้าสต็อก + บันทึกค่าใช้จ่าย</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>ประวัติการรับสินค้าเข้า</h2></div>
+        <div class="table-wrap" data-po-list></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>ลูกค้า / สมาชิก</h2></div>
+        <div class="table-wrap" data-customers></div>
+      </div>
+    </main>
+  </div>
+  <script src="../assets/thai-geo.js"></script>
+  <script src="../assets/store.js"></script>
+  <script src="../assets/ui.js"></script>
+  <script src="../assets/admin.js"></script>
+</body>
+</html>

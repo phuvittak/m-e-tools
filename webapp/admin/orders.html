@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>คำสั่งซื้อ / เช่า — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css">
+</head>
+<body data-admin="orders">
+  <div class="admin" data-shell>
+    <main class="main">
+      <div class="topbar">
+        <div><h1>คำสั่งซื้อ / เช่า</h1><div class="sub" data-osum></div></div>
+        <a class="btn btn-ghost" href="dashboard.html">← แดชบอร์ด</a>
+      </div>
+
+      <div class="panel">
+        <div class="search-admin">
+          <input data-customer type="text" placeholder="ค้นหาลูกค้า: ชื่อ หรือ เบอร์โทร…">
+          <select data-typefilter>
+            <option value="">ทุกประเภท</option>
+            <option value="buy">ซื้อสินค้า</option>
+            <option value="rent">เช่าสินค้า</option>
+          </select>
+          <select data-statusfilter>
+            <option value="">ทุกสถานะ</option>
+            <option value="paid">ชำระแล้ว · รอรับสินค้า</option>
+            <option value="received">ได้รับสินค้าแล้ว</option>
+            <option value="returned">คืนแล้ว</option>
+            <option value="cancelled">ยกเลิก</option>
+          </select>
+          <button class="btn btn-ghost" data-shipcfg>ตั้งค่าค่าจัดส่ง</button>
+        </div>
+        <div class="table-wrap"><table class="data" data-ordtable></table></div>
+      </div>
+    </main>
+  </div>
+  <script src="../assets/thai-geo.js"></script>
+  <script src="../assets/store.js"></script>
+  <script src="../assets/ui.js"></script>
+  <script src="../assets/admin.js"></script>
+</body>
+</html>

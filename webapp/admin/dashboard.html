@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>แดชบอร์ด — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css">
+</head>
+<body data-admin="dashboard">
+  <div class="admin" data-shell>
+    <main class="main">
+      <div class="topbar">
+        <div><h1>แดชบอร์ด</h1><div class="sub">ภาพรวมรายได้ ต้นทุน กำไร และสต็อกสินค้า</div></div>
+        <a class="btn btn-ghost" href="orders.html">ดูคำสั่งซื้อทั้งหมด →</a>
+      </div>
+
+      <div class="kpis" data-kpis></div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><h2>รายได้ 7 วันล่าสุด</h2></div>
+          <div class="chart" data-chart></div>
+          <div class="legend"><span><span class="swatch y"></span> รายได้</span><span><span class="swatch g"></span> กำไร</span></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>สินค้าใกล้หมด</h2></div>
+          <div data-lowstock></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>คำสั่งซื้อล่าสุด</h2><a class="btn btn-sm btn-ghost" href="orders.html">ทั้งหมด</a></div>
+        <div class="table-wrap"><table class="data" data-recent></table></div>
+      </div>
+    </main>
+  </div>
+  <script src="../assets/thai-geo.js"></script>
+  <script src="../assets/store.js"></script>
+  <script src="../assets/ui.js"></script>
+  <script src="../assets/admin.js"></script>
+</body>
+</html>

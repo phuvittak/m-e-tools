@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>สินค้า เช่า & ซื้อ — M.E.Tools ท่ารั่ว เชียงใหม่</title>
+  <meta name="description" content="เลือกซื้อหรือเช่าเครื่องมือช่าง DEWALT, MAKITA, BOSCH และแบรนด์โปรอื่นๆ กรองตามประเภท แบรนด์ และงบได้">
+  <link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="shop">
+  <div data-header></div>
+
+  <main class="shop wrap">
+    <div class="shop-head">
+      <div class="me-overline"><span class="me-overline-bar"></span>เช่า & ซื้อเครื่องมือช่าง</div>
+      <h1 class="me-section-h">สินค้า<span class="me-hl">ทั้งหมด</span></h1>
+    </div>
+
+    <div class="shop-grid">
+      <aside class="filters" data-filters></aside>
+      <section>
+        <div class="search-row">
+          <input class="inp" data-q type="text" placeholder="ค้นหาด้วยชื่อ / แบรนด์ / รหัสสินค้า…">
+          <select class="inp" data-sort style="max-width:200px">
+            <option value="default">เรียง: แนะนำ</option>
+            <option value="price-asc">ราคา: ต่ำ → สูง</option>
+            <option value="price-desc">ราคา: สูง → ต่ำ</option>
+            <option value="name">ชื่อ ก–ฮ</option>
+          </select>
+        </div>
+        <div class="toolbar"><span class="result-count" data-count></span></div>
+        <div class="cards" data-cards></div>
+      </section>
+    </div>
+  </main>
+
+  <div data-footer></div>
+  <script src="assets/thai-geo.js"></script>
+  <script src="assets/store.js"></script>
+  <script src="assets/ui.js"></script>
+  <script src="assets/public.js"></script>
+</body>
+</html>

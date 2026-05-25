@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>คลัง / สต็อก — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css">
+</head>
+<body data-admin="inventory">
+  <div class="admin" data-shell>
+    <main class="main">
+      <div class="topbar">
+        <div><h1>คลัง / สต็อก</h1><div class="sub">จำนวนคงเหลือ ที่จัดเก็บ ต้นทุน และราคาของสินค้าทุกชิ้น</div></div>
+        <button class="btn" data-add>+ เพิ่มสินค้า</button>
+      </div>
+
+      <div class="alert" data-alert style="display:none"></div>
+
+      <div class="panel">
+        <div class="search-admin">
+          <input data-search type="text" placeholder="ค้นหาสินค้า / แบรนด์ / SKU / ที่จัดเก็บ…">
+          <select data-catfilter></select>
+        </div>
+        <div class="table-wrap"><table class="data" data-invtable></table></div>
+      </div>
+    </main>
+  </div>
+  <script src="../assets/thai-geo.js"></script>
+  <script src="../assets/store.js"></script>
+  <script src="../assets/ui.js"></script>
+  <script src="../assets/admin.js"></script>
+</body>
+</html>

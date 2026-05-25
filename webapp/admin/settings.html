@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ตั้งค่าเว็บไซต์ — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css">
+</head>
+<body data-admin="settings">
+  <div class="admin" data-shell>
+    <main class="main">
+      <div class="topbar">
+        <div><h1>ตั้งค่าเว็บไซต์</h1><div class="sub">แก้ไขข้อความ รูป และข้อมูลที่ลูกค้าเห็นบนหน้าร้าน — บันทึกแล้วหน้าร้านอัปเดตทันที</div></div>
+        <button class="btn" data-savesettings>บันทึกทั้งหมด</button>
+      </div>
+
+      <div data-setroot>
+        <div class="panel">
+          <div class="panel-head"><h2>ส่วนหัว (Hero) หน้าแรก</h2></div>
+          <div class="field"><label>ข้อความบรรทัดบน</label><input data-set="heroOverline"></div>
+          <div class="field"><label>หัวข้อใหญ่ (เช่น PRO TOOLS)</label><input data-set="heroTitle"></div>
+          <div class="field"><label>ข้อความพิมพ์ดีด — พิมพ์ 1 ประโยคต่อ 1 บรรทัด (ระบบจะวนพิมพ์ทีละบรรทัด)</label><textarea data-set="heroPhrases" rows="4"></textarea></div>
+          <div class="field"><label>คำโปรยใต้หัวข้อ</label><textarea data-set="heroSub" rows="2"></textarea></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>แบรนด์ในร้าน</h2></div>
+          <div class="field"><label>หัวข้อแบรนด์ (เช่น ครบเครื่องทุกระดับ)</label><input data-set="brandsTagline"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>ข้อมูลร้าน / ส่วนท้าย (Footer)</h2></div>
+          <div class="f2">
+            <div class="field"><label>ชื่อบริษัท</label><input data-set="company"></div>
+            <div class="field"><label>เบอร์โทร</label><input data-set="phone"></div>
+          </div>
+          <div class="field"><label>ที่อยู่</label><input data-set="address"></div>
+          <div class="f2">
+            <div class="field"><label>LINE ID</label><input data-set="line"></div>
+            <div class="field"><label>ลิงก์ Facebook</label><input data-set="facebook"></div>
+          </div>
+          <div class="f2">
+            <div class="field"><label>ลิงก์ Instagram</label><input data-set="instagram"></div>
+            <div class="field"><label>ลิงก์ TikTok</label><input data-set="tiktok"></div>
+          </div>
+          <div class="f2">
+            <div class="field"><label>เวลาทำการ (จันทร์–เสาร์)</label><input data-set="hoursWeek"></div>
+            <div class="field"><label>เวลาทำการ (อาทิตย์)</label><input data-set="hoursSun"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>แบรนด์ในร้าน</h2><button class="btn btn-sm" data-brand-add>+ เพิ่มแบรนด์</button></div>
+          <div class="img-hint" style="margin-bottom:10px">เพิ่ม/แก้/ลบแบรนด์ได้ตามต้องการ — ติ๊ก "เด่น" เพื่อให้เป็นแบรนด์หลัก (มีป้ายศูนย์แท้)</div>
+          <div data-brandlist></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>โปรโมชั่นหน้าแรก (แบนเนอร์ใต้ส่วนหัว)</h2></div>
+          <label class="f-check" style="margin-bottom:10px"><input type="checkbox" data-promo-enabled> เปิดใช้งานแบนเนอร์โปรโมชั่น (ถ้าไม่เปิด หน้าแรกจะไม่มีส่วนนี้)</label>
+          <div class="field"><label>หัวข้อโปรโมชั่น</label><input data-promo-title placeholder="เช่น ลดทั้งร้านต้อนรับหน้าฝน"></div>
+          <div class="field"><label>รายละเอียด</label><textarea data-promo-text rows="2"></textarea></div>
+          <div class="field"><label>รูปโปรโมชั่น (ไม่บังคับ)</label>
+            <div class="img-edit"><div class="img-preview" data-promo-prev></div>
+              <div class="img-edit-controls">
+                <label class="btn btn-ghost btn-sm filebtn">อัปโหลดรูป…<input type="file" accept="image/*" data-promo-file></label>
+                <button type="button" class="btn btn-ghost btn-sm" data-promo-clear>ลบรูป</button>
+              </div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>แฟลชเซล / ลดพิเศษ (นับถอยหลัง · ใต้แบรนด์)</h2><button class="btn btn-sm" data-flash-additem>+ เพิ่มสินค้า</button></div>
+          <label class="f-check" style="margin-bottom:10px"><input type="checkbox" data-flash-enabled> เปิดใช้งานแฟลชเซล</label>
+          <div class="f2">
+            <div class="field"><label>หัวข้อ</label><input data-flash-title></div>
+            <div class="field"><label>สิ้นสุดโปรเมื่อ (วันที่-เวลา)</label><input type="datetime-local" data-flash-end></div>
+          </div>
+          <div class="field"><label>สินค้าที่ลดราคา (เลือกสินค้า · ราคาลด · ราคาเดิม)</label><div data-flashlist></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>QR ชำระเงิน (PromptPay)</h2></div>
+          <div class="field"><label>ชื่อบัญชี / พร้อมเพย์ (แสดงบนหน้าชำระเงิน)</label><input data-set="bankInfo"></div>
+          <div class="img-edit">
+            <div class="img-preview" data-qrprev></div>
+            <div class="img-edit-controls">
+              <label class="btn btn-ghost btn-sm filebtn">อัปโหลดรูป QR…<input type="file" accept="image/*" data-qrfile></label>
+              <button type="button" class="btn btn-ghost btn-sm" data-qrclear>ลบ QR</button>
+              <div class="img-hint">อัปโหลด QR PromptPay จริงของร้าน — ลูกค้าจะเห็น QR นี้ตอนชำระเงิน (ถ้าไม่ใส่ ระบบจะสร้าง QR ตัวอย่างให้)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>แชท AI ตอบลูกค้าอัตโนมัติ</h2><button class="btn btn-sm" data-chatadd>+ เพิ่มกฎ</button></div>
+          <div class="img-hint" style="margin-bottom:10px">เมื่อข้อความลูกค้ามี "คำค้น" (คั่นด้วยจุลภาค ,) ระบบจะตอบด้วยคำตอบที่ตั้งไว้ — เฉพาะเจ้าของร้านแก้ได้</div>
+          <div class="field"><label>ข้อความทักทายเมื่อเปิดแชท</label><textarea data-set="chatGreeting" rows="2"></textarea></div>
+          <div class="field"><label>คำตอบเริ่มต้น (เมื่อไม่ตรงกฎใด)</label><textarea data-set="chatFallback" rows="2"></textarea></div>
+          <div class="field"><label>กฎการตอบ (คำค้น → คำตอบ)</label><div data-chatlist></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>คำถามที่พบบ่อย (FAQ)</h2><button class="btn btn-sm" data-faqadd>+ เพิ่มคำถาม</button></div>
+          <div data-faqlist></div>
+        </div>
+
+        <button class="btn" data-savesettings>บันทึกทั้งหมด</button>
+      </div>
+    </main>
+  </div>
+  <script src="../assets/thai-geo.js"></script>
+  <script src="../assets/store.js"></script>
+  <script src="../assets/ui.js"></script>
+  <script src="../assets/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ติดตามคำสั่งซื้อ — M.E.Tools</title>
+  <link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="orders">
+  <div data-header></div>
+  <main class="orders-page wrap">
+    <div class="shop-head">
+      <div class="me-overline"><span class="me-overline-bar"></span>คำสั่งซื้อ & การเช่า</div>
+      <h1 class="me-section-h">ติดตาม<span class="me-hl">คำสั่งซื้อ</span></h1>
+    </div>
+    <div class="panel" data-confirm hidden style="border-left:6px solid var(--tape-green);margin-bottom:20px">
+      <h3 style="color:var(--tape-green)">✓ รับคำสั่งซื้อแล้ว!</h3>
+      <p style="margin:0;font-family:var(--font-body)">หมายเลขคำสั่งซื้อ: <b data-ids></b> — ทีมงาน M.E.Tools จะติดต่อกลับเพื่อยืนยันการรับของ/จัดส่ง</p>
+    </div>
+    <div data-orders></div>
+  </main>
+  <div data-footer></div>
+  <script src="assets/thai-geo.js"></script>
+  <script src="assets/store.js"></script>
+  <script src="assets/ui.js"></script>
+  <script src="assets/public.js"></script>
+</body>
+</html>
