@@ -5,6 +5,25 @@
   "use strict";
   var S = global.MEStore;
 
+  /* ---------- PWA bootstrap (installable on Android & iOS) ---------- */
+  (function pwa() {
+    try {
+      var base = /\/admin\//.test(location.pathname) ? "../" : "./";
+      var head = document.head;
+      function add(tag, attrs) { var el = document.createElement(tag); for (var k in attrs) el.setAttribute(k, attrs[k]); head.appendChild(el); }
+      if (!document.querySelector("link[rel=manifest]")) add("link", { rel: "manifest", href: base + "manifest.webmanifest" });
+      add("meta", { name: "theme-color", content: "#0B0B0B" });
+      add("meta", { name: "mobile-web-app-capable", content: "yes" });
+      add("meta", { name: "apple-mobile-web-app-capable", content: "yes" });
+      add("meta", { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" });
+      add("meta", { name: "apple-mobile-web-app-title", content: "M.E.Tools" });
+      add("link", { rel: "apple-touch-icon", href: base + "assets/mascot-on-yellow.png" });
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () { navigator.serviceWorker.register(base + "sw.js", { scope: base }).catch(function () {}); });
+      }
+    } catch (e) {}
+  })();
+
   /* ---------- tool icons (inline SVG tiles) ---------------------- */
   var ICONS = {
     drill: '<path d="M3 9h7l2-2h4v4l3 1v3l-3 1v2H8l-1 3H4v-3H3z"/><path d="M16 9V6"/>',

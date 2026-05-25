@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#FEBD17"/>
+  <!-- bottom hazard bar -->
+  <rect x="0" y="446" width="512" height="66" fill="#0B0B0B"/>
+  <g fill="#FEBD17">
+    <polygon points="20,446 70,446 30,512 -20,512"/>
+    <polygon points="120,446 170,446 130,512 80,512"/>
+    <polygon points="220,446 270,446 230,512 180,512"/>
+    <polygon points="320,446 370,446 330,512 280,512"/>
+    <polygon points="420,446 470,446 430,512 380,512"/>
+  </g>
+  <!-- red corner accent -->
+  <rect x="396" y="40" width="76" height="76" fill="#D7261E"/>
+  <!-- centered wrench glyph -->
+  <g transform="translate(96,70) scale(13)" fill="#0B0B0B">
+    <path d="M14.7 6.3a4 4 0 0 0-5 5l-7 7a2.12 2.12 0 1 0 3 3l7-7a4 4 0 0 0 5-5l-2.6 2.6a1.5 1.5 0 0 1-2.1-2.1z"/>
+  </g>
+</svg>

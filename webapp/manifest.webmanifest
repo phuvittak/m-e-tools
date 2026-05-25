@@ -1,0 +1,17 @@
+{
+  "name": "M.E.Tools — เช่า & ซื้อเครื่องมือช่าง DEWALT",
+  "short_name": "M.E.Tools",
+  "description": "ร้านเช่า–ซื้อเครื่องมือช่าง DEWALT และแบรนด์โปร แยกท่ารั่ว เชียงใหม่",
+  "lang": "th",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FEBD17",
+  "theme_color": "#0B0B0B",
+  "categories": ["shopping", "business"],
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "assets/mascot-on-yellow.png", "sizes": "360x380", "type": "image/png", "purpose": "any" }
+  ]
+}
