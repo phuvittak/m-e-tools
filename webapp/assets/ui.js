@@ -161,7 +161,61 @@
   }
 
   /* ---------- chat widget (rule-based "AI", owner-configurable) ---------- */
-  var chatPoll = null;
+  /* ---------- MEChat: real online chat (Firebase) with localStorage fallback ---------- */
+  var MEChat = (function () {
+    var db = null, ready = false, loading = false, q = [];
+    function rawCfg() { try { var r = (S.getSettings().firebaseConfig || "").trim(); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+    function enabled() { return !!rawCfg(); }
+    function mode() { return enabled() ? "online" : "local"; }
+    function loadScript(src, ok, err) { if (document.querySelector('script[src="' + src + '"]')) { ok(); return; } var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = err || ok; document.head.appendChild(s); }
+    function ensure(cb) {
+      if (ready) return cb(true);
+      var c = rawCfg(); if (!c) return cb(false);
+      q.push(cb); if (loading) return; loading = true;
+      var base = "https://www.gstatic.com/firebasejs/10.12.2/";
+      loadScript(base + "firebase-app-compat.js", function () {
+        loadScript(base + "firebase-firestore-compat.js", function () {
+          try { if (!window.firebase) throw 0; if (!firebase.apps.length) firebase.initializeApp(c); db = firebase.firestore(); ready = true; flush(true); }
+          catch (e) { flush(false); }
+        }, function () { flush(false); });
+      }, function () { flush(false); });
+    }
+    function flush(ok) { loading = false; q.splice(0).forEach(function (cb) { cb(ok); }); }
+    function convId() { return S.chatConvId(); }
+    function localSend(id, from, text, meta) {
+      if (from === "user") S.chatPushUser(text, meta.escalated);
+      else if (from === "bot") S.chatPushBot(text);
+      else if (from === "shop") S.chatReplyShop(id, text);
+    }
+    function send(id, from, text, meta) {
+      meta = meta || {};
+      if (mode() === "online") {
+        ensure(function (ok) {
+          if (!ok) return localSend(id, from, text, meta);
+          var ref = db.collection("chats").doc(id), patch = { updatedAt: Date.now(), lastText: text };
+          if (meta.name) patch.name = meta.name; if (meta.email) patch.email = meta.email;
+          if (from === "user" && meta.escalated) patch.needsShop = true;
+          if (from === "shop") patch.needsShop = false;
+          ref.set(patch, { merge: true });
+          ref.collection("messages").add({ from: from, text: text, at: Date.now() });
+        });
+      } else localSend(id, from, text, meta);
+    }
+    function localConv(id, cb) { function emit() { var c = S.chatGetConv(id); cb(c ? c.messages : []); } emit(); var h = function () { emit(); }; window.addEventListener("me-store-change", h); window.addEventListener("storage", h); return function () { window.removeEventListener("me-store-change", h); window.removeEventListener("storage", h); }; }
+    function localList(cb) { function emit() { cb(S.chatList()); } emit(); var h = function () { emit(); }; window.addEventListener("me-store-change", h); window.addEventListener("storage", h); return function () { window.removeEventListener("me-store-change", h); window.removeEventListener("storage", h); }; }
+    function subscribeConv(id, cb) {
+      if (mode() === "online") { var u = function () {}; ensure(function (ok) { if (!ok) { u = localConv(id, cb); return; } u = db.collection("chats").doc(id).collection("messages").orderBy("at").onSnapshot(function (s) { cb(s.docs.map(function (d) { return d.data(); })); }, function () {}); }); return function () { try { u(); } catch (e) {} }; }
+      return localConv(id, cb);
+    }
+    function subscribeList(cb) {
+      if (mode() === "online") { var u = function () {}; ensure(function (ok) { if (!ok) { u = localList(cb); return; } u = db.collection("chats").orderBy("updatedAt", "desc").onSnapshot(function (s) { cb(s.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })); }, function () {}); }); return function () { try { u(); } catch (e) {} }; }
+      return localList(cb);
+    }
+    return { enabled: enabled, mode: mode, convId: convId, send: send, subscribeConv: subscribeConv, subscribeList: subscribeList };
+  })();
+  global.MEChat = MEChat;
+
+  var chatUnsub = null;
   function mountChat() {
     if (document.querySelector("[data-chat]")) return;
     var box = document.createElement("div");
@@ -181,25 +235,27 @@
     box.querySelector("[data-chat-form]").addEventListener("submit", function (e) {
       e.preventDefault();
       var inp = box.querySelector("[data-chat-text]"); var t = inp.value.trim(); if (!t) return;
-      var ans = chatAnswer(t);
-      S.chatPushUser(t, !ans.matched); inp.value = ""; renderChat();
-      setTimeout(function () { S.chatPushBot(ans.text); renderChat(); }, 450);
+      var ans = chatAnswer(t); var s = S.session();
+      var meta = { escalated: !ans.matched, name: (s && s.name) || "ผู้เยี่ยมชม", email: (s && s.email) || "" };
+      MEChat.send(MEChat.convId(), "user", t, meta); inp.value = "";
+      setTimeout(function () { MEChat.send(MEChat.convId(), "bot", ans.text, meta); }, 450);
     });
   }
+  var chatGreeted = false;
   function openChat() {
     var box = document.querySelector("[data-chat]"); if (!box) { mountChat(); box = document.querySelector("[data-chat]"); }
     box.querySelector("[data-chat-panel]").hidden = false;
-    var conv = S.chatCurrent();
-    if (!conv || !conv.messages.length) S.chatPushBot(S.getSettings().chatGreeting);
-    renderChat();
+    if (chatUnsub) chatUnsub();
+    chatUnsub = MEChat.subscribeConv(MEChat.convId(), function (msgs) {
+      renderMsgs(msgs);
+      if (!chatGreeted && (!msgs || !msgs.length)) { chatGreeted = true; var s = S.session(); MEChat.send(MEChat.convId(), "bot", S.getSettings().chatGreeting, { name: (s && s.name) || "ผู้เยี่ยมชม", email: (s && s.email) || "" }); }
+    });
     box.querySelector("[data-chat-text]").focus();
-    if (chatPoll) clearInterval(chatPoll);
-    chatPoll = setInterval(renderChat, 3000); // pick up shop replies
   }
-  function closeChat() { var p = document.querySelector("[data-chat-panel]"); if (p) p.hidden = true; if (chatPoll) { clearInterval(chatPoll); chatPoll = null; } }
-  function renderChat() {
+  function closeChat() { var p = document.querySelector("[data-chat-panel]"); if (p) p.hidden = true; if (chatUnsub) { chatUnsub(); chatUnsub = null; } }
+  function renderMsgs(msgs) {
     var body = document.querySelector("[data-chat-body]"); if (!body) return;
-    var conv = S.chatCurrent(), msgs = conv ? conv.messages : [];
+    msgs = msgs || [];
     body.innerHTML = msgs.map(function (m) {
       var cls = m.from === "user" ? "me" : (m.from === "shop" ? "shop" : "bot");
       return '<div class="me-chat-msg ' + cls + '">' + (m.from === "shop" ? '<span class="chat-who">ร้าน</span>' : "") + esc(m.text) + "</div>";

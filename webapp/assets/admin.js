@@ -398,7 +398,7 @@
   function initSettings() {
     var st = S.getSettings();
     var root = document.querySelector("[data-setroot]");
-    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "phone", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "chatGreeting", "chatFallback", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
+    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "phone", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "chatGreeting", "chatFallback", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
     var openSunEl = root.querySelector("[data-open-sun]"); if (openSunEl) openSunEl.checked = st.openSun !== false;
     var sdays = (st.specialDays || []).map(function (d) { return { date: d.date, open: !!d.open, note: d.note || "" }; });
     var sdayList = root.querySelector("[data-sdaylist]");
@@ -726,35 +726,43 @@
     render();
   }
 
-  /* ===================== CHAT INBOX (LINE-OA style) ===================== */
+  /* ===================== CHAT INBOX (LINE-OA style, real-time) ===================== */
   function initChat() {
     var listEl = document.querySelector("[data-chatlist]");
     var threadEl = document.querySelector("[data-chatthread]");
-    var activeId = null;
+    var activeId = null, convUnsub = null, convs = [];
+    var C = window.MEChat;
+    var modeNote = document.querySelector("[data-chatmode]");
+    if (modeNote) modeNote.textContent = C.mode() === "online" ? "● ออนไลน์ (เรียลไทม์ ข้ามอุปกรณ์)" : "● โหมดออฟไลน์ (ตั้งค่า Firebase ในหน้าตั้งค่าเพื่อใช้ข้ามเครื่อง)";
+    threadEl.innerHTML = '<div class="img-hint" style="padding:20px">เลือกการสนทนาทางซ้ายเพื่อตอบลูกค้า</div>';
+    C.subscribeList(function (list) { convs = list; renderList(); });
     function renderList() {
-      var convs = S.chatList();
       listEl.innerHTML = convs.length ? convs.map(function (c) {
-        var last = c.messages[c.messages.length - 1];
+        var last = (c.messages && c.messages.length) ? c.messages[c.messages.length - 1].text : (c.lastText || "");
         return '<button class="chat-li' + (c.id === activeId ? " on" : "") + (c.needsShop ? " need" : "") + '" data-conv="' + esc(c.id) + '">' +
           '<div class="chat-li-name">' + esc(c.name || "ลูกค้า") + (c.needsShop ? ' <span class="chat-badge">รอตอบ</span>' : "") + "</div>" +
-          '<div class="chat-li-last">' + esc(last ? last.text : "") + "</div></button>";
+          '<div class="chat-li-last">' + esc(last) + "</div></button>";
       }).join("") : '<div class="img-hint" style="padding:14px">ยังไม่มีข้อความจากลูกค้า</div>';
-      listEl.querySelectorAll("[data-conv]").forEach(function (b) { b.onclick = function () { activeId = b.dataset.conv; renderThread(); renderList(); }; });
+      listEl.querySelectorAll("[data-conv]").forEach(function (b) { b.onclick = function () { openConv(b.dataset.conv); }; });
     }
-    function renderThread() {
-      if (!activeId) { threadEl.innerHTML = '<div class="img-hint" style="padding:20px">เลือกการสนทนาทางซ้ายเพื่อตอบลูกค้า</div>'; return; }
-      var c = S.chatGetConv(activeId); if (!c) { threadEl.innerHTML = ""; return; }
+    function openConv(id) {
+      activeId = id; renderList();
+      if (convUnsub) convUnsub();
+      convUnsub = C.subscribeConv(id, function (msgs) { renderThread(id, msgs); });
+    }
+    function renderThread(id, msgs) {
+      var c = convs.filter(function (x) { return x.id === id; })[0] || {};
+      var prev = threadEl.querySelector("[data-replytext]"); var pv = prev ? prev.value : ""; var focused = prev && document.activeElement === prev;
       threadEl.innerHTML = '<div class="chat-thread-head">' + esc(c.name || "ลูกค้า") + (c.email ? " · " + esc(c.email) : "") + "</div>" +
-        '<div class="chat-thread-body" data-tbody>' + c.messages.map(function (m) {
+        '<div class="chat-thread-body" data-tbody>' + (msgs || []).map(function (m) {
           var cls = m.from === "user" ? "them" : (m.from === "shop" ? "meShop" : "bot");
           return '<div class="me-chat-msg ' + cls + '">' + (m.from === "bot" ? '<span class="chat-who">AI</span>' : "") + esc(m.text) + "</div>";
         }).join("") + "</div>" +
         '<form class="chat-thread-input" data-reply><input data-replytext placeholder="พิมพ์ตอบลูกค้า…" autocomplete="off"><button class="btn" type="submit">ส่ง</button></form>';
       var tb = threadEl.querySelector("[data-tbody]"); tb.scrollTop = tb.scrollHeight;
-      threadEl.querySelector("[data-reply]").onsubmit = function (e) { e.preventDefault(); var i = threadEl.querySelector("[data-replytext]"); var t = i.value.trim(); if (!t) return; S.chatReplyShop(activeId, t); i.value = ""; renderThread(); renderList(); };
+      var ri = threadEl.querySelector("[data-replytext]"); ri.value = pv; if (focused) ri.focus();
+      threadEl.querySelector("[data-reply]").onsubmit = function (e) { e.preventDefault(); var t = ri.value.trim(); if (!t) return; C.send(id, "shop", t, {}); ri.value = ""; };
     }
-    renderList(); renderThread();
-    setInterval(function () { renderList(); var i = threadEl.querySelector("[data-replytext]"); if (activeId && (!i || (document.activeElement !== i && !i.value))) renderThread(); }, 3000);
   }
 
   // confirm-with-PIN before deleting data

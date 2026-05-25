@@ -58,6 +58,22 @@ URL ปัจจุบันคือ `phuvittak.github.io/m-e-tools`. ถ้า
 2. ตั้งค่า DNS ของโดเมน: apex → A records `185.199.108–111.153` (และ AAAA), หรือ `www` → CNAME `phuvittak.github.io`
 3. GitHub → repo Settings → Pages → **Custom domain** ใส่โดเมน แล้วรอออก HTTPS
 
+## แชทออนไลน์จริง (ข้ามเครื่อง · เรียลไทม์)
+
+แชทลูกค้า–ร้าน ทำงาน **ข้ามอุปกรณ์แบบเรียลไทม์** ได้เมื่อต่อ **Firebase Firestore** (ฟรี):
+
+1. สร้างโปรเจกต์ที่ https://console.firebase.google.com → Add project
+2. เปิด **Firestore Database** (Build → Firestore Database → Create) เลือกโหมดทดสอบ
+3. Project settings → Your apps → Web (`</>`) → คัดลอกก้อน `firebaseConfig` (JSON)
+4. นำไปวางในเว็บ: **ระบบหลังร้าน → ตั้งค่าเว็บไซต์ → ความปลอดภัย & เชื่อมต่อบัญชี → Firebase Config** แล้วบันทึก
+5. เพิ่ม domain ของเว็บใน Firebase → Authentication/Hosting authorized domains (ถ้าจำเป็น)
+
+จากนั้นลูกค้าทุกเครื่องกับเจ้าของร้านจะเห็นข้อความกันแบบเรียลไทม์ทันที
+(ถ้าไม่ใส่ Firebase แชทจะทำงานแบบเฉพาะเครื่องเหมือนเดิม)
+
+> **กฎความปลอดภัย Firestore (เริ่มต้น):** โหมดทดสอบเปิดให้อ่าน/เขียนได้ชั่วคราว —
+> ก่อนใช้จริงควรตั้งกฎจำกัดสิทธิ์ คอลเลกชัน `chats` ให้เหมาะสม
+
 ## เครื่องมือบรรทัดคำสั่ง (`tools/`)
 
 | Tool | Description |

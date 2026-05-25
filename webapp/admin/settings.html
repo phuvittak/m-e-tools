@@ -107,6 +107,10 @@
           <div class="field"><label>รหัสยืนยันการลบข้อมูล (ใช้ตอนลบคำสั่งซื้อ/ใบรับเข้า)</label><input data-set="deletePin"></div>
           <div class="field"><label>Google Client ID (สำหรับปุ่มเข้าสู่ระบบด้วย Google — เว้นว่างถ้ายังไม่ใช้)</label><input data-set="googleClientId" placeholder="xxxxx.apps.googleusercontent.com"></div>
           <div class="field"><label>Facebook App ID (สำหรับปุ่มเข้าสู่ระบบด้วย Facebook)</label><input data-set="facebookAppId"></div>
+          <div class="field"><label>Firebase Config (สำหรับแชทออนไลน์จริงข้ามเครื่อง — วางทั้งก้อน JSON จาก Firebase Console)</label>
+            <textarea data-set="firebaseConfig" rows="6" placeholder='{ "apiKey": "...", "authDomain": "...", "projectId": "...", "storageBucket": "...", "messagingSenderId": "...", "appId": "..." }'></textarea>
+            <div class="img-hint">ถ้าเว้นว่าง แชทจะทำงานแบบเฉพาะเครื่อง (offline). ใส่ค่าแล้วลูกค้าทุกเครื่องกับเจ้าของจะคุยกันแบบเรียลไทม์</div>
+          </div>
         </div>
 
         <div class="panel">

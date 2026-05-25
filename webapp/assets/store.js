@@ -179,6 +179,7 @@
     authRegTitle: "สมัครสมาชิก", authRegSub: "สมัครสมาชิกร้าน M.E.Tools เพื่อสั่งซื้อ/เช่าเครื่องมือและติดตามคำสั่งซื้อได้ง่ายขึ้น",
     deletePin: "1234",
     googleClientId: "", facebookAppId: "",
+    firebaseConfig: "", // paste Firebase web config JSON to enable real online chat
     qrImage: "",
     bankInfo: "พร้อมเพย์ M.E.Tools",
     chatGreeting: "สวัสดีครับ M.E.Tools ยินดีให้บริการ พิมพ์คำถามได้เลยครับ 😊",
