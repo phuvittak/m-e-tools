@@ -10,14 +10,21 @@
   <div data-header></div>
   <main class="auth-wrap">
     <form class="auth-card" data-register>
-      <h1>สมัครสมาชิก</h1>
-      <p class="auth-sub">สมัครสมาชิกร้าน M.E.Tools เพื่อสั่งซื้อ/เช่าเครื่องมือและติดตามคำสั่งซื้อได้ง่ายขึ้น</p>
+      <h1 data-auth-title>สมัครสมาชิก</h1>
+      <p class="auth-sub" data-auth-sub>สมัครสมาชิกร้าน M.E.Tools เพื่อสั่งซื้อ/เช่าเครื่องมือและติดตามคำสั่งซื้อได้ง่ายขึ้น</p>
       <div class="field"><label>ชื่อ-นามสกุล</label><input data-name type="text" placeholder="เช่น สมชาย ใจดี"></div>
       <div class="field"><label>อีเมล</label><input data-email type="email" placeholder="you@example.com" autocomplete="username"></div>
-      <div class="field"><label>เบอร์โทร</label><input data-phone type="tel" placeholder="08X-XXX-XXXX"></div>
+      <div class="field"><label>เบอร์โทร</label>
+        <div class="otp-row"><input data-phone type="tel" placeholder="08X-XXX-XXXX"><button type="button" class="me-btn me-btn-sm" data-otp-send>ส่ง OTP</button></div>
+        <div class="otp-verify" data-otp-box hidden><input data-otp type="text" inputmode="numeric" maxlength="6" placeholder="กรอกรหัส OTP 6 หลัก"><button type="button" class="me-btn me-btn-sm" data-otp-check>ยืนยัน</button></div>
+        <div class="otp-status" data-otp-status></div>
+      </div>
       <div class="field"><label>รหัสผ่าน</label><input data-pass type="password" placeholder="••••••••" autocomplete="new-password"></div>
       <div class="field"><label>ยืนยันรหัสผ่าน</label><input data-pass2 type="password" placeholder="••••••••" autocomplete="new-password"></div>
       <button class="me-btn me-btn-block" type="submit">สมัครสมาชิก</button>
+      <div class="auth-or"><span>หรือ</span></div>
+      <button type="button" class="social-btn google" data-social="google"><span class="social-ic">G</span> สมัคร/เข้าสู่ระบบด้วย Google</button>
+      <button type="button" class="social-btn facebook" data-social="facebook"><span class="social-ic">f</span> สมัคร/เข้าสู่ระบบด้วย Facebook</button>
       <div class="auth-alt">มีบัญชีอยู่แล้ว? <a href="login.html">เข้าสู่ระบบ</a></div>
     </form>
   </main>

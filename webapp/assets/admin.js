@@ -11,10 +11,12 @@
   if (view === "staff") {
     if (!S.requirePerm(null, "../login.html")) return;
     if (!S.isOwner()) { window.location.href = "dashboard.html"; return; }
+  } else if (view === "chat") {
+    if (!S.requirePerm(null, "../login.html")) return; // any staff
   } else if (!S.requirePerm(permFor[view] || "dashboard", "../login.html")) return;
 
   mountShell(view);
-  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff }[view] || function () {})();
+  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat }[view] || function () {})();
 
   /* ---------- shell / sidebar ---------- */
   function mountShell(active) {
@@ -26,6 +28,7 @@
       erp: '<path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-6"/>',
       settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
       staff: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+      chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     };
     var nav = [
       ["dashboard.html", "dashboard", "แดชบอร์ด", "dashboard"],
@@ -34,12 +37,13 @@
       ["erp.html", "erp", "ระบบ ERP / บัญชี", "erp"],
       ["settings.html", "settings", "ตั้งค่าเว็บไซต์", "settings"],
     ].filter(function (n) { return S.hasPerm(n[3]); });
+    nav.push(["chat.html", "chat", "แชทลูกค้า", "chat"]);
     if (S.isOwner()) nav.push(["staff.html", "staff", "จัดการทีมงาน", "staff"]);
 
     var roleTag = sess.role === "owner" ? "เจ้าของร้าน" : "พนักงาน";
     var side =
       '<aside class="side"><div class="side-brand">M.E.<span>T</span>ools</div>' +
-      '<div class="side-tag">ระบบหลังร้าน · ท่ารั่ว</div>' +
+      '<div class="side-tag">ระบบหลังร้าน · ท่ารั้ว</div>' +
       '<nav class="side-nav">' +
       nav.map(function (n) {
         return '<a href="' + n[0] + '" class="' + (active === n[1] ? "on" : "") + '">' +
@@ -47,15 +51,11 @@
       }).join("") + "</nav>" +
       '<div class="side-foot"><div class="side-user">' + roleTag + "<b>" + sess.name + "</b></div>" +
       '<a href="../index.html" target="_blank">↗ ดูหน้าร้าน</a>' +
-      '<button data-reset>↺ รีเซ็ตข้อมูลตัวอย่าง</button>' +
       '<button data-logout>⎋ ออกจากระบบ</button></div></aside>';
 
     var shell = document.querySelector("[data-shell]");
     shell.insertAdjacentHTML("afterbegin", side);
     document.querySelector("[data-logout]").addEventListener("click", function () { S.logout(); window.location.href = "../login.html"; });
-    document.querySelector("[data-reset]").addEventListener("click", function () {
-      if (confirm("รีเซ็ตข้อมูลสินค้าและคำสั่งซื้อทั้งหมดกลับเป็นค่าตัวอย่าง?")) { S.resetAll(); location.reload(); }
-    });
   }
 
   /* ===================== DASHBOARD ===================== */
@@ -334,6 +334,7 @@
             "<td>" + adminStatusBadges(o) + (o.staffMessage ? '<br><span class="prod-sku">📩 ' + esc(o.staffMessage) + "</span>" : "") + "</td>" +
             '<td><div class="ord-act">' + (opts ? '<select class="statussel" data-os="' + o.id + '">' + opts + "</select>" : '<span class="prod-sku">—</span>') +
               '<div class="ord-msg"><input data-msg="' + o.id + '" value="' + esc(o.staffMessage || "") + '" placeholder="ตอบลูกค้า เช่น ของถึงใน 2 วัน"><button class="btn btn-sm" data-sendmsg="' + o.id + '">ส่ง</button></div>' +
+              (S.isOwner() ? '<button class="btn btn-sm btn-danger" data-delorder="' + o.id + '">ลบคำสั่งซื้อ</button>' : "") +
             "</div></td></tr>";
         }).join("") + "</tbody>";
 
@@ -352,6 +353,9 @@
           S.saveOrderMessage(b.dataset.sendmsg, inp.value.trim());
           U.toast("ส่งข้อความถึงลูกค้าแล้ว · แจ้งอีเมล (จำลอง)", "ok"); render();
         };
+      });
+      tb.querySelectorAll("[data-delorder]").forEach(function (b) {
+        b.onclick = function () { askPin("ลบคำสั่งซื้อ " + b.dataset.delorder, function () { S.deleteOrder(b.dataset.delorder); U.toast("ลบคำสั่งซื้อแล้ว", "ok"); render(); }); };
       });
     }
     render();
@@ -394,7 +398,22 @@
   function initSettings() {
     var st = S.getSettings();
     var root = document.querySelector("[data-setroot]");
-    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "phone", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "chatGreeting", "chatFallback"];
+    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "phone", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "chatGreeting", "chatFallback", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
+    var openSunEl = root.querySelector("[data-open-sun]"); if (openSunEl) openSunEl.checked = st.openSun !== false;
+    var sdays = (st.specialDays || []).map(function (d) { return { date: d.date, open: !!d.open, note: d.note || "" }; });
+    var sdayList = root.querySelector("[data-sdaylist]");
+    function syncSdays() { if (!sdayList) return; sdayList.querySelectorAll("[data-sd]").forEach(function (r) { var i = +r.getAttribute("data-sd"); sdays[i].date = r.querySelector("[data-sd-date]").value; sdays[i].open = r.querySelector("[data-sd-open]").checked; sdays[i].note = r.querySelector("[data-sd-note]").value; }); }
+    function renderSdays() {
+      if (!sdayList) return;
+      sdayList.innerHTML = sdays.map(function (d, i) {
+        return '<div class="row-edit" data-sd="' + i + '"><input type="date" data-sd-date value="' + esc(d.date || "") + '">' +
+          '<label class="f-check"><input type="checkbox" data-sd-open' + (d.open ? " checked" : "") + "> เปิด</label>" +
+          '<input data-sd-note value="' + esc(d.note || "") + '" placeholder="หมายเหตุ เช่น หยุดสงกรานต์" style="flex:1">' +
+          '<button class="btn btn-sm btn-danger" data-sd-del="' + i + '">ลบ</button></div>';
+      }).join("");
+      sdayList.querySelectorAll("[data-sd-del]").forEach(function (b) { b.onclick = function () { syncSdays(); sdays.splice(+b.dataset.sdDel, 1); renderSdays(); }; });
+    }
+    if (sdayList) { renderSdays(); root.querySelector("[data-sday-add]").addEventListener("click", function () { syncSdays(); sdays.push({ date: "", open: false, note: "" }); renderSdays(); }); }
     simpleKeys.forEach(function (k) { var el = root.querySelector('[data-set="' + k + '"]'); if (el) el.value = st[k] || ""; });
     var phrasesEl = root.querySelector('[data-set="heroPhrases"]'); if (phrasesEl) phrasesEl.value = (st.heroPhrases || []).join("\n");
 
@@ -514,9 +533,11 @@
     }
 
     function doSave() {
-      syncFaq(); syncBrands(); syncFlashItems(); syncChat();
+      syncFaq(); syncBrands(); syncFlashItems(); syncChat(); syncSdays();
       var patch = {};
       simpleKeys.forEach(function (k) { var el = root.querySelector('[data-set="' + k + '"]'); patch[k] = el ? el.value : st[k]; });
+      if (openSunEl) patch.openSun = openSunEl.checked;
+      patch.specialDays = sdays.filter(function (d) { return d.date; });
       patch.heroPhrases = phrasesEl.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
       patch.faq = faq.filter(function (f) { return (f.q || "").trim(); });
       patch.chatRules = chat.filter(function (c) { return (c.keywords || "").trim() && (c.answer || "").trim(); });
@@ -540,7 +561,26 @@
   /* ===================== ERP / ACCOUNTING ===================== */
   function initErp() {
     var permLbl = { income: "รายรับ", expense: "รายจ่าย" };
-    renderPnl(); renderLedger(); renderSuppliers(); renderPO(); renderCustomers();
+    renderPnl(); renderLedger(); renderSuppliers(); renderPO(); renderCustomers(); renderSales();
+    document.querySelector("[data-salesperiod]").addEventListener("change", renderSales);
+
+    function periodStart(p) {
+      var d = new Date(); d.setHours(0, 0, 0, 0);
+      if (p === "week") { var dow = (d.getDay() + 6) % 7; return d.getTime() - dow * 86400000; }
+      if (p === "month") { d.setDate(1); return d.getTime(); }
+      if (p === "year") { d.setMonth(0, 1); return d.getTime(); }
+      return d.getTime();
+    }
+    function renderSales() {
+      var p = document.querySelector("[data-salesperiod]").value, start = periodStart(p);
+      var os = S.getOrders().filter(function (o) { return o.status !== "cancelled" && o.createdAt >= start; });
+      var total = os.reduce(function (s, o) { return s + (o.revenue || 0); }, 0);
+      document.querySelector("[data-salesreport]").innerHTML =
+        '<div class="kpis" style="margin-bottom:16px">' + kpi("accent", "ยอดขายรวม", S.money(total), "") + kpi("", "จำนวนคำสั่งซื้อ", os.length + " รายการ", "") + "</div>" +
+        '<div class="table-wrap"><table class="data"><thead><tr><th>เลขที่คำสั่งซื้อ</th><th>วันที่</th><th>ลูกค้า</th><th class=num>ยอด</th></tr></thead><tbody>' +
+        (os.length ? os.map(function (o) { return "<tr><td><b>" + o.id + "</b></td><td>" + S.fmtDate(o.createdAt) + "</td><td>" + esc(o.customer.name) + '</td><td class="num">' + S.money(o.total) + "</td></tr>"; }).join("") : '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--fg-2)">ไม่มีคำสั่งซื้อในช่วงนี้</td></tr>') +
+        "</tbody></table></div>";
+    }
 
     function renderPnl() {
       var p = S.getPnL();
@@ -587,9 +627,11 @@
       prodSel.innerHTML = S.getProducts().map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + " (" + p.sku + ")</option>"; }).join("");
       supSel.innerHTML = '<option value="">— ไม่ระบุ —</option>' + S.getSuppliers().map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + "</option>"; }).join("");
       var first = S.getProducts()[0]; document.querySelector("[data-po-cost]").value = first ? first.cost : "";
-      var purch = S.getPurchases();
-      document.querySelector("[data-po-list]").innerHTML = "<table class=\"data\"><thead><tr><th>เลขที่</th><th>วันที่</th><th>ผู้จัดจำหน่าย</th><th>รายการ</th><th class=num>รวมต้นทุน</th></tr></thead><tbody>" +
-        (purch.length ? purch.map(function (po) { return "<tr><td>" + po.id + "</td><td>" + S.fmtDate(po.date) + "</td><td>" + esc(po.supplierName || "-") + "</td><td>" + po.items.map(function (it) { return esc(it.name) + " ×" + it.qty; }).join("<br>") + '</td><td class="num">' + S.money(po.total) + "</td></tr>"; }).join("") : '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--fg-2)">ยังไม่มีการรับสินค้าเข้า</td></tr>') + "</tbody></table>";
+      var purch = S.getPurchases(), owner = S.isOwner();
+      var el = document.querySelector("[data-po-list]");
+      el.innerHTML = "<table class=\"data\"><thead><tr><th>เลขที่</th><th>วันที่</th><th>ผู้จัดจำหน่าย</th><th>รายการ</th><th class=num>รวมต้นทุน</th>" + (owner ? "<th></th>" : "") + "</tr></thead><tbody>" +
+        (purch.length ? purch.map(function (po) { return "<tr><td>" + po.id + "</td><td>" + S.fmtDate(po.date) + "</td><td>" + esc(po.supplierName || "-") + "</td><td>" + po.items.map(function (it) { return esc(it.name) + " ×" + it.qty; }).join("<br>") + '</td><td class="num">' + S.money(po.total) + "</td>" + (owner ? '<td><button class="btn btn-sm btn-danger" data-delpo="' + po.id + '">ลบ</button></td>' : "") + "</tr>"; }).join("") : '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--fg-2)">ยังไม่มีการรับสินค้าเข้า</td></tr>') + "</tbody></table>";
+      el.querySelectorAll("[data-delpo]").forEach(function (b) { b.onclick = function () { askPin("ลบใบรับสินค้าเข้า " + b.dataset.delpo, function () { S.deletePurchase(b.dataset.delpo); U.toast("ลบแล้ว", "ok"); renderPO(); renderPnl(); }); }; });
     }
     document.querySelector("[data-po-product]").addEventListener("change", function () { var p = S.getProduct(this.value); document.querySelector("[data-po-cost]").value = p ? p.cost : ""; });
     document.querySelector("[data-po-add]").onclick = function () {
@@ -601,14 +643,41 @@
       U.toast("รับสินค้าเข้าสต็อกแล้ว +" + qty + " ชิ้น", "ok"); renderPO(); renderPnl(); renderLedger();
     };
     function renderCustomers() {
-      var users = S.getUsers(), orders = S.getOrders();
-      document.querySelector("[data-customers]").innerHTML = "<table class=\"data\"><thead><tr><th>ชื่อ</th><th>อีเมล</th><th>โทร</th><th class=num>คำสั่งซื้อ</th><th class=num>ยอดรวม</th></tr></thead><tbody>" +
-        (users.length ? users.map(function (u) {
-          var os = orders.filter(function (o) { return o.customer && o.customer.phone === u.phone; });
-          var tot = os.reduce(function (s, o) { return s + (o.status !== "cancelled" ? o.total : 0); }, 0);
-          return "<tr><td>" + esc(u.name) + "</td><td>" + esc(u.email) + "</td><td>" + esc(u.phone || "") + '</td><td class="num">' + os.length + '</td><td class="num">' + S.money(tot) + "</td></tr>";
-        }).join("") : '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--fg-2)">ยังไม่มีสมาชิก</td></tr>') + "</tbody></table>";
+      var box = document.querySelector("[data-customers]");
+      function ordersOf(u) { return S.getOrders().filter(function (o) { return custMatch(o, u); }); }
+      function draw(q) {
+        var rows = S.getUsers().map(function (u) { var os = ordersOf(u); var tot = os.reduce(function (s, o) { return s + (o.status !== "cancelled" ? o.total : 0); }, 0); return { u: u, os: os, tot: tot }; });
+        if (q) rows = rows.filter(function (x) { return x.os.some(function (o) { return o.items.some(function (it) { return it.name.toLowerCase().indexOf(q) >= 0; }); }); });
+        rows.sort(function (a, b) { return b.tot - a.tot; });
+        box.innerHTML = '<div class="search-admin"><input data-custsearch type="text" placeholder="ค้นหาว่าใครซื้อสินค้าอะไร เช่น สว่าน" value="' + esc(q || "") + '"></div>' +
+          "<table class=\"data\"><thead><tr><th>อันดับ</th><th>ชื่อ</th><th>อีเมล</th><th>โทร</th><th class=num>คำสั่งซื้อ</th><th class=num>ยอดรวม</th><th></th></tr></thead><tbody>" +
+          (rows.length ? rows.map(function (x, i) { return "<tr><td><b>#" + (i + 1) + "</b></td><td>" + esc(x.u.name) + "</td><td>" + esc(x.u.email) + "</td><td>" + esc(x.u.phone || "") + '</td><td class="num">' + x.os.length + '</td><td class="num">' + S.money(x.tot) + '</td><td><button class="btn btn-sm btn-ghost" data-custview="' + esc(x.u.email) + '">ดู</button></td></tr>'; }).join("") : '<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--fg-2)">ไม่พบลูกค้า</td></tr>') + "</tbody></table>";
+        var si = box.querySelector("[data-custsearch]");
+        si.oninput = function () { var v = si.value.trim().toLowerCase(); draw(v); var n = box.querySelector("[data-custsearch]"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); };
+        box.querySelectorAll("[data-custview]").forEach(function (b) { b.onclick = function () { openCustomer(b.dataset.custview); }; });
+      }
+      draw("");
     }
+  }
+  function custMatch(o, u) {
+    var oe = (o.userEmail || (o.customer && o.customer.email) || "").toLowerCase();
+    return (oe && oe === (u.email || "").toLowerCase()) || (o.customer && o.customer.phone && u.phone && o.customer.phone === u.phone);
+  }
+  function openCustomer(email) {
+    var u = S.getUsers().filter(function (x) { return x.email === email; })[0]; if (!u) return;
+    var orders = S.getOrders().filter(function (o) { return custMatch(o, u); });
+    function body(q) {
+      var rows = []; orders.forEach(function (o) { o.items.forEach(function (it) { if (q && it.name.toLowerCase().indexOf(q) < 0) return; rows.push({ o: o, it: it }); }); });
+      var spent = orders.reduce(function (s, o) { return s + (o.status !== "cancelled" ? o.total : 0); }, 0);
+      return '<div style="font-family:var(--font-body);margin:0 0 10px">' + esc(u.email) + (u.phone ? " · " + esc(u.phone) : "") + " · ยอดซื้อรวม <b>" + S.money(spent) + "</b></div>" +
+        '<div class="field"><input data-itemsearch placeholder="ค้นหาสินค้าที่ลูกค้าคนนี้ซื้อ เช่น สว่าน" value="' + esc(q || "") + '"></div>' +
+        "<table class=\"data\"><thead><tr><th>คำสั่งซื้อ</th><th>วันที่</th><th>สินค้า</th><th class=num>จำนวน</th><th class=num>ราคา</th></tr></thead><tbody>" +
+        (rows.length ? rows.map(function (r) { return "<tr><td>" + r.o.id + "</td><td>" + S.fmtDate(r.o.createdAt) + "</td><td>" + esc(r.it.name) + '</td><td class="num">' + r.it.qty + '</td><td class="num">' + S.money(r.it.unitPrice * r.it.qty * (r.it.days || 1)) + "</td></tr>"; }).join("") : '<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--fg-2)">ไม่พบสินค้า</td></tr>') + "</tbody></table>";
+    }
+    openModal("ลูกค้า: " + u.name, body(""), function () { return true; });
+    var mb = document.querySelector(".modal-bg .modal-body");
+    function rewire() { var si = mb.querySelector("[data-itemsearch]"); if (!si) return; si.oninput = function () { var v = si.value.trim().toLowerCase(); mb.innerHTML = body(v); rewire(); var n = mb.querySelector("[data-itemsearch]"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }; }
+    rewire();
   }
 
   /* ===================== STAFF MANAGEMENT (owner) ===================== */
@@ -655,6 +724,45 @@
       };
     }
     render();
+  }
+
+  /* ===================== CHAT INBOX (LINE-OA style) ===================== */
+  function initChat() {
+    var listEl = document.querySelector("[data-chatlist]");
+    var threadEl = document.querySelector("[data-chatthread]");
+    var activeId = null;
+    function renderList() {
+      var convs = S.chatList();
+      listEl.innerHTML = convs.length ? convs.map(function (c) {
+        var last = c.messages[c.messages.length - 1];
+        return '<button class="chat-li' + (c.id === activeId ? " on" : "") + (c.needsShop ? " need" : "") + '" data-conv="' + esc(c.id) + '">' +
+          '<div class="chat-li-name">' + esc(c.name || "ลูกค้า") + (c.needsShop ? ' <span class="chat-badge">รอตอบ</span>' : "") + "</div>" +
+          '<div class="chat-li-last">' + esc(last ? last.text : "") + "</div></button>";
+      }).join("") : '<div class="img-hint" style="padding:14px">ยังไม่มีข้อความจากลูกค้า</div>';
+      listEl.querySelectorAll("[data-conv]").forEach(function (b) { b.onclick = function () { activeId = b.dataset.conv; renderThread(); renderList(); }; });
+    }
+    function renderThread() {
+      if (!activeId) { threadEl.innerHTML = '<div class="img-hint" style="padding:20px">เลือกการสนทนาทางซ้ายเพื่อตอบลูกค้า</div>'; return; }
+      var c = S.chatGetConv(activeId); if (!c) { threadEl.innerHTML = ""; return; }
+      threadEl.innerHTML = '<div class="chat-thread-head">' + esc(c.name || "ลูกค้า") + (c.email ? " · " + esc(c.email) : "") + "</div>" +
+        '<div class="chat-thread-body" data-tbody>' + c.messages.map(function (m) {
+          var cls = m.from === "user" ? "them" : (m.from === "shop" ? "meShop" : "bot");
+          return '<div class="me-chat-msg ' + cls + '">' + (m.from === "bot" ? '<span class="chat-who">AI</span>' : "") + esc(m.text) + "</div>";
+        }).join("") + "</div>" +
+        '<form class="chat-thread-input" data-reply><input data-replytext placeholder="พิมพ์ตอบลูกค้า…" autocomplete="off"><button class="btn" type="submit">ส่ง</button></form>';
+      var tb = threadEl.querySelector("[data-tbody]"); tb.scrollTop = tb.scrollHeight;
+      threadEl.querySelector("[data-reply]").onsubmit = function (e) { e.preventDefault(); var i = threadEl.querySelector("[data-replytext]"); var t = i.value.trim(); if (!t) return; S.chatReplyShop(activeId, t); i.value = ""; renderThread(); renderList(); };
+    }
+    renderList(); renderThread();
+    setInterval(function () { renderList(); var i = threadEl.querySelector("[data-replytext]"); if (activeId && (!i || (document.activeElement !== i && !i.value))) renderThread(); }, 3000);
+  }
+
+  // confirm-with-PIN before deleting data
+  function askPin(title, onOk) {
+    openModal(title || "ยืนยันการลบ",
+      '<p style="font-family:var(--font-body);margin:0 0 10px">การลบนี้ลบถาวร — กรุณากรอกรหัสยืนยันการลบ (ตั้งได้ในหน้าตั้งค่า → ความปลอดภัย)</p>' +
+      '<div class="field"><label>รหัสยืนยันการลบ</label><input type="password" data-pin autocomplete="off"></div>',
+      function (root) { if (!S.checkPin(root.querySelector("[data-pin]").value)) { U.toast("รหัสไม่ถูกต้อง", "err"); return false; } onOk(); return true; });
   }
 
   /* ---------- generic modal ---------- */

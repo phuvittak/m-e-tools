@@ -1,7 +1,7 @@
 {
   "name": "M.E.Tools — เช่า & ซื้อเครื่องมือช่าง DEWALT",
   "short_name": "M.E.Tools",
-  "description": "ร้านเช่า–ซื้อเครื่องมือช่าง DEWALT และแบรนด์โปร แยกท่ารั่ว เชียงใหม่",
+  "description": "ร้านเช่า–ซื้อเครื่องมือช่าง DEWALT และแบรนด์โปร แยกท่ารั้ว เชียงใหม่",
   "lang": "th",
   "start_url": "./index.html",
   "scope": "./",

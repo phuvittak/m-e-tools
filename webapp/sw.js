@@ -1,6 +1,6 @@
 /* M.E.Tools service worker — offline app shell + runtime cache.
    Scope = the folder this file lives in (the app root). */
-var CACHE = "metools-v1";
+var CACHE = "metools-v2";
 var CORE = [
   "./", "index.html", "shop.html", "product.html", "cart.html", "orders.html",
   "login.html", "register.html", "manifest.webmanifest",
@@ -31,20 +31,13 @@ self.addEventListener("fetch", function (e) {
   var url = new URL(req.url);
   // let cross-origin (e.g. jsdelivr address dataset) go straight to network
   if (url.origin !== self.location.origin) return;
-  if (req.mode === "navigate") {
-    // network-first for pages, fall back to cache/offline
-    e.respondWith(
-      fetch(req).then(function (res) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); return res; })
-        .catch(function () { return caches.match(req).then(function (m) { return m || caches.match("index.html"); }); })
-    );
-    return;
-  }
-  // cache-first for static assets
+  // network-first for everything same-origin: always fresh when online,
+  // fall back to cache (offline). Avoids serving stale JS/CSS after updates.
   e.respondWith(
-    caches.match(req).then(function (cached) {
-      return cached || fetch(req).then(function (res) {
-        var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); return res;
-      }).catch(function () { return cached; });
+    fetch(req).then(function (res) {
+      var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); return res;
+    }).catch(function () {
+      return caches.match(req).then(function (m) { return m || (req.mode === "navigate" ? caches.match("index.html") : m); });
     })
   );
 });

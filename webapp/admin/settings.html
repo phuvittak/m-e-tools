@@ -80,6 +80,36 @@
         </div>
 
         <div class="panel">
+          <div class="panel-head"><h2>เวลาทำการ & วันหยุดพิเศษ</h2><button class="btn btn-sm" data-sday-add>+ วันพิเศษ</button></div>
+          <div class="img-hint" style="margin-bottom:10px">ระบบจะคำนวณสถานะ "เปิดอยู่/ปิดอยู่" อัตโนมัติตามเวลาจริง</div>
+          <div class="f2">
+            <div class="field"><label>จันทร์–เสาร์ เปิด</label><input type="time" data-set="hoursWeekOpen"></div>
+            <div class="field"><label>จันทร์–เสาร์ ปิด</label><input type="time" data-set="hoursWeekClose"></div>
+          </div>
+          <div class="f-check" style="margin:6px 0"><label><input type="checkbox" data-open-sun> เปิดวันอาทิตย์</label></div>
+          <div class="f2">
+            <div class="field"><label>อาทิตย์ เปิด</label><input type="time" data-set="hoursSunOpen"></div>
+            <div class="field"><label>อาทิตย์ ปิด</label><input type="time" data-set="hoursSunClose"></div>
+          </div>
+          <div class="field"><label>วันหยุด/วันพิเศษ (ระบุวัน + เปิดหรือปิด)</label><div data-sdaylist></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>ข้อความหน้าเข้าสู่ระบบ / สมัครสมาชิก</h2></div>
+          <div class="field"><label>หัวข้อหน้าเข้าสู่ระบบ</label><input data-set="authLoginTitle"></div>
+          <div class="field"><label>คำโปรยหน้าเข้าสู่ระบบ</label><textarea data-set="authLoginSub" rows="2"></textarea></div>
+          <div class="field"><label>หัวข้อหน้าสมัครสมาชิก</label><input data-set="authRegTitle"></div>
+          <div class="field"><label>คำโปรยหน้าสมัครสมาชิก</label><textarea data-set="authRegSub" rows="2"></textarea></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>ความปลอดภัย & เชื่อมต่อบัญชี</h2></div>
+          <div class="field"><label>รหัสยืนยันการลบข้อมูล (ใช้ตอนลบคำสั่งซื้อ/ใบรับเข้า)</label><input data-set="deletePin"></div>
+          <div class="field"><label>Google Client ID (สำหรับปุ่มเข้าสู่ระบบด้วย Google — เว้นว่างถ้ายังไม่ใช้)</label><input data-set="googleClientId" placeholder="xxxxx.apps.googleusercontent.com"></div>
+          <div class="field"><label>Facebook App ID (สำหรับปุ่มเข้าสู่ระบบด้วย Facebook)</label><input data-set="facebookAppId"></div>
+        </div>
+
+        <div class="panel">
           <div class="panel-head"><h2>QR ชำระเงิน (PromptPay)</h2></div>
           <div class="field"><label>ชื่อบัญชี / พร้อมเพย์ (แสดงบนหน้าชำระเงิน)</label><input data-set="bankInfo"></div>
           <div class="img-edit">

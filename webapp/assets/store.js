@@ -18,6 +18,7 @@
     ledger: "me_ledger",
     suppliers: "me_suppliers",
     purchases: "me_purchases",
+    chats: "me_chats",
     seeded: "me_seeded_v2",
   };
 
@@ -156,13 +157,13 @@
 
   /* ---------- Editable site content (back office) ----------------- */
   var DEFAULT_SETTINGS = {
-    heroOverline: "DEWALT BY M.E.TOOLS · แยกท่ารั่ว เชียงใหม่",
+    heroOverline: "DEWALT BY M.E.TOOLS · แยกท่ารั้ว เชียงใหม่",
     heroTitle: "PRO TOOLS",
     heroPhrases: ["เช่าก็ได้ ซื้อก็ดี"],
     heroSub: "ศูนย์รวมเครื่องมือช่าง DEWALT ของแท้ + แบรนด์โปร เช่ารายวัน หรือ ซื้อขาด จองง่ายในไม่กี่คลิก รับเองที่ร้านหรือส่งถึงงาน",
     brandsTagline: "ครบเครื่อง|ทุกระดับ",
     company: "บริษัท เอ็ม.อี.ทูลส์ จำกัด",
-    address: "แยกท่ารั่ว ต.ท่าวังตาล อ.สารภี จ.เชียงใหม่ 50140",
+    address: "แยกท่ารั้ว ต.ท่าวังตาล อ.สารภี จ.เชียงใหม่ 50140",
     phone: "053-XXX-XXXX",
     line: "@metools",
     facebook: "https://facebook.com/metools.tharua",
@@ -170,13 +171,21 @@
     tiktok: "https://tiktok.com/@metools.cm",
     hoursWeek: "จันทร์ – เสาร์ 8:00 – 17:00 น.",
     hoursSun: "อาทิตย์ 8:00 – 15:00 น.",
+    // structured hours for the live open/closed status (24h "HH:MM")
+    hoursWeekOpen: "08:00", hoursWeekClose: "17:00",
+    openSun: true, hoursSunOpen: "08:00", hoursSunClose: "15:00",
+    specialDays: [], // [{date:"YYYY-MM-DD", open:false, note:"หยุดสงกรานต์"}]
+    authLoginTitle: "เข้าสู่ระบบ", authLoginSub: "เข้าสู่ระบบเพื่อสั่งซื้อ/เช่า ติดตามคำสั่งซื้อ หรือเข้าสู่ระบบหลังร้าน (พนักงาน)",
+    authRegTitle: "สมัครสมาชิก", authRegSub: "สมัครสมาชิกร้าน M.E.Tools เพื่อสั่งซื้อ/เช่าเครื่องมือและติดตามคำสั่งซื้อได้ง่ายขึ้น",
+    deletePin: "1234",
+    googleClientId: "", facebookAppId: "",
     qrImage: "",
     bankInfo: "พร้อมเพย์ M.E.Tools",
     chatGreeting: "สวัสดีครับ M.E.Tools ยินดีให้บริการ พิมพ์คำถามได้เลยครับ 😊",
     chatFallback: "ขอบคุณสำหรับข้อความครับ เดี๋ยวทีมงานติดต่อกลับ หรือโทร 053-XXX-XXXX / LINE @metools",
     chatRules: [
       { keywords: "เวลา, เปิด, ปิด, กี่โมง", answer: "ร้านเปิด จันทร์–เสาร์ 8:00–17:00 น. และอาทิตย์ 8:00–15:00 น. ครับ" },
-      { keywords: "ที่อยู่, แผนที่, ไปยังไง, สาขา, อยู่ไหน", answer: "ร้านอยู่แยกท่ารั่ว ต.ท่าวังตาล อ.สารภี จ.เชียงใหม่ 50140 ครับ" },
+      { keywords: "ที่อยู่, แผนที่, ไปยังไง, สาขา, อยู่ไหน", answer: "ร้านอยู่แยกท่ารั้ว ต.ท่าวังตาล อ.สารภี จ.เชียงใหม่ 50140 ครับ" },
       { keywords: "เช่า, ค่าเช่า, มัดจำ", answer: "เช่าได้ตั้งแต่ 1 วัน มีมัดจำเท่าราคาสินค้า คืนเต็มจำนวนเมื่อนำมาคืนในสภาพปกติครับ" },
       { keywords: "ส่ง, จัดส่ง, ขนส่ง, ค่าส่ง", answer: "มีบริการจัดส่งทั่วประเทศครับ ค่าส่งคิดตามจังหวัดปลายทาง หรือรับเองที่ร้านฟรี" },
       { keywords: "ประกัน, รับประกัน, วารันตี", answer: "สินค้าของแท้มีใบรับประกันศูนย์ ส่วนใหญ่ 1 ปีครับ" },
@@ -197,7 +206,7 @@
     faq: [
       { q: "เช่าอุปกรณ์ช่างต้องวางมัดจำไหม?", a: "ต้องวางเงินมัดจำเท่าราคาสินค้า และคืนเต็มจำนวนเมื่อนำเครื่องมือมาส่งคืนในสภาพปกติครับ" },
       { q: "ซื้ออุปกรณ์ช่างมีรับประกันไหม?", a: "สินค้าของแท้ทุกชิ้นมีใบรับประกันศูนย์ (ส่วนใหญ่ 1 ปี) ส่งซ่อมศูนย์ได้โดยตรง" },
-      { q: "มีบริการจัดส่งหรือไม่ ค่าส่งเท่าไหร่?", a: "มีครับ ค่าจัดส่งคิดตามจังหวัดปลายทาง ระบบจะคำนวณให้อัตโนมัติ หรือมารับเองที่ร้านท่ารั่วได้ฟรี" },
+      { q: "มีบริการจัดส่งหรือไม่ ค่าส่งเท่าไหร่?", a: "มีครับ ค่าจัดส่งคิดตามจังหวัดปลายทาง ระบบจะคำนวณให้อัตโนมัติ หรือมารับเองที่ร้านท่ารั้วได้ฟรี" },
       { q: "ชำระเงินอย่างไร?", a: "สแกน QR PromptPay ชำระเต็มจำนวนก่อนรับสินค้า เมื่อชำระเรียบร้อยระบบจะยืนยันคำสั่งซื้อให้" },
       { q: "เช่าได้นานสุดกี่วัน ต่อเวลาได้ไหม?", a: "เช่าได้ตั้งแต่ 1 วันขึ้นไป หากต้องการต่อเวลาแจ้งทางร้านล่วงหน้าได้เลยครับ" },
       { q: "ถ้าเครื่องมือชำรุดระหว่างเช่าทำอย่างไร?", a: "แจ้งร้านทันที หากชำรุดจากการใช้งานปกติไม่มีค่าปรับ แต่หากเสียหายจากการใช้ผิดวิธีจะคิดตามจริง" },
@@ -418,7 +427,9 @@
   function placeOrder(checkout) {
     var lines = cartLines();
     if (!lines.length) return null;
-    var customer = { name: checkout.name, phone: checkout.phone };
+    var sess = session();
+    var userEmail = (sess && sess.email) || checkout.email || "";
+    var customer = { name: checkout.name, phone: checkout.phone, email: userEmail };
     var fulfillment = checkout.fulfillment === "delivery" ? "delivery" : "pickup";
     var shipping = fulfillment === "delivery" ? (checkout.shipping || 0) : 0;
 
@@ -447,7 +458,7 @@
       shippingApplied = true;
       var order = {
         id: genId("ORD"), createdAt: Date.now(), type: mode,
-        customer: customer, fulfillment: fulfillment,
+        customer: customer, userEmail: userEmail, fulfillment: fulfillment,
         address: fulfillment === "delivery" ? checkout.address : null,
         items: items, days: days,
         subtotal: subtotal, deposit: deposit, shipping: thisShip,
@@ -513,6 +524,49 @@
     for (var i = 0; i < orders.length; i++) if (orders[i].id === orderId) { orders[i].staffMessage = msg; orders[i].staffMessageAt = Date.now(); break; }
     write(KEY.orders, orders); dispatch();
   }
+  function deleteOrder(id) { write(KEY.orders, read(KEY.orders, []).filter(function (o) { return o.id !== id; })); dispatch(); }
+  function deletePurchase(id) { write(KEY.purchases, read(KEY.purchases, []).filter(function (p) { return p.id !== id; })); dispatch(); }
+  function checkPin(pin) { return String(pin) === String(getSettings().deletePin || "1234"); }
+
+  /* ---------- Chat (customer ↔ shop, LINE-OA style) -------------- */
+  function getChats() { return read(KEY.chats, {}); }
+  function saveChats(c) { write(KEY.chats, c); dispatch(); }
+  function chatConvId() {
+    var s = session();
+    if (s && s.role === "customer") return "u:" + (s.email || "").toLowerCase();
+    var gid = localStorage.getItem("me_chat_gid");
+    if (!gid) { gid = "g-" + Date.now().toString(36) + Math.floor(Math.random() * 1000); localStorage.setItem("me_chat_gid", gid); }
+    return gid;
+  }
+  function chatEnsure(id) {
+    var chats = getChats();
+    if (!chats[id]) {
+      var s = session();
+      chats[id] = { id: id, name: (s && s.name) || (id.indexOf("u:") === 0 ? id.slice(2) : "ผู้เยี่ยมชม"), email: (s && s.email) || "", messages: [], needsShop: false, updatedAt: Date.now() };
+      write(KEY.chats, chats);
+    }
+    return getChats()[id];
+  }
+  function chatPushUser(text, escalated) {
+    var id = chatConvId(); chatEnsure(id);
+    var chats = getChats(), c = chats[id];
+    c.messages.push({ from: "user", text: text, at: Date.now() });
+    if (escalated) c.needsShop = true;
+    var s = session(); if (s) { c.name = s.name; c.email = s.email; }
+    c.updatedAt = Date.now(); saveChats(chats); return id;
+  }
+  function chatPushBot(text) {
+    var id = chatConvId(); chatEnsure(id);
+    var chats = getChats(); chats[id].messages.push({ from: "bot", text: text, at: Date.now() }); chats[id].updatedAt = Date.now(); saveChats(chats);
+  }
+  function chatReplyShop(id, text) {
+    var chats = getChats(); if (!chats[id]) return;
+    chats[id].messages.push({ from: "shop", text: text, at: Date.now() }); chats[id].needsShop = false; chats[id].updatedAt = Date.now(); saveChats(chats);
+  }
+  function chatGetConv(id) { return getChats()[id] || null; }
+  function chatCurrent() { return chatGetConv(chatConvId()); }
+  function chatList() { var c = getChats(); return Object.keys(c).map(function (k) { return c[k]; }).sort(function (a, b) { return b.updatedAt - a.updatedAt; }); }
+  function chatDelete(id) { var c = getChats(); delete c[id]; saveChats(c); }
 
   /* ---------- Metrics (for the employee dashboard) ---------------- */
   function getMetrics() {
@@ -613,6 +667,19 @@
     write(KEY.settings, Object.assign(s, patch));
     dispatch();
   }
+  // live open/closed based on current time + opening hours + special days
+  function isOpenNow() {
+    var st = getSettings(), now = new Date();
+    function toMin(s) { var p = String(s || "0:0").split(":"); return (+p[0]) * 60 + (+p[1] || 0); }
+    var ymd = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+    var sp = (st.specialDays || []).filter(function (d) { return d.date === ymd; })[0];
+    var open, close;
+    if (sp) { if (!sp.open) return { open: false, reason: sp.note || "วันหยุดพิเศษ" }; open = st.hoursWeekOpen; close = st.hoursWeekClose; }
+    else if (now.getDay() === 0) { if (!st.openSun) return { open: false, reason: "วันอาทิตย์ปิดทำการ" }; open = st.hoursSunOpen; close = st.hoursSunClose; }
+    else { open = st.hoursWeekOpen; close = st.hoursWeekClose; }
+    var cur = now.getHours() * 60 + now.getMinutes();
+    return { open: cur >= toMin(open) && cur < toMin(close) };
+  }
 
   /* ---------- Staff (owner + employees) --------------------------- */
   function seedStaff() { if (!localStorage.getItem(KEY.staff)) write(KEY.staff, JSON.parse(JSON.stringify(DEFAULT_STAFF))); }
@@ -661,6 +728,16 @@
     if (users.some(function (x) { return x.email === email; })) return { ok: false, error: "อีเมลนี้สมัครสมาชิกแล้ว" };
     users.push({ name: u.name, email: email, phone: u.phone || "", password: u.password, createdAt: Date.now() });
     write(KEY.users, users);
+    setSession({ email: email, name: u.name, role: "customer" });
+    return { ok: true, role: "customer" };
+  }
+  // create/login a customer from a social provider (Google/Facebook) profile
+  function socialUpsert(email, name, provider) {
+    email = (email || "").trim().toLowerCase();
+    if (!email) return { ok: false, error: "ไม่ได้รับอีเมลจากผู้ให้บริการ" };
+    var users = getUsers();
+    var u = users.filter(function (x) { return x.email === email; })[0];
+    if (!u) { u = { name: name || email, email: email, phone: "", password: "__social__", social: provider || "social", createdAt: Date.now() }; users.push(u); write(KEY.users, users); }
     setSession({ email: email, name: u.name, role: "customer" });
     return { ok: true, role: "customer" };
   }
@@ -750,14 +827,17 @@
     provinces: provinces, districtsOf: districtsOf, subdistrictsOf: subdistrictsOf, zipsOf: zipsOf,
     setGeoData: setGeoData,
     getShipRates: getShipRates, getShippingFee: getShippingFee, setShipRate: setShipRate,
-    getSettings: getSettings, saveSettings: saveSettings,
-    getUsers: getUsers, registerUser: registerUser, loginUser: loginUser,
+    getSettings: getSettings, saveSettings: saveSettings, isOpenNow: isOpenNow,
+    getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
     session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS,
-    logout: logout, requirePerm: requirePerm,
+    logout: logout, requirePerm: requirePerm, checkPin: checkPin,
+    deleteOrder: deleteOrder, deletePurchase: deletePurchase,
     getLedger: getLedger, saveLedgerEntry: saveLedgerEntry, deleteLedgerEntry: deleteLedgerEntry,
     getSuppliers: getSuppliers, saveSupplier: saveSupplier, deleteSupplier: deleteSupplier,
     getPurchases: getPurchases, receivePurchase: receivePurchase, getPnL: getPnL,
+    chatPushUser: chatPushUser, chatPushBot: chatPushBot, chatReplyShop: chatReplyShop,
+    chatCurrent: chatCurrent, chatGetConv: chatGetConv, chatConvId: chatConvId, chatList: chatList, chatDelete: chatDelete,
     resetAll: resetAll, onChange: onChange,
   };
 })(window);

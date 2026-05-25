@@ -12,31 +12,98 @@
   if (routes[page]) routes[page]();
 
   /* ===================== AUTH ===================== */
+  function applyAuthText(kind) {
+    var st = S.getSettings();
+    setText("[data-auth-title]", kind === "register" ? st.authRegTitle : st.authLoginTitle);
+    setText("[data-auth-sub]", kind === "register" ? st.authRegSub : st.authLoginSub);
+  }
+  function wireSocial() {
+    document.querySelectorAll("[data-social]").forEach(function (b) {
+      b.addEventListener("click", function () { socialLogin(b.getAttribute("data-social")); });
+    });
+  }
   function initLogin() {
+    applyAuthText("login");
+    wireSocial();
     var form = document.querySelector("[data-login]");
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var r = S.loginUser(form.querySelector("[data-email]").value, form.querySelector("[data-pass]").value);
       if (r.ok) {
         U.toast("เข้าสู่ระบบสำเร็จ", "ok");
-        setTimeout(function () { window.location.href = r.role === "employee" ? "admin/dashboard.html" : "index.html"; }, 400);
+        setTimeout(function () { window.location.href = r.role === "employee" || r.role === "owner" ? "admin/dashboard.html" : redirectAfterAuth(); }, 400);
       } else U.toast(r.error || "เข้าสู่ระบบไม่สำเร็จ", "err");
     });
   }
   function initRegister() {
+    applyAuthText("register");
+    wireSocial();
     var form = document.querySelector("[data-register]");
+    var phoneVerified = false, otpCode = null;
+    var phoneI = form.querySelector("[data-phone]");
+    var otpBox = form.querySelector("[data-otp-box]"), otpStatus = form.querySelector("[data-otp-status]");
+    form.querySelector("[data-otp-send]").addEventListener("click", function () {
+      var digits = phoneI.value.replace(/\D/g, "");
+      if (digits.length < 9 || digits.length > 10) { U.toast("กรุณากรอกเบอร์โทรให้ครบ (9–10 หลัก)", "err"); return; }
+      otpCode = ("" + Math.floor(100000 + Math.random() * 900000));
+      otpBox.hidden = false;
+      otpStatus.className = "otp-status sending";
+      otpStatus.textContent = "ส่งรหัส OTP แล้ว (โหมดสาธิต รหัสคือ " + otpCode + ")";
+      U.toast("ส่ง OTP ไปยัง " + phoneI.value + " แล้ว (สาธิต)", "ok");
+    });
+    form.querySelector("[data-otp-check]").addEventListener("click", function () {
+      if (form.querySelector("[data-otp]").value.trim() === otpCode && otpCode) {
+        phoneVerified = true; otpStatus.className = "otp-status ok"; otpStatus.textContent = "ยืนยันเบอร์โทรแล้ว ✓";
+      } else { U.toast("รหัส OTP ไม่ถูกต้อง", "err"); }
+    });
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (!phoneVerified) { U.toast("กรุณายืนยันเบอร์โทรด้วย OTP ก่อน", "err"); return; }
       var pass = form.querySelector("[data-pass]").value, pass2 = form.querySelector("[data-pass2]").value;
       if (pass !== pass2) { U.toast("รหัสผ่านไม่ตรงกัน", "err"); return; }
-      var r = S.registerUser({
-        name: form.querySelector("[data-name]").value.trim(),
-        email: form.querySelector("[data-email]").value,
-        phone: form.querySelector("[data-phone]").value.trim(),
-        password: pass,
-      });
-      if (r.ok) { U.toast("สมัครสมาชิกสำเร็จ ยินดีต้อนรับ!", "ok"); setTimeout(function () { window.location.href = "index.html"; }, 500); }
+      var r = S.registerUser({ name: form.querySelector("[data-name]").value.trim(), email: form.querySelector("[data-email]").value, phone: phoneI.value.trim(), password: pass });
+      if (r.ok) { U.toast("สมัครสมาชิกสำเร็จ ยินดีต้อนรับ!", "ok"); setTimeout(function () { window.location.href = redirectAfterAuth(); }, 500); }
       else U.toast(r.error || "สมัครไม่สำเร็จ", "err");
+    });
+  }
+  function redirectAfterAuth() { var r = U.qp("next"); return r ? decodeURIComponent(r) : "index.html"; }
+
+  function socialLogin(provider) {
+    var st = S.getSettings();
+    var id = provider === "google" ? st.googleClientId : st.facebookAppId;
+    if (!id) { U.toast("ผู้ดูแลร้านยังไม่ได้เชื่อมต่อ " + (provider === "google" ? "Google" : "Facebook") + " — ตั้งค่า Client ID ได้ในระบบหลังร้าน", "err"); return; }
+    if (provider === "google") googleSignIn(id); else facebookSignIn(id);
+  }
+  function loadScript(src, cb) {
+    if (document.querySelector('script[src="' + src + '"]')) { cb(); return; }
+    var s = document.createElement("script"); s.src = src; s.async = true; s.onload = cb; s.onerror = function () { U.toast("โหลดสคริปต์ไม่สำเร็จ", "err"); }; document.head.appendChild(s);
+  }
+  function googleSignIn(clientId) {
+    loadScript("https://accounts.google.com/gsi/client", function () {
+      if (!window.google || !google.accounts || !google.accounts.id) { U.toast("เชื่อมต่อ Google ไม่สำเร็จ", "err"); return; }
+      google.accounts.id.initialize({ client_id: clientId, callback: function (resp) {
+        try {
+          var part = resp.credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+          var p = JSON.parse(decodeURIComponent(escape(atob(part))));
+          var r = S.socialUpsert(p.email, p.name, "google");
+          if (r.ok) { U.toast("เข้าสู่ระบบด้วย Google สำเร็จ", "ok"); setTimeout(function () { location.href = redirectAfterAuth(); }, 500); }
+        } catch (e) { U.toast("เข้าสู่ระบบด้วย Google ไม่สำเร็จ", "err"); }
+      } });
+      google.accounts.id.prompt();
+    });
+  }
+  function facebookSignIn(appId) {
+    loadScript("https://connect.facebook.net/en_US/sdk.js", function () {
+      if (!window.FB) { U.toast("เชื่อมต่อ Facebook ไม่สำเร็จ", "err"); return; }
+      FB.init({ appId: appId, version: "v19.0", cookie: true, xfbml: false });
+      FB.login(function (resp) {
+        if (resp.authResponse) {
+          FB.api("/me", { fields: "name,email" }, function (u) {
+            var r = S.socialUpsert(u.email || (u.id + "@facebook.local"), u.name, "facebook");
+            if (r.ok) { U.toast("เข้าสู่ระบบด้วย Facebook สำเร็จ", "ok"); setTimeout(function () { location.href = redirectAfterAuth(); }, 500); }
+          });
+        }
+      }, { scope: "public_profile,email" });
     });
   }
 
@@ -298,7 +365,7 @@
             '<div class="field"><label>เบอร์โทร *</label><input data-phone type="tel" placeholder="08X-XXX-XXXX" value="' + esc(co.phone) + '"></div>' +
             '<div class="field"><label>วิธีรับสินค้า *</label><div class="ful-toggle">' +
               '<button type="button" class="ful-opt" data-ful="delivery"><span class="t">บริการจัดส่ง</span><span class="d">ส่งถึงที่อยู่ (มีค่าจัดส่ง)</span></button>' +
-              '<button type="button" class="ful-opt" data-ful="pickup"><span class="t">รับเองที่ร้าน</span><span class="d">รับที่ร้านท่ารั่ว (ฟรี)</span></button>' +
+              '<button type="button" class="ful-opt" data-ful="pickup"><span class="t">รับเองที่ร้าน</span><span class="d">รับที่ร้านท่ารั้ว (ฟรี)</span></button>' +
             "</div></div>" +
             '<div class="addr-cascade" data-addr hidden>' +
               '<div class="field"><label>จังหวัด *</label><select data-province></select></div>' +
@@ -366,6 +433,8 @@
     }
 
     function confirmOrder() {
+      var sess = S.session();
+      if (!sess) { U.toast("กรุณาเข้าสู่ระบบ/สมัครสมาชิกก่อนสั่งซื้อ", "err"); setTimeout(function () { location.href = "login.html?next=" + encodeURIComponent("cart.html"); }, 900); return; }
       co.name = (co.name || "").trim(); co.phone = (co.phone || "").trim();
       if (!co.name) { U.toast("กรุณากรอกชื่อ-นามสกุล", "err"); return; }
       var digits = co.phone.replace(/\D/g, "");
@@ -396,43 +465,42 @@
       bg.className = "me-modal-bg";
       bg.innerHTML =
         '<div class="me-modal"><div class="me-modal-head"><h3>ชำระเงิน</h3><button class="me-modal-x">×</button></div>' +
-        '<div class="me-modal-body"><div class="qr-pp"><b>PromptPay</b> · ' + esc(st.company || "M.E.Tools") + "</div>" +
-          '<div class="qr-card">' + qrVisual + '<div class="qr-amount">' + S.money(amount) + '</div><div class="qr-cap">สแกน QR เพื่อชำระเงิน</div></div>' +
+        '<div class="me-modal-body"><div class="qr-pp"><b>PromptPay</b> · ' + esc(st.bankInfo || st.company || "M.E.Tools") + "</div>" +
+          '<div class="qr-card" data-qrcard>' + qrVisual + '<div class="qr-amount">' + S.money(amount) + '</div><div class="qr-cap">สแกน QR เพื่อชำระเงิน · หมดอายุใน <b data-qrtimer>10:00</b></div></div>' +
           '<div class="pay-rows">' +
             '<div class="r"><span>ยอดสินค้า/ค่าเช่า</span><span>' + S.money(totals.subtotal) + "</span></div>" +
             (totals.deposit ? '<div class="r"><span>เงินมัดจำ</span><span>' + S.money(totals.deposit) + "</span></div>" : "") +
             (shipping ? '<div class="r"><span>ค่าจัดส่ง (' + checkout.address.province + ")</span><span>" + S.money(shipping) + "</span></div>" : '<div class="r"><span>รับเองที่ร้าน</span><span>ฟรี</span></div>') +
             '<div class="r total"><span>รวมชำระ</span><span>' + S.money(amount) + "</span></div>" +
           "</div>" +
-          '<div class="qr-status" data-paystatus>ยังไม่ได้ชำระเงิน — กรุณาสแกนแล้วกดตรวจสอบ</div>' +
+          '<div class="qr-status checking" data-paystatus>⏳ ระบบกำลังตรวจสอบยอดเงินเข้าจากธนาคารอัตโนมัติ…</div>' +
         "</div>" +
-        '<div class="me-modal-foot"><button class="me-btn me-btn-block" data-verify>ตรวจสอบการชำระเงิน</button>' +
-          '<button class="me-btn me-btn-block" data-paid disabled>ยืนยันการชำระเงินแล้ว</button>' +
+        '<div class="me-modal-foot"><button class="me-btn me-btn-block" data-paid disabled>ยืนยันการชำระเงิน</button>' +
           '<button class="me-btn me-btn-ghost me-btn-block" data-cancel>ยกเลิก</button></div></div>';
       document.body.appendChild(bg);
-      function close() { bg.remove(); }
+      var detected = false, left = 600, poll, timer, elapsed = 0;
+      function cleanup() { clearInterval(poll); clearInterval(timer); }
+      function close() { cleanup(); bg.remove(); }
       bg.querySelector(".me-modal-x").onclick = close;
       bg.querySelector("[data-cancel]").onclick = close;
       bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
-
-      var verified = false;
-      var statusEl = bg.querySelector("[data-paystatus]");
-      var verifyBtn = bg.querySelector("[data-verify]");
-      var paidBtn = bg.querySelector("[data-paid]");
-      verifyBtn.onclick = function () {
-        verifyBtn.disabled = true;
-        statusEl.textContent = "กำลังเชื่อมต่อธนาคารและตรวจสอบยอดเงินเข้า…";
-        statusEl.className = "qr-status checking";
-        setTimeout(function () {
-          verified = true;
-          statusEl.textContent = "ธนาคารยืนยัน: ได้รับชำระเงินแล้ว ✓";
-          statusEl.className = "qr-status ok";
-          verifyBtn.style.display = "none";
+      var statusEl = bg.querySelector("[data-paystatus]"), paidBtn = bg.querySelector("[data-paid]"), timerEl = bg.querySelector("[data-qrtimer]");
+      // 10-minute QR countdown
+      timer = setInterval(function () {
+        left--; var m = Math.floor(left / 60), s = left % 60; timerEl.textContent = m + ":" + (s < 10 ? "0" + s : s);
+        if (left <= 0) { cleanup(); bg.querySelector("[data-qrcard]").innerHTML = '<div class="qr-expired">QR หมดอายุแล้ว<br>กรุณาเริ่มสั่งซื้อใหม่</div>'; statusEl.className = "qr-status"; statusEl.textContent = "หมดเวลาชำระเงิน"; }
+      }, 1000);
+      // auto bank check — SIMULATED (real needs a payment gateway / bank API + backend)
+      poll = setInterval(function () {
+        elapsed++;
+        if (!detected && elapsed >= 7) {
+          detected = true; clearInterval(poll);
+          statusEl.className = "qr-status ok"; statusEl.textContent = "ธนาคารยืนยันได้รับการชำระเงินแล้ว ✓";
           paidBtn.removeAttribute("disabled");
-        }, 1600);
-      };
+        }
+      }, 1000);
       paidBtn.onclick = function () {
-        if (!verified) { U.toast("กรุณากดตรวจสอบการชำระเงินก่อน", "err"); return; }
+        if (!detected) { U.toast("ระบบยังตรวจไม่พบการชำระเงิน", "err"); return; }
         var created = S.placeOrder(checkout);
         close();
         if (created && created.length) {
@@ -460,7 +528,13 @@
     }
 
     function render() {
-      var orders = S.getOrders();
+      var sess = S.session();
+      if (!sess) {
+        root.innerHTML = '<div class="empty"><h3>กรุณาเข้าสู่ระบบ</h3><p>เข้าสู่ระบบเพื่อดูคำสั่งซื้อของคุณ</p><a class="me-btn" href="login.html?next=' + encodeURIComponent("orders.html") + '">เข้าสู่ระบบ</a></div>';
+        return;
+      }
+      var myEmail = (sess.email || "").toLowerCase();
+      var orders = S.getOrders().filter(function (o) { return ((o.userEmail || (o.customer && o.customer.email) || "").toLowerCase()) === myEmail; });
       if (!orders.length) {
         root.innerHTML = '<div class="empty"><h3>ยังไม่มีคำสั่งซื้อ</h3><p>เมื่อคุณสั่งซื้อหรือเช่า รายการจะแสดงที่นี่</p><a class="me-btn" href="shop.html">เริ่มเลือกซื้อ</a></div>';
         return;

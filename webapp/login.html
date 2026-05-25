@@ -10,11 +10,14 @@
   <div data-header></div>
   <main class="auth-wrap">
     <form class="auth-card" data-login>
-      <h1>เข้าสู่ระบบ</h1>
-      <p class="auth-sub">เข้าสู่ระบบเพื่อสั่งซื้อ/เช่า ติดตามคำสั่งซื้อ หรือเข้าสู่ระบบหลังร้าน (พนักงาน)</p>
+      <h1 data-auth-title>เข้าสู่ระบบ</h1>
+      <p class="auth-sub" data-auth-sub>เข้าสู่ระบบเพื่อสั่งซื้อ/เช่า ติดตามคำสั่งซื้อ หรือเข้าสู่ระบบหลังร้าน (พนักงาน)</p>
       <div class="field"><label>อีเมล</label><input data-email type="email" placeholder="you@example.com" autocomplete="username"></div>
       <div class="field"><label>รหัสผ่าน</label><input data-pass type="password" placeholder="••••••••" autocomplete="current-password"></div>
       <button class="me-btn me-btn-block" type="submit">เข้าสู่ระบบ</button>
+      <div class="auth-or"><span>หรือ</span></div>
+      <button type="button" class="social-btn google" data-social="google"><span class="social-ic">G</span> เข้าสู่ระบบด้วย Google</button>
+      <button type="button" class="social-btn facebook" data-social="facebook"><span class="social-ic">f</span> เข้าสู่ระบบด้วย Facebook</button>
       <div class="auth-alt">ยังไม่มีบัญชี? <a href="register.html">สมัครสมาชิก</a></div>
       <div class="auth-note">พนักงาน/เจ้าของร้าน เข้าสู่ระบบด้วยบัญชีที่ได้รับจากร้าน</div>
     </form>

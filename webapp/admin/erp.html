@@ -60,7 +60,19 @@
       </div>
 
       <div class="panel">
-        <div class="panel-head"><h2>ลูกค้า / สมาชิก</h2></div>
+        <div class="panel-head"><h2>ประวัติการขาย</h2>
+          <select data-salesperiod>
+            <option value="day">รายวัน (วันนี้)</option>
+            <option value="week">รายสัปดาห์ (สัปดาห์นี้)</option>
+            <option value="month" selected>รายเดือน (เดือนนี้)</option>
+            <option value="year">รายปี (ปีนี้)</option>
+          </select>
+        </div>
+        <div data-salesreport></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>ลูกค้า / สมาชิก (จัดอันดับตามยอดซื้อ)</h2></div>
         <div class="table-wrap" data-customers></div>
       </div>
     </main>

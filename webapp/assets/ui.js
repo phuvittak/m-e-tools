@@ -72,7 +72,7 @@
       '<header class="me-header"><div class="me-header-inner">' +
       '<a class="me-header-brand" href="index.html">' +
       '<span class="me-header-mark">M.E.<span style="color:var(--price-red)">T</span>ools</span>' +
-      '<span class="me-header-loc">ท่ารั่ว · เชียงใหม่</span></a>' +
+      '<span class="me-header-loc">ท่ารั้ว · เชียงใหม่</span></a>' +
       '<nav class="me-header-nav">' +
       navLink("index.html", "หน้าแรก", active === "home") +
       navLink("shop.html", "สินค้า / เช่า-ซื้อ", active === "shop") +
@@ -118,7 +118,9 @@
           '<div class="me-footer-company">' + esc(st.company) + "</div>" +
           '<div class="me-footer-rows">' +
             '<div class="me-footer-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><span>' + esc(st.address) + "</span></div>" +
-            '<div class="me-footer-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg><a href="tel:' + esc((st.phone || "").replace(/[^0-9+]/g, "")) + '">' + esc(st.phone) + "</a></div>" +
+            String(st.phone || "").split(/[,\n]/).map(function (p) { return p.trim(); }).filter(Boolean).map(function (p) {
+              return '<div class="me-footer-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg><a href="tel:' + esc(p.replace(/[^0-9+]/g, "")) + '">' + esc(p) + "</a></div>";
+            }).join("") +
             '<div class="me-footer-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg><span>LINE: ' + esc(st.line) + "</span></div>" +
           "</div>" +
           '<div class="me-socials">' + socialBtn(st.facebook, "Facebook", FB) + socialBtn(st.instagram, "Instagram", IG) + socialBtn(st.tiktok, "TikTok", TT) + "</div>" +
@@ -131,9 +133,9 @@
           '<a href="login.html">เข้าสู่ระบบ</a><a href="register.html">สมัครสมาชิก</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">เวลาทำการ</div>' +
           "<div>" + esc(st.hoursWeek) + "</div><div>" + esc(st.hoursSun) + "</div>" +
-          '<div class="me-footer-pill"><span class="dot"></span> เปิดอยู่</div></div>' +
+          (function () { var op = S.isOpenNow(); return '<div class="me-footer-pill ' + (op.open ? "open" : "closed") + '"><span class="dot' + (op.open ? "" : " dot-closed") + '"></span> ' + (op.open ? "เปิดอยู่" : "ปิดอยู่" + (op.reason ? " · " + esc(op.reason) : "")) + "</div>"; })() + "</div>" +
       "</div>" +
-      '<div class="me-footer-foot"><span>© 2026 ' + esc(st.company) + " · แยกท่ารั่ว เชียงใหม่</span>" +
+      '<div class="me-footer-foot"><span>© 2026 ' + esc(st.company) + " · แยกท่ารั้ว เชียงใหม่</span>" +
       "<span>DEWALT® is a trademark of Stanley Black &amp; Decker.</span></div></footer>"
     );
   }
@@ -159,7 +161,7 @@
   }
 
   /* ---------- chat widget (rule-based "AI", owner-configurable) ---------- */
-  var chatGreeted = false;
+  var chatPoll = null;
   function mountChat() {
     if (document.querySelector("[data-chat]")) return;
     var box = document.createElement("div");
@@ -174,35 +176,43 @@
         '<form class="me-chat-input" data-chat-form><input data-chat-text placeholder="พิมพ์คำถาม เช่น เวลาเปิด, ค่าส่ง…" autocomplete="off"><button class="me-btn me-btn-sm" type="submit">ส่ง</button></form>' +
       "</div>";
     document.body.appendChild(box);
-    box.querySelector("[data-chat-fab]").addEventListener("click", function () { var pn = box.querySelector("[data-chat-panel]"); if (pn.hidden) openChat(); else pn.hidden = true; });
-    box.querySelector("[data-chat-close]").addEventListener("click", function () { box.querySelector("[data-chat-panel]").hidden = true; });
+    box.querySelector("[data-chat-fab]").addEventListener("click", function () { var pn = box.querySelector("[data-chat-panel]"); if (pn.hidden) openChat(); else closeChat(); });
+    box.querySelector("[data-chat-close]").addEventListener("click", closeChat);
     box.querySelector("[data-chat-form]").addEventListener("submit", function (e) {
       e.preventDefault();
       var inp = box.querySelector("[data-chat-text]"); var t = inp.value.trim(); if (!t) return;
-      addChatMsg(t, "user"); inp.value = "";
-      setTimeout(function () { addChatMsg(chatAnswer(t), "bot"); }, 450);
+      var ans = chatAnswer(t);
+      S.chatPushUser(t, !ans.matched); inp.value = ""; renderChat();
+      setTimeout(function () { S.chatPushBot(ans.text); renderChat(); }, 450);
     });
   }
   function openChat() {
     var box = document.querySelector("[data-chat]"); if (!box) { mountChat(); box = document.querySelector("[data-chat]"); }
     box.querySelector("[data-chat-panel]").hidden = false;
-    if (!chatGreeted) { addChatMsg(S.getSettings().chatGreeting, "bot"); chatGreeted = true; }
+    var conv = S.chatCurrent();
+    if (!conv || !conv.messages.length) S.chatPushBot(S.getSettings().chatGreeting);
+    renderChat();
     box.querySelector("[data-chat-text]").focus();
+    if (chatPoll) clearInterval(chatPoll);
+    chatPoll = setInterval(renderChat, 3000); // pick up shop replies
   }
-  function addChatMsg(text, who) {
+  function closeChat() { var p = document.querySelector("[data-chat-panel]"); if (p) p.hidden = true; if (chatPoll) { clearInterval(chatPoll); chatPoll = null; } }
+  function renderChat() {
     var body = document.querySelector("[data-chat-body]"); if (!body) return;
-    var m = document.createElement("div");
-    m.className = "me-chat-msg " + (who === "user" ? "me" : "bot");
-    m.textContent = text;
-    body.appendChild(m); body.scrollTop = body.scrollHeight;
+    var conv = S.chatCurrent(), msgs = conv ? conv.messages : [];
+    body.innerHTML = msgs.map(function (m) {
+      var cls = m.from === "user" ? "me" : (m.from === "shop" ? "shop" : "bot");
+      return '<div class="me-chat-msg ' + cls + '">' + (m.from === "shop" ? '<span class="chat-who">ร้าน</span>' : "") + esc(m.text) + "</div>";
+    }).join("");
+    body.scrollTop = body.scrollHeight;
   }
   function chatAnswer(text) {
     var st = S.getSettings(), t = (text || "").toLowerCase(), rules = st.chatRules || [];
     for (var i = 0; i < rules.length; i++) {
       var kws = String(rules[i].keywords || "").split(",").map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
-      for (var j = 0; j < kws.length; j++) { if (t.indexOf(kws[j]) >= 0) return rules[i].answer; }
+      for (var j = 0; j < kws.length; j++) { if (kws[j] && t.indexOf(kws[j]) >= 0) return { text: rules[i].answer, matched: true }; }
     }
-    return st.chatFallback;
+    return { text: st.chatFallback, matched: false };
   }
   function refreshCartBadge() { renderChrome(); }
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
