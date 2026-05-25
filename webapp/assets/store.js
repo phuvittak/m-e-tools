@@ -22,6 +22,19 @@
     seeded: "me_seeded_v2",
   };
 
+  // ===== Firebase web config for REAL online chat (shared by ALL visitors) =====
+  // Paste the config object from Firebase Console here, then redeploy.
+  // (Firebase web config is meant to be public; security is enforced by Firestore rules.)
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDAuAE8rfpEAbn_T6T-7i_xX36PW6uVC8k",
+    authDomain: "metools-724dc.firebaseapp.com",
+    projectId: "metools-724dc",
+    storageBucket: "metools-724dc.firebasestorage.app",
+    messagingSenderId: "591880000748",
+    appId: "1:591880000748:web:c0f087ce2805c5b41f81c9",
+    measurementId: "G-6XYGTML9GZ"
+  };
+
   /* ---------- Seed catalog ---------------------------------------- */
   // icon = category key used to draw an inline SVG tile (see iconFor).
   var SEED_PRODUCTS = [
@@ -668,6 +681,13 @@
     write(KEY.settings, Object.assign(s, patch));
     dispatch();
   }
+  // Firebase config used by the chat: per-browser override (back office) wins,
+  // else the committed FIREBASE_CONFIG (shared by every visitor → real online chat).
+  function firebaseCfg() {
+    var s = (getSettings().firebaseConfig || "").trim();
+    if (s) return s;
+    return FIREBASE_CONFIG ? JSON.stringify(FIREBASE_CONFIG) : "";
+  }
   // live open/closed based on current time + opening hours + special days
   function isOpenNow() {
     var st = getSettings(), now = new Date();
@@ -828,7 +848,7 @@
     provinces: provinces, districtsOf: districtsOf, subdistrictsOf: subdistrictsOf, zipsOf: zipsOf,
     setGeoData: setGeoData,
     getShipRates: getShipRates, getShippingFee: getShippingFee, setShipRate: setShipRate,
-    getSettings: getSettings, saveSettings: saveSettings, isOpenNow: isOpenNow,
+    getSettings: getSettings, saveSettings: saveSettings, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
     session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS,

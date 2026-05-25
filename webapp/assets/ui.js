@@ -176,7 +176,7 @@
   /* ---------- MEChat: real online chat (Firebase) with localStorage fallback ---------- */
   var MEChat = (function () {
     var db = null, ready = false, loading = false, q = [];
-    function rawCfg() { return parseFbConfig(S.getSettings().firebaseConfig); }
+    function rawCfg() { return parseFbConfig(S.firebaseCfg ? S.firebaseCfg() : S.getSettings().firebaseConfig); }
     function enabled() { return !!rawCfg(); }
     function mode() { return enabled() ? "online" : "local"; }
     function loadScript(src, ok, err) { if (document.querySelector('script[src="' + src + '"]')) { ok(); return; } var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = err || ok; document.head.appendChild(s); }
@@ -190,8 +190,11 @@
           if (!window.firebase) throw 0;
           if (!firebase.apps.length) firebase.initializeApp(c);
           db = firebase.firestore();
-          try { if (firebase.auth) firebase.auth().signInAnonymously().catch(function () {}); } catch (e) {}
-          ready = true; flush(true);
+          // wait for anonymous sign-in so auth-required Firestore rules pass
+          // (proceeds anyway if Anonymous auth isn't enabled — works under test-mode rules)
+          if (firebase.auth) {
+            firebase.auth().signInAnonymously().then(function () { ready = true; flush(true); }).catch(function () { ready = true; flush(true); });
+          } else { ready = true; flush(true); }
         } catch (e) { flush(false); }
       }
       loadScript(base + "firebase-app-compat.js", function () {
