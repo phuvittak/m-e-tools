@@ -41,6 +41,23 @@ powershell -ExecutionPolicy Bypass -File .claude\serve.ps1
 
 > ปุ่ม **"รีเซ็ตข้อมูลตัวอย่าง"** ในหน้าหลังร้าน ใช้ล้างข้อมูลกลับเป็นค่าตั้งต้นได้ทุกเมื่อ
 
+## ติดตั้งเป็นแอป (PWA — Android & iOS)
+
+เว็บนี้เป็น **PWA** ติดตั้งลงหน้าจอมือถือได้ ชื่อแอปคือ **M.E.Tools**
+
+- **Android (Chrome):** เปิดเว็บ → เมนู ⋮ → "เพิ่มลงในหน้าจอหลัก / ติดตั้งแอป"
+- **iOS (Safari):** เปิดเว็บ → ปุ่มแชร์ → "เพิ่มลงในหน้าจอโฮม"
+
+ทำงานออฟไลน์ได้บางส่วน (service worker `webapp/sw.js`) และพร้อมต่อยอดเป็นแอปจริง
+ด้วย **PWABuilder / Capacitor / TWA** (ใช้ `webapp/assets/icon.svg` สร้างไอคอนทุกขนาด)
+
+## โดเมนของตัวเอง (เช่น metools.co.th)
+
+URL ปัจจุบันคือ `phuvittak.github.io/m-e-tools`. ถ้าต้องการชื่อแบบ `metools.co.th`:
+1. ซื้อโดเมน (เช่น `.co.th` / `.com`) จากผู้ให้บริการโดเมน
+2. ตั้งค่า DNS ของโดเมน: apex → A records `185.199.108–111.153` (และ AAAA), หรือ `www` → CNAME `phuvittak.github.io`
+3. GitHub → repo Settings → Pages → **Custom domain** ใส่โดเมน แล้วรอออก HTTPS
+
 ## เครื่องมือบรรทัดคำสั่ง (`tools/`)
 
 | Tool | Description |
