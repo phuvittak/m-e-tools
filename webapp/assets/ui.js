@@ -173,10 +173,18 @@
       var c = rawCfg(); if (!c) return cb(false);
       q.push(cb); if (loading) return; loading = true;
       var base = "https://www.gstatic.com/firebasejs/10.12.2/";
+      function boot() {
+        try {
+          if (!window.firebase) throw 0;
+          if (!firebase.apps.length) firebase.initializeApp(c);
+          db = firebase.firestore();
+          try { if (firebase.auth) firebase.auth().signInAnonymously().catch(function () {}); } catch (e) {}
+          ready = true; flush(true);
+        } catch (e) { flush(false); }
+      }
       loadScript(base + "firebase-app-compat.js", function () {
         loadScript(base + "firebase-firestore-compat.js", function () {
-          try { if (!window.firebase) throw 0; if (!firebase.apps.length) firebase.initializeApp(c); db = firebase.firestore(); ready = true; flush(true); }
-          catch (e) { flush(false); }
+          loadScript(base + "firebase-auth-compat.js", boot, boot); // auth optional
         }, function () { flush(false); });
       }, function () { flush(false); });
     }

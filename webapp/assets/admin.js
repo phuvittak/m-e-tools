@@ -548,6 +548,10 @@
         var endStr = root.querySelector("[data-flash-end]").value;
         patch.flashSale = { enabled: flashEnabled.checked, title: root.querySelector("[data-flash-title]").value, endTime: endStr ? new Date(endStr).getTime() : 0, items: flash.items.filter(function (x) { return x.productId; }) };
       }
+      if (patch.firebaseConfig && patch.firebaseConfig.trim()) {
+        try { JSON.parse(patch.firebaseConfig); }
+        catch (e) { U.toast("Firebase Config ไม่ใช่ JSON ที่ถูกต้อง — ตรวจสอบวงเล็บ { } และเครื่องหมายคำพูด", "err"); return; }
+      }
       try { S.saveSettings(patch); U.toast("บันทึกการตั้งค่าแล้ว — หน้าร้านอัปเดตทันที", "ok"); }
       catch (e) { U.toast("บันทึกไม่สำเร็จ — รูปอาจใหญ่เกินไป", "err"); }
     }

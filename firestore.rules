@@ -1,0 +1,28 @@
+rules_version = '2';
+// ---------------------------------------------------------------------------
+// M.E.Tools — Firestore security rules (PRODUCTION baseline)
+// วางกฎนี้ใน Firebase Console → Firestore Database → Rules → Publish
+//
+// ต้องเปิด Anonymous Authentication ด้วย:
+//   Build → Authentication → Sign-in method → Anonymous → Enable
+// เว็บจะลงชื่อเข้าใช้แบบ anonymous อัตโนมัติ เพื่อให้ request.auth ไม่ว่าง
+// (กันสแปมจากผู้ที่ไม่ได้ผ่านหน้าเว็บ) แชทลูกค้า–ร้านจึงอ่าน/เขียนได้เฉพาะผู้ที่
+// เข้าผ่านเว็บเท่านั้น
+// ---------------------------------------------------------------------------
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // แชทลูกค้า: เอกสารบทสนทนา + ข้อความ
+    match /chats/{convId} {
+      allow read, write: if request.auth != null;
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
+    // อื่น ๆ ปิดทั้งหมด
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
