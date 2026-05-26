@@ -205,16 +205,34 @@
     if (!cfg) { U.toast("ยังไม่ได้ตั้ง Firebase Config ในหน้า ตั้งค่าเว็บไซต์", "err"); return; }
 
     var origText = btn.textContent;
-    btn.disabled = true; btn.textContent = "กำลังซิงค์…";
-    function done(msg, kind) { btn.disabled = false; btn.textContent = origText; U.toast(msg, kind); }
+    btn.disabled = true;
+    function status(s) { btn.textContent = s; console.log("[sync]", s); }
+    var finished = false;
+    function done(msg, kind) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(hardTimeout);
+      btn.disabled = false; btn.textContent = origText;
+      U.toast(msg, kind);
+      console.log("[sync] done —", kind, msg);
+    }
+    // hard timeout: ถ้าเงียบเกิน 30 วิ แสดงว่าค้างแน่ ๆ
+    var hardTimeout = setTimeout(function () {
+      done("Timeout 30 วิ — ดู Console (F12) ว่าค้างขั้นไหน", "err");
+    }, 30000);
+
+    status("โหลด SDK…");
 
     function go() {
+      status("เริ่ม Firebase…");
       try {
         if (!firebase.apps.length) firebase.initializeApp(cfg);
-      } catch (e) { done("Firebase init ล้มเหลว: " + e.message, "err"); return; }
+      } catch (e) { done("Firebase init: " + e.message, "err"); return; }
       var auth = firebase.auth ? firebase.auth() : null;
+      status(auth ? "เข้าสู่ระบบ…" : "ข้าม auth…");
       var signIn = auth ? auth.signInAnonymously() : Promise.resolve();
       signIn.then(function () {
+        status("เตรียมข้อมูล…");
         var db = firebase.firestore();
         var items = S.getProducts().map(function (p) {
           // strip image data URIs — Firestore doc max 1MB
@@ -231,6 +249,7 @@
           }
           return clean;
         });
+        status("กำลังเขียน " + items.length + " รายการ…");
         return db.collection("products").doc("catalog").set({
           items: items,
           count: items.length,
@@ -239,7 +258,8 @@
       }).then(function () {
         done("ซิงค์สินค้า " + S.getProducts().length + " รายการไปบอท LINE แล้ว ✓", "ok");
       }).catch(function (e) {
-        done("ซิงค์ไม่สำเร็จ: " + (e.message || e), "err");
+        var code = e && e.code ? " [" + e.code + "]" : "";
+        done("ซิงค์ไม่สำเร็จ" + code + ": " + (e.message || e), "err");
       });
     }
 
@@ -253,8 +273,8 @@
     loadScript(base + "firebase-app-compat.js", function () {
       loadScript(base + "firebase-firestore-compat.js", function () {
         loadScript(base + "firebase-auth-compat.js", go, go);
-      }, function () { done("โหลด Firestore SDK ไม่สำเร็จ", "err"); });
-    }, function () { done("โหลด Firebase SDK ไม่สำเร็จ", "err"); });
+      }, function () { done("โหลด Firestore SDK ไม่สำเร็จ — ลองปิด ad blocker", "err"); });
+    }, function () { done("โหลด Firebase SDK ไม่สำเร็จ — ลองปิด ad blocker", "err"); });
   }
 
   function openProductModal(p) {
