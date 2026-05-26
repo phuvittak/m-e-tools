@@ -200,6 +200,34 @@
   }
 
   /* ---------- sync products → Firestore (for LINE bot) ---------- */
+  // ใช้ Firestore REST API (รองรับ named database "default" ที่ compat SDK ไม่รองรับ)
+  // Firebase Auth (anonymous) ใช้แค่เอา ID token ให้ผ่าน rules ที่ต้องการ request.auth != null
+  var FIRESTORE_DB = "default"; // ชื่อ database ใน Firebase Console (ไม่ใช่ "(default)")
+
+  // แปลง JS value → Firestore REST typed format
+  function toFsValue(v) {
+    if (v === null || v === undefined) return { nullValue: null };
+    if (typeof v === "boolean") return { booleanValue: v };
+    if (typeof v === "number") {
+      if (Number.isInteger(v)) return { integerValue: String(v) };
+      return { doubleValue: v };
+    }
+    if (typeof v === "string") return { stringValue: v };
+    if (v instanceof Date) return { timestampValue: v.toISOString() };
+    if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
+    if (typeof v === "object") {
+      var fields = {};
+      for (var k in v) if (Object.prototype.hasOwnProperty.call(v, k)) fields[k] = toFsValue(v[k]);
+      return { mapValue: { fields: fields } };
+    }
+    return { nullValue: null };
+  }
+  function toFsFields(obj) {
+    var fields = {};
+    for (var k in obj) if (Object.prototype.hasOwnProperty.call(obj, k)) fields[k] = toFsValue(obj[k]);
+    return fields;
+  }
+
   function syncProductsToFirebase(btn) {
     var cfg = window.parseFbConfig ? window.parseFbConfig(S.firebaseCfg ? S.firebaseCfg() : "") : null;
     if (!cfg) { U.toast("ยังไม่ได้ตั้ง Firebase Config ในหน้า ตั้งค่าเว็บไซต์", "err"); return; }
@@ -216,7 +244,6 @@
       U.toast(msg, kind);
       console.log("[sync] done —", kind, msg);
     }
-    // hard timeout: ถ้าเงียบเกิน 30 วิ แสดงว่าค้างแน่ ๆ
     var hardTimeout = setTimeout(function () {
       done("Timeout 30 วิ — ดู Console (F12) ว่าค้างขั้นไหน", "err");
     }, 30000);
@@ -228,18 +255,14 @@
       try {
         if (!firebase.apps.length) firebase.initializeApp(cfg);
       } catch (e) { done("Firebase init: " + e.message, "err"); return; }
-      var auth = firebase.auth ? firebase.auth() : null;
-      status(auth ? "เข้าสู่ระบบ…" : "ข้าม auth…");
-      var signIn = auth ? auth.signInAnonymously() : Promise.resolve();
-      signIn.then(function () {
+      if (!firebase.auth) { done("Firebase Auth ไม่ได้โหลด", "err"); return; }
+      status("เข้าสู่ระบบ…");
+      firebase.auth().signInAnonymously().then(function (cred) {
         status("เตรียมข้อมูล…");
-        var db = firebase.firestore();
         var items = S.getProducts().map(function (p) {
-          // strip image data URIs — Firestore doc max 1MB
           var clean = {};
           for (var k in p) if (Object.prototype.hasOwnProperty.call(p, k) && k !== "images" && k !== "image") clean[k] = p[k];
           clean.available = S.available(p);
-          // Firestore ห้ามใช้ array ซ้อน array โดยตรง — แปลง specs [[k,v]] เป็น [{label,value}]
           if (Array.isArray(clean.specs)) {
             clean.specs = clean.specs.map(function (s) {
               if (Array.isArray(s)) return { label: String(s[0] || ""), value: String(s[1] || "") };
@@ -249,14 +272,26 @@
           }
           return clean;
         });
-        status("กำลังเขียน " + items.length + " รายการ…");
-        return db.collection("products").doc("catalog").set({
-          items: items,
-          count: items.length,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        var body = { fields: toFsFields({ items: items, count: items.length, updatedAt: new Date() }) };
+        return cred.user.getIdToken().then(function (token) {
+          status("กำลังเขียน " + items.length + " รายการ…");
+          var url = "https://firestore.googleapis.com/v1/projects/" + cfg.projectId +
+            "/databases/" + FIRESTORE_DB + "/documents/products/catalog";
+          return fetch(url, {
+            method: "PATCH",
+            headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }).then(function (res) {
+            return res.text().then(function (txt) { return { ok: res.ok, status: res.status, text: txt }; });
+          });
         });
-      }).then(function () {
-        done("ซิงค์สินค้า " + S.getProducts().length + " รายการไปบอท LINE แล้ว ✓", "ok");
+      }).then(function (result) {
+        if (result.ok) {
+          done("ซิงค์สินค้า " + S.getProducts().length + " รายการไปบอท LINE แล้ว ✓", "ok");
+        } else {
+          var snippet = (result.text || "").slice(0, 200);
+          done("ซิงค์ไม่สำเร็จ [HTTP " + result.status + "]: " + snippet, "err");
+        }
       }).catch(function (e) {
         var code = e && e.code ? " [" + e.code + "]" : "";
         done("ซิงค์ไม่สำเร็จ" + code + ": " + (e.message || e), "err");
@@ -268,12 +303,10 @@
       var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = err || ok;
       document.head.appendChild(s);
     }
-    if (window.firebase && firebase.firestore) { go(); return; }
+    if (window.firebase && firebase.auth) { go(); return; }
     var base = "https://www.gstatic.com/firebasejs/10.12.2/";
     loadScript(base + "firebase-app-compat.js", function () {
-      loadScript(base + "firebase-firestore-compat.js", function () {
-        loadScript(base + "firebase-auth-compat.js", go, go);
-      }, function () { done("โหลด Firestore SDK ไม่สำเร็จ — ลองปิด ad blocker", "err"); });
+      loadScript(base + "firebase-auth-compat.js", go, function () { done("โหลด Firebase Auth SDK ไม่สำเร็จ", "err"); });
     }, function () { done("โหลด Firebase SDK ไม่สำเร็จ — ลองปิด ad blocker", "err"); });
   }
 

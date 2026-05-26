@@ -13,6 +13,7 @@
 import crypto from 'node:crypto';
 
 const FIREBASE_PROJECT = 'metools-724dc';
+const FIRESTORE_DB = 'default'; // named database (not the special "(default)")
 
 // ----- ข้อมูลร้าน (ต้องตรงกับ DEFAULT_SETTINGS ใน webapp/assets/store.js) -----
 const SHOP = {
@@ -44,7 +45,7 @@ async function getCatalog() {
   if (_catalogCache && Date.now() - _catalogFetchedAt < CATALOG_TTL_MS) {
     return _catalogCache;
   }
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents/products/catalog`;
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/products/catalog`;
   try {
     const res = await fetch(url);
     if (!res.ok) {
