@@ -221,6 +221,14 @@
           var clean = {};
           for (var k in p) if (Object.prototype.hasOwnProperty.call(p, k) && k !== "images" && k !== "image") clean[k] = p[k];
           clean.available = S.available(p);
+          // Firestore ห้ามใช้ array ซ้อน array โดยตรง — แปลง specs [[k,v]] เป็น [{label,value}]
+          if (Array.isArray(clean.specs)) {
+            clean.specs = clean.specs.map(function (s) {
+              if (Array.isArray(s)) return { label: String(s[0] || ""), value: String(s[1] || "") };
+              if (s && typeof s === "object") return { label: String(s.label || ""), value: String(s.value || "") };
+              return { label: "", value: String(s || "") };
+            });
+          }
           return clean;
         });
         return db.collection("products").doc("catalog").set({
