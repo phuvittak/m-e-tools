@@ -62,20 +62,36 @@ function buildReply(text) {
 
 // ----- LINE API client (ผ่าน fetch) -------------------------------------
 async function replyMessage(replyToken, text, token) {
-  const res = await fetch('https://api.line.me/v2/bot/message/reply', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      replyToken,
-      messages: [{ type: 'text', text }],
-    }),
-  });
-  if (!res.ok) {
+  console.log('[reply] calling LINE reply API, token len:', token?.length, 'token tail:', token?.slice(-6));
+  const startedAt = Date.now();
+  // safety timeout — abort fetch if LINE doesn't answer in 8s
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch('https://api.line.me/v2/bot/message/reply', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        replyToken,
+        messages: [{ type: 'text', text }],
+      }),
+      signal: ctrl.signal,
+    });
     const body = await res.text().catch(() => '');
-    console.error('LINE reply failed:', res.status, body);
+    const ms = Date.now() - startedAt;
+    if (res.ok) {
+      console.log('[reply] LINE reply OK', res.status, 'in', ms, 'ms');
+    } else {
+      console.error('[reply] LINE reply FAILED', res.status, 'in', ms, 'ms — body:', body);
+    }
+  } catch (err) {
+    const ms = Date.now() - startedAt;
+    console.error('[reply] LINE reply THREW after', ms, 'ms —', err?.name, err?.message);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -115,15 +131,19 @@ export default async function handler(req) {
 
   const secret = process.env.LINE_CHANNEL_SECRET;
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  console.log('[webhook] POST received — secret set:', !!secret, 'len:', secret?.length,
+    '| token set:', !!token, 'len:', token?.length);
   if (!secret || !token) {
-    console.error('Missing LINE env vars');
+    console.error('[webhook] Missing LINE env vars');
     return new Response('Server not configured', { status: 500 });
   }
 
   const rawBody = await req.text();
   const signature = req.headers.get('x-line-signature');
+  console.log('[webhook] body len:', rawBody.length, '| sig present:', !!signature);
 
   const ok = await verifySignature(secret, rawBody, signature);
+  console.log('[webhook] signature valid:', ok);
   if (!ok) {
     return new Response('Invalid signature', { status: 401 });
   }
@@ -136,11 +156,13 @@ export default async function handler(req) {
   }
 
   const events = Array.isArray(payload.events) ? payload.events : [];
+  console.log('[webhook] events count:', events.length, '| types:', events.map(e => e.type).join(','));
 
   await Promise.all(
     events.map(async (event) => {
       try {
         if (event.type === 'follow') {
+          console.log('[event] follow — sending welcome');
           await replyMessage(
             event.replyToken,
             `สวัสดีครับ! ขอบคุณที่เพิ่มเพื่อน ${SHOP.company} 🛠️\n\n${HELP_TEXT}`,
@@ -149,14 +171,17 @@ export default async function handler(req) {
           return;
         }
         if (event.type === 'message' && event.message?.type === 'text') {
-          const reply = buildReply(event.message.text);
+          const userText = event.message.text;
+          const reply = buildReply(userText);
+          console.log('[event] text:', JSON.stringify(userText), '| reply chars:', reply?.length);
           if (reply) await replyMessage(event.replyToken, reply, token);
         }
       } catch (err) {
-        console.error('Event handler error:', err);
+        console.error('[event] handler error:', err?.name, err?.message);
       }
     })
   );
+  console.log('[webhook] done');
 
   return new Response('OK', { status: 200 });
 }
