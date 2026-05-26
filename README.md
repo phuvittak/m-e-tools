@@ -74,6 +74,43 @@ URL ปัจจุบันคือ `phuvittak.github.io/m-e-tools`. ถ้า
 > **กฎความปลอดภัย Firestore (เริ่มต้น):** โหมดทดสอบเปิดให้อ่าน/เขียนได้ชั่วคราว —
 > ก่อนใช้จริงควรตั้งกฎจำกัดสิทธิ์ คอลเลกชัน `chats` ให้เหมาะสม
 
+## บอท LINE ตอบอัตโนมัติ (`api/line-webhook.js`)
+
+ระบบตอบ LINE อัตโนมัติทำงานบน **Vercel Edge Function** — ไม่ต้องมีเซิร์ฟเวอร์แยก
+ตอนนี้ตอบได้: ทักทาย · เวลาเปิด-ปิด · ที่อยู่ · เบอร์โทร · ลิงก์สินค้า · ขอคุยกับแอดมิน
+
+### ตั้งค่าครั้งแรก (ทำครั้งเดียว)
+
+**1) สร้าง Messaging API channel ที่ LINE Developers Console**
+- เข้า https://developers.line.biz/console/ → เลือก/สร้าง Provider → **Create a Messaging API channel**
+- กรอกชื่อ + รูป + คำอธิบาย → สร้างเสร็จจะได้ channel ใหม่
+- ในหน้า channel:
+  - แท็บ **Basic settings** → คัดลอก **Channel secret**
+  - แท็บ **Messaging API** → กดปุ่ม **Issue** ใต้ "Channel access token (long-lived)" → คัดลอก token
+
+**2) ใส่ค่าใน Vercel**
+- ไปที่ https://vercel.com → โปรเจกต์ของคุณ → **Settings → Environment Variables** → เพิ่ม 2 ตัว:
+  - `LINE_CHANNEL_SECRET` = (channel secret จากข้อ 1)
+  - `LINE_CHANNEL_ACCESS_TOKEN` = (long-lived token จากข้อ 1)
+- กด **Save** แล้ว **Redeploy** (Deployments → คลิกล่าสุด → ⋯ → Redeploy)
+
+**3) เชื่อม Webhook URL กลับเข้า LINE**
+- กลับไปที่ channel ใน LINE Console → แท็บ **Messaging API**
+- ช่อง **Webhook URL** ใส่: `https://<โดเมน-vercel-ของคุณ>/api/line-webhook`
+- กด **Verify** — ถ้าขึ้น Success คือใช้ได้
+- เปิดสวิตช์ **Use webhook**
+- เลื่อนลงไปหา **Auto-reply messages / Greeting messages** → กด **Edit** → ปิดทั้งสองอันใน LINE Official Account Manager (ไม่งั้นจะตอบทับกัน)
+
+**4) ทดสอบ**
+- สแกน QR ของ Official Account จากแท็บ Messaging API → เพิ่มเพื่อน → ทักไปคำว่า "เวลาเปิด"
+- ถ้าไม่ตอบ ดู log ที่ Vercel → โปรเจกต์ → **Logs** กรอง `/api/line-webhook`
+
+### แก้คำตอบ
+- ข้อมูลร้าน (เวลา/ที่อยู่/เบอร์) แก้ที่ตัวแปร `SHOP` ในไฟล์ `api/line-webhook.js`
+- เพิ่มคีย์เวิร์ดใหม่ในฟังก์ชัน `buildReply()` ใต้คอมเมนต์ "ตัวจัดการคำตอบ"
+
+> **เร็ว ๆ นี้:** Phase 2 จะให้บอทตอบราคา/สเป็กสินค้าจาก Firestore ได้ตรง ๆ และ Phase 3 จะแจ้งเตือนแอดมินเมื่อมีออเดอร์ใหม่
+
 ## เครื่องมือบรรทัดคำสั่ง (`tools/`)
 
 | Tool | Description |
