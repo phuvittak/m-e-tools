@@ -11,7 +11,10 @@
     <main class="main">
       <div class="topbar">
         <div><h1>คลัง / สต็อก</h1><div class="sub">จำนวนคงเหลือ ที่จัดเก็บ ต้นทุน และราคาของสินค้าทุกชิ้น</div></div>
-        <button class="btn" data-add>+ เพิ่มสินค้า</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <button class="btn btn-ghost" data-sync-bot title="ส่งข้อมูลสินค้าทั้งหมดไป Firebase เพื่อให้บอท LINE ใช้ตอบลูกค้า">⤴ ซิงค์ไปบอท LINE</button>
+          <button class="btn" data-add>+ เพิ่มสินค้า</button>
+        </div>
       </div>
 
       <div class="alert" data-alert style="display:none"></div>

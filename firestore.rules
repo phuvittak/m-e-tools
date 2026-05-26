@@ -20,6 +20,14 @@ service cloud.firestore {
       }
     }
 
+    // แคตตาล็อกสินค้า (แชร์กับบอท LINE)
+    // อ่าน: เปิดสาธารณะ — บอท LINE เรียกผ่าน REST API โดยไม่ต้อง auth
+    // เขียน: ต้องเป็นผู้ใช้ที่ผ่านเว็บ (anonymous auth) — แอดมินซิงค์จากหน้าหลังร้าน
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
     // อื่น ๆ ปิดทั้งหมด
     match /{document=**} {
       allow read, write: if false;
