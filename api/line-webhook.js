@@ -1,5 +1,5 @@
 /* =====================================================================
-   LINE Messaging API — Webhook (Vercel Edge Function)
+   LINE Messaging API — Webhook (Vercel Node.js Function)
    ---------------------------------------------------------------------
    รับข้อความจาก LINE Official Account แล้วตอบกลับอัตโนมัติ
    ตั้งค่า env vars ที่ Vercel:
@@ -9,7 +9,7 @@
      https://<your-vercel-domain>/api/line-webhook
    ===================================================================== */
 
-export const config = { runtime: 'edge' };
+import crypto from 'node:crypto';
 
 // ----- ข้อมูลร้าน (ต้องตรงกับ DEFAULT_SETTINGS ใน webapp/assets/store.js) -----
 const SHOP = {
@@ -56,15 +56,39 @@ function buildReply(text) {
   if (/^(help|ช่วย|menu|เมนู|\?)$/i.test(t)) {
     return HELP_TEXT;
   }
-  // ไม่ตรงคำสำคัญ — ตอบช่วยเหลือสั้น ๆ
   return `ขอบคุณสำหรับข้อความครับ 🙏\n\n${HELP_TEXT}`;
 }
 
-// ----- LINE API client (ผ่าน fetch) -------------------------------------
+// ----- อ่าน raw body จาก request stream (ต้องใช้ raw bytes ตรวจ signature) -----
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+// ----- ตรวจลายเซ็น HMAC-SHA256 ของ LINE ---------------------------------
+function verifySignature(secret, body, signature) {
+  if (!signature || !secret) return false;
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(body, 'utf8')
+    .digest('base64');
+  try {
+    const a = Buffer.from(expected);
+    const b = Buffer.from(signature);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+// ----- LINE Reply API ---------------------------------------------------
 async function replyMessage(replyToken, text, token) {
-  console.log('[reply] calling LINE reply API, token len:', token?.length, 'token tail:', token?.slice(-6));
+  console.log('[reply] calling LINE — token len:', token?.length, 'tail:', token?.slice(-6));
   const startedAt = Date.now();
-  // safety timeout — abort fetch if LINE doesn't answer in 8s
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
@@ -83,80 +107,69 @@ async function replyMessage(replyToken, text, token) {
     const body = await res.text().catch(() => '');
     const ms = Date.now() - startedAt;
     if (res.ok) {
-      console.log('[reply] LINE reply OK', res.status, 'in', ms, 'ms');
+      console.log('[reply] LINE OK', res.status, 'in', ms, 'ms');
     } else {
-      console.error('[reply] LINE reply FAILED', res.status, 'in', ms, 'ms — body:', body);
+      console.error('[reply] LINE FAILED', res.status, 'in', ms, 'ms — body:', body);
     }
   } catch (err) {
     const ms = Date.now() - startedAt;
-    console.error('[reply] LINE reply THREW after', ms, 'ms —', err?.name, err?.message);
+    console.error('[reply] LINE THREW after', ms, 'ms —', err?.name, err?.message);
   } finally {
     clearTimeout(timer);
   }
 }
 
-// ----- ตรวจลายเซ็น HMAC-SHA256 ของ LINE ---------------------------------
-async function verifySignature(secret, body, signature) {
-  if (!signature || !secret) return false;
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(body));
-  const bytes = new Uint8Array(sigBuf);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  const expected = btoa(bin);
-  // constant-time compare
-  if (expected.length !== signature.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) {
-    diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
-// ----- Handler ----------------------------------------------------------
-export default async function handler(req) {
+// ----- Handler (Vercel Node.js function: req, res) ----------------------
+export default async function handler(req, res) {
   if (req.method === 'GET') {
-    return new Response('LINE webhook is live ✅', { status: 200 });
+    res.status(200).send('LINE webhook is live ✅');
+    return;
   }
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    res.status(405).send('Method not allowed');
+    return;
   }
 
   const secret = process.env.LINE_CHANNEL_SECRET;
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  console.log('[webhook] POST received — secret set:', !!secret, 'len:', secret?.length,
-    '| token set:', !!token, 'len:', token?.length);
+  console.log(
+    '[webhook] POST received — secret set:', !!secret, 'len:', secret?.length,
+    '| token set:', !!token, 'len:', token?.length
+  );
   if (!secret || !token) {
     console.error('[webhook] Missing LINE env vars');
-    return new Response('Server not configured', { status: 500 });
+    res.status(500).send('Server not configured');
+    return;
   }
 
-  const rawBody = await req.text();
-  const signature = req.headers.get('x-line-signature');
+  let rawBody;
+  try {
+    rawBody = await readRawBody(req);
+  } catch (err) {
+    console.error('[webhook] readRawBody error:', err?.message);
+    res.status(400).send('Bad request');
+    return;
+  }
+  const signature = req.headers['x-line-signature'];
   console.log('[webhook] body len:', rawBody.length, '| sig present:', !!signature);
 
-  const ok = await verifySignature(secret, rawBody, signature);
+  const ok = verifySignature(secret, rawBody, signature);
   console.log('[webhook] signature valid:', ok);
   if (!ok) {
-    return new Response('Invalid signature', { status: 401 });
+    res.status(401).send('Invalid signature');
+    return;
   }
 
   let payload;
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    return new Response('Bad JSON', { status: 400 });
+    res.status(400).send('Bad JSON');
+    return;
   }
 
   const events = Array.isArray(payload.events) ? payload.events : [];
-  console.log('[webhook] events count:', events.length, '| types:', events.map(e => e.type).join(','));
+  console.log('[webhook] events:', events.length, '| types:', events.map((e) => e.type).join(','));
 
   await Promise.all(
     events.map(async (event) => {
@@ -182,6 +195,5 @@ export default async function handler(req) {
     })
   );
   console.log('[webhook] done');
-
-  return new Response('OK', { status: 200 });
+  res.status(200).send('OK');
 }
