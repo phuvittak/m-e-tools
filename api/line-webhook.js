@@ -19,7 +19,7 @@ const SHOP = {
   hoursWeek: 'จันทร์ – เสาร์ 8:00 – 17:00 น.',
   hoursSun: 'อาทิตย์ 8:00 – 15:00 น.',
   line: '@metools',
-  website: 'https://m-e-tools.vercel.app',
+  website: 'https://metools-rho.vercel.app',
 };
 
 const HELP_TEXT =
