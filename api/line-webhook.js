@@ -201,6 +201,33 @@ function verifySignature(secret, body, signature) {
   }
 }
 
+// ----- บันทึก log บทสนทนาลง Firestore (ให้แอดมินดูในหลังร้าน) -----------
+async function logBotMessage(userId, text, reply) {
+  if (!userId) return;
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_messages`;
+  const safe = (s, max) => String(s || '').slice(0, max);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fields: {
+          userId: { stringValue: safe(userId, 99) },
+          text: { stringValue: safe(text, 4999) },
+          reply: { stringValue: safe(reply, 4999) },
+          at: { timestampValue: new Date().toISOString() },
+        },
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[log] write failed', res.status, body.slice(0, 200));
+    }
+  } catch (err) {
+    console.error('[log] write threw', err?.message);
+  }
+}
+
 // ----- LINE Reply API ---------------------------------------------------
 async function replyMessage(replyToken, text, token) {
   console.log('[reply] calling LINE — chars:', text?.length);
@@ -277,7 +304,13 @@ export default async function handler(req, res) {
         let reply = await tryProductReply(userText);
         if (!reply) reply = buildReply(userText);
         console.log('[event] text:', JSON.stringify(userText).slice(0, 80), '| reply chars:', reply?.length);
-        if (reply) await replyMessage(event.replyToken, reply, token);
+        if (reply) {
+          // ส่งคำตอบ + log ลง Firestore พร้อมกัน
+          await Promise.all([
+            replyMessage(event.replyToken, reply, token),
+            logBotMessage(event.source?.userId, userText, reply),
+          ]);
+        }
       }
     } catch (err) {
       console.error('[event] handler error:', err?.name, err?.message);

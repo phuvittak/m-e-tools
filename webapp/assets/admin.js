@@ -11,12 +11,12 @@
   if (view === "staff") {
     if (!S.requirePerm(null, "../login.html")) return;
     if (!S.isOwner()) { window.location.href = "dashboard.html"; return; }
-  } else if (view === "chat") {
+  } else if (view === "chat" || view === "botinbox") {
     if (!S.requirePerm(null, "../login.html")) return; // any staff
   } else if (!S.requirePerm(permFor[view] || "dashboard", "../login.html")) return;
 
   mountShell(view);
-  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat }[view] || function () {})();
+  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox }[view] || function () {})();
 
   /* ---------- shell / sidebar ---------- */
   function mountShell(active) {
@@ -29,6 +29,7 @@
       settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
       staff: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
       chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+      botinbox: '<path d="M12 2C6.48 2 2 6.04 2 11c0 2.5 1.16 4.74 3 6.33V22l3.83-2.1c1.01.23 2.07.35 3.17.35 5.52 0 10-4.04 10-9s-4.48-9-10-9z"/><circle cx="8.5" cy="11" r="1.2" fill="currentColor"/><circle cx="12" cy="11" r="1.2" fill="currentColor"/><circle cx="15.5" cy="11" r="1.2" fill="currentColor"/>',
     };
     var nav = [
       ["dashboard.html", "dashboard", "แดชบอร์ด", "dashboard"],
@@ -38,6 +39,7 @@
       ["settings.html", "settings", "ตั้งค่าเว็บไซต์", "settings"],
     ].filter(function (n) { return S.hasPerm(n[3]); });
     nav.push(["chat.html", "chat", "แชทลูกค้า", "chat"]);
+    nav.push(["bot-inbox.html", "botinbox", "แชทบอท LINE", "botinbox"]);
     if (S.isOwner()) nav.push(["staff.html", "staff", "จัดการทีมงาน", "staff"]);
 
     var roleTag = sess.role === "owner" ? "เจ้าของร้าน" : "พนักงาน";
@@ -308,6 +310,207 @@
     loadScript(base + "firebase-app-compat.js", function () {
       loadScript(base + "firebase-auth-compat.js", go, function () { done("โหลด Firebase Auth SDK ไม่สำเร็จ", "err"); });
     }, function () { done("โหลด Firebase SDK ไม่สำเร็จ — ลองปิด ad blocker", "err"); });
+  }
+
+  /* ---------- shared: ensure Firebase Auth + return ID token --------------- */
+  function withFirebaseAuth(cb) {
+    var cfg = window.parseFbConfig ? window.parseFbConfig(S.firebaseCfg ? S.firebaseCfg() : "") : null;
+    if (!cfg) return cb(null, new Error("ยังไม่ได้ตั้ง Firebase Config"));
+    function loadScript(src, ok, err) {
+      if (document.querySelector('script[src="' + src + '"]')) { ok(); return; }
+      var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = err || ok;
+      document.head.appendChild(s);
+    }
+    function go() {
+      try { if (!firebase.apps.length) firebase.initializeApp(cfg); }
+      catch (e) { return cb(null, e); }
+      if (!firebase.auth) return cb(null, new Error("Firebase Auth ไม่ได้โหลด"));
+      firebase.auth().signInAnonymously()
+        .then(function (cred) { return cred.user.getIdToken(); })
+        .then(function (token) { cb({ token: token, projectId: cfg.projectId }, null); })
+        .catch(function (e) { cb(null, e); });
+    }
+    if (window.firebase && firebase.auth) return go();
+    var base = "https://www.gstatic.com/firebasejs/10.12.2/";
+    loadScript(base + "firebase-app-compat.js", function () {
+      loadScript(base + "firebase-auth-compat.js", go, function () { cb(null, new Error("โหลด Firebase Auth ไม่สำเร็จ")); });
+    }, function () { cb(null, new Error("โหลด Firebase SDK ไม่สำเร็จ")); });
+  }
+
+  /* ---------- ปลด Firestore REST typed value → JS plain ---------------- */
+  function fromFsValue(v) {
+    if (!v || typeof v !== "object") return null;
+    if ("stringValue" in v) return v.stringValue;
+    if ("integerValue" in v) return Number(v.integerValue);
+    if ("doubleValue" in v) return Number(v.doubleValue);
+    if ("booleanValue" in v) return v.booleanValue;
+    if ("timestampValue" in v) return v.timestampValue;
+    if ("nullValue" in v) return null;
+    if ("mapValue" in v) {
+      var out = {}, f = v.mapValue.fields || {};
+      for (var k in f) out[k] = fromFsValue(f[k]);
+      return out;
+    }
+    if ("arrayValue" in v) return (v.arrayValue.values || []).map(fromFsValue);
+    return null;
+  }
+  function fromFsFields(fields) {
+    var out = {};
+    for (var k in fields || {}) out[k] = fromFsValue(fields[k]);
+    return out;
+  }
+
+  /* ===================== BOT INBOX (Phase 2.5) ===================== */
+  function initBotInbox() {
+    var refresh = document.querySelector("[data-refresh]");
+    var alertBox = document.querySelector("[data-alert]");
+    function alert(msg, kind) {
+      if (!msg) { alertBox.style.display = "none"; return; }
+      alertBox.textContent = msg; alertBox.style.display = "block";
+      alertBox.style.background = kind === "err" ? "#fee" : "#efe";
+    }
+
+    var state = { messages: [], byUser: {}, activeUid: null };
+
+    if (refresh) refresh.addEventListener("click", load);
+    load();
+
+    function load() {
+      alert("กำลังโหลดข้อความ…");
+      withFirebaseAuth(function (auth, err) {
+        if (err) { alert("ไม่สามารถเชื่อม Firebase: " + err.message, "err"); return; }
+        var url = "https://firestore.googleapis.com/v1/projects/" + auth.projectId +
+          "/databases/default/documents/bot_messages?pageSize=500";
+        fetch(url, { headers: { "Authorization": "Bearer " + auth.token } })
+          .then(function (res) { return res.json().then(function (j) { return { ok: res.ok, status: res.status, body: j }; }); })
+          .then(function (r) {
+            if (!r.ok) {
+              alert("โหลดไม่สำเร็จ [HTTP " + r.status + "]: " + (r.body.error && r.body.error.message ? r.body.error.message : ""), "err");
+              renderEmpty();
+              return;
+            }
+            alert("");
+            var docs = r.body.documents || [];
+            state.messages = docs.map(function (d) {
+              var f = fromFsFields(d.fields || {});
+              return { userId: f.userId || "", text: f.text || "", reply: f.reply || "", at: f.at || d.createTime || "" };
+            }).sort(function (a, b) { return (b.at || "").localeCompare(a.at || ""); });
+            groupAndRender();
+          })
+          .catch(function (e) {
+            alert("โหลดผิดพลาด: " + (e.message || e), "err");
+            renderEmpty();
+          });
+      });
+    }
+
+    function groupAndRender() {
+      // group by userId
+      var byUser = {};
+      state.messages.forEach(function (m) {
+        if (!byUser[m.userId]) byUser[m.userId] = { userId: m.userId, messages: [], lastAt: m.at, lastText: m.text };
+        byUser[m.userId].messages.push(m);
+        if ((m.at || "") > (byUser[m.userId].lastAt || "")) {
+          byUser[m.userId].lastAt = m.at; byUser[m.userId].lastText = m.text;
+        }
+      });
+      state.byUser = byUser;
+
+      var todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      var weekStart = new Date(Date.now() - 7 * 86400000);
+      var todayMsgs = state.messages.filter(function (m) { return new Date(m.at) >= todayStart; });
+      var weekMsgs = state.messages.filter(function (m) { return new Date(m.at) >= weekStart; });
+      var todayUsers = {}; todayMsgs.forEach(function (m) { todayUsers[m.userId] = 1; });
+
+      document.querySelector("[data-kpi-today]").textContent = todayMsgs.length;
+      document.querySelector("[data-kpi-users]").textContent = Object.keys(todayUsers).length;
+      document.querySelector("[data-kpi-week]").textContent = weekMsgs.length;
+      document.querySelector("[data-kpi-total]").textContent = Object.keys(byUser).length;
+
+      // keyword cloud — นับคำเด่นที่ยาว 2+ ตัวอักษร จากข้อความ 7 วัน
+      var freq = {};
+      weekMsgs.forEach(function (m) {
+        var words = (m.text || "").toLowerCase().split(/\s+/);
+        words.forEach(function (w) {
+          w = w.replace(/[.,!?"()\[\]{}:;]/g, "").trim();
+          if (w.length >= 2 && w.length < 30) freq[w] = (freq[w] || 0) + 1;
+        });
+      });
+      var top = Object.keys(freq).map(function (k) { return [k, freq[k]]; })
+        .sort(function (a, b) { return b[1] - a[1]; }).slice(0, 20);
+      var kw = document.querySelector("[data-keywords]");
+      kw.innerHTML = top.length
+        ? top.map(function (p) { return '<span class="keyword-pill"><b>' + p[1] + '</b>' + esc(p[0]) + '</span>'; }).join("")
+        : '<span style="color:var(--fg-2); font-size:13px">ยังไม่มีข้อความใน 7 วันที่ผ่านมา</span>';
+
+      // conversation list
+      var convs = Object.values(byUser).sort(function (a, b) { return (b.lastAt || "").localeCompare(a.lastAt || ""); });
+      var list = document.querySelector("[data-convs]");
+      if (!convs.length) {
+        list.innerHTML = '<div class="thread-empty">ยังไม่มีลูกค้าทักบอท</div>';
+        renderEmpty();
+        return;
+      }
+      list.innerHTML = convs.map(function (c) {
+        var when = fmtRelative(c.lastAt);
+        var nameTag = c.userId.slice(-8);
+        return '<div class="conv-row" data-uid="' + esc(c.userId) + '">' +
+          '<div class="who"><span>👤 …' + esc(nameTag) + '</span><span>' + c.messages.length + ' ข้อความ</span></div>' +
+          '<div class="last">' + esc(c.lastText) + '</div>' +
+          '<div class="meta"><span>' + when + '</span></div>' +
+          '</div>';
+      }).join("");
+      list.querySelectorAll("[data-uid]").forEach(function (row) {
+        row.addEventListener("click", function () {
+          list.querySelectorAll(".conv-row").forEach(function (r) { r.classList.remove("on"); });
+          row.classList.add("on");
+          state.activeUid = row.dataset.uid;
+          renderThread(state.activeUid);
+        });
+      });
+      // auto-select first
+      if (!state.activeUid || !byUser[state.activeUid]) state.activeUid = convs[0].userId;
+      var firstRow = list.querySelector('[data-uid="' + cssEsc(state.activeUid) + '"]');
+      if (firstRow) { firstRow.classList.add("on"); renderThread(state.activeUid); }
+    }
+
+    function renderEmpty() {
+      document.querySelector("[data-thread]").innerHTML = '<div class="thread-empty">ยังไม่มีบทสนทนา</div>';
+    }
+
+    function renderThread(uid) {
+      var conv = state.byUser[uid];
+      var box = document.querySelector("[data-thread]");
+      if (!conv) { box.innerHTML = '<div class="thread-empty">เลือกบทสนทนาทางซ้าย</div>'; return; }
+      var msgs = conv.messages.slice().sort(function (a, b) { return (a.at || "").localeCompare(b.at || ""); });
+      box.innerHTML =
+        '<div style="margin-bottom:14px; padding-bottom:10px; border-bottom:2px solid var(--border-3)">' +
+        '<div style="font-weight:600; font-size:14px">👤 ลูกค้า ID: …' + esc(uid.slice(-12)) + '</div>' +
+        '<div style="font-size:12px; color:var(--fg-2); margin-top:2px">' + msgs.length + ' ข้อความทั้งหมด · เริ่มทัก ' + fmtAbsolute(msgs[0].at) + '</div>' +
+        '</div>' +
+        msgs.map(function (m) {
+          return '<div class="msg-pair">' +
+            '<div class="msg-line user"><span class="role">ลูกค้า</span><div class="body">' + esc(m.text) + '</div></div>' +
+            '<div class="msg-line bot"><span class="role">บอท</span><div class="body">' + esc(m.reply) + '</div></div>' +
+            '<div class="msg-time">' + fmtAbsolute(m.at) + '</div>' +
+            '</div>';
+        }).join("");
+    }
+
+    function fmtRelative(iso) {
+      if (!iso) return "—";
+      var d = new Date(iso), now = new Date(), diff = (now - d) / 1000;
+      if (diff < 60) return "เมื่อสักครู่";
+      if (diff < 3600) return Math.floor(diff / 60) + " นาทีที่แล้ว";
+      if (diff < 86400) return Math.floor(diff / 3600) + " ชั่วโมงที่แล้ว";
+      if (diff < 7 * 86400) return Math.floor(diff / 86400) + " วันที่แล้ว";
+      return d.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+    }
+    function fmtAbsolute(iso) {
+      if (!iso) return "—";
+      return new Date(iso).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    }
+    function cssEsc(s) { return String(s).replace(/[^a-zA-Z0-9_-]/g, "\\$&"); }
   }
 
   function openProductModal(p) {
