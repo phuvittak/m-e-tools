@@ -370,7 +370,7 @@
       alertBox.style.background = kind === "err" ? "#fee" : "#efe";
     }
 
-    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, prevCount: 0, fs: null };
+    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, unsubProfiles: null, prevCount: 0, fs: null, profiles: {} };
 
     if (refresh) refresh.addEventListener("click", function () {
       // listener อัปเดตเองอยู่แล้ว — ปุ่มนี้กลายเป็นปุ่ม re-subscribe เผื่อ connection ขาด
@@ -425,13 +425,24 @@
         var authInst = authMod.getAuth(app);
         return authMod.signInAnonymously(authInst).then(function () {
           var db = fsMod.getFirestore(app, "default");
-          // เก็บ helpers ที่ sendReply() ใช้ — ไม่ต้องโหลด SDK ซ้ำ
+          // เก็บ helpers ที่ sendReply / promptRename ใช้ — ไม่ต้องโหลด SDK ซ้ำ
           state.fs = {
             db: db,
             collection: fsMod.collection,
             addDoc: fsMod.addDoc,
+            doc: fsMod.doc,
+            setDoc: fsMod.setDoc,
+            deleteField: fsMod.deleteField,
             serverTimestamp: fsMod.serverTimestamp
           };
+          // ฟัง customer_profiles เพื่อให้ชื่อลูกค้าอัปเดตเรียลไทม์
+          var profCol = fsMod.collection(db, "customer_profiles");
+          state.unsubProfiles = fsMod.onSnapshot(profCol, function (ps) {
+            var map = {};
+            ps.docs.forEach(function (d) { map[d.id] = d.data() || {}; });
+            state.profiles = map;
+            if (state.messages.length) groupAndRender();
+          }, function (err) { console.warn("[profiles listener]", err); });
           var col = fsMod.collection(db, "bot_messages");
           state.unsub = fsMod.onSnapshot(col, function (snap) {
             alert("");
@@ -518,13 +529,17 @@
       list.innerHTML = convs.map(function (c) {
         var when = fmtRelative(c.lastAt);
         var nameTag = c.userId.slice(-8);
-        // source tag — ส่วนใหญ่จะเป็น LINE; ในอนาคตอาจรวม web ด้วย
-        var lastSrc = (c.messages[0] && c.messages[0].source) || "line";
+        var nick = (state.profiles[c.userId] && state.profiles[c.userId].nickname) || "";
+        // badge เลือกจากแหล่งของข้อความ "ฝั่งลูกค้า" ล่าสุด (กรอง admin/bot ออก)
+        // ลูกค้า = role:"user" หรือ doc paired เก่า (มี text แต่ไม่มี role)
+        var customerMsgs = c.messages.filter(function (m) { return !m.role || m.role === "user"; });
+        var lastSrc = (customerMsgs[0] && customerMsgs[0].source) || "line";
         var srcBadge = lastSrc === "web"
           ? '<span style="background:#e8f5e9;color:#1b5e20;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600">เว็บ</span>'
           : '<span style="background:#06c755;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600">LINE</span>';
+        var displayName = nick ? esc(nick) : '…' + esc(nameTag);
         return '<div class="conv-row" data-uid="' + esc(c.userId) + '">' +
-          '<div class="who"><span>' + srcBadge + ' …' + esc(nameTag) + '</span><span>' + c.messages.length + ' ข้อความ</span></div>' +
+          '<div class="who"><span>' + srcBadge + ' ' + displayName + '</span><span>' + c.messages.length + ' ข้อความ</span></div>' +
           '<div class="last">' + esc(c.lastText) + '</div>' +
           '<div class="meta"><span>' + when + '</span></div>' +
           '</div>';
@@ -560,8 +575,6 @@
       }
       if (bar) bar.style.display = "flex";
       var pairs = conv.messages.slice().sort(function (a, b) { return (a.at || "").localeCompare(b.at || ""); });
-      // แยก doc paired เก่า (text + reply) เป็น bubble ลูกค้าซ้าย + bot ขวา 2 ก้อน
-      // doc flat ใหม่ (role: "user"|"admin"|"bot") เป็น 1 bubble — ฝั่งซ้ายถ้า user, ขวาถ้าตอบ
       var bubbles = [];
       pairs.forEach(function (m) {
         if (m.role) {
@@ -572,28 +585,47 @@
         }
       });
       var roleLabel = { user: "ลูกค้า", admin: "แอดมิน", bot: "บอท" };
+      var nick = (state.profiles[uid] && state.profiles[uid].nickname) || "ลูกค้า";
       box.innerHTML =
         '<div class="thread-head">' +
-          '<div style="font-weight:600; font-size:14px">👤 ลูกค้า ID: …' + esc(uid.slice(-12)) + '</div>' +
-          '<div style="font-size:12px; color:var(--fg-2); margin-top:2px">' + pairs.length + ' บทสนทนา · เริ่มทัก ' + fmtAbsolute(pairs[0].at) + '</div>' +
+          '<div class="thread-name">' +
+            '<span>👤</span>' +
+            '<b data-nick>' + esc(nick) + '</b>' +
+            '<button class="edit-name" data-edit-nick title="แก้ไขชื่อ (ID ไม่เปลี่ยน)">✎ แก้ชื่อ</button>' +
+            '<span class="thread-id">ID: …' + esc(uid.slice(-12)) + '</span>' +
+          '</div>' +
         '</div>' +
         '<div class="thread-body">' +
           bubbles.map(function (b) {
             var bubbleClass = b.role === "bot" ? "bot" : b.side;
             return '<div class="bubble-row ' + b.side + '">' +
-              (b.side === "left"
-                ? '<div><div class="bubble-role">' + esc(roleLabel[b.role] || "") + '</div>' +
-                  '<div class="bubble ' + bubbleClass + '">' + esc(b.text) + '</div>' +
-                  '<div class="bubble-meta">' + fmtAbsolute(b.at) + '</div></div>'
-                : '<div style="text-align:right"><div class="bubble-role">' + esc(roleLabel[b.role] || "") + '</div>' +
-                  '<div class="bubble ' + bubbleClass + '">' + esc(b.text) + '</div>' +
-                  '<div class="bubble-meta">' + fmtAbsolute(b.at) + '</div></div>'
-              ) +
+              '<div class="bubble-col">' +
+                '<div class="bubble-role">' + esc(roleLabel[b.role] || "") + '</div>' +
+                '<div class="bubble ' + bubbleClass + '">' + esc(b.text) + '</div>' +
+                '<div class="bubble-meta">' + fmtAbsolute(b.at) + '</div>' +
+              '</div>' +
               '</div>';
           }).join("") +
         '</div>';
-      // auto-scroll ไปข้อความล่าสุดด้านล่าง
+      var editBtn = box.querySelector("[data-edit-nick]");
+      if (editBtn) editBtn.addEventListener("click", function () { promptRename(uid); });
       box.scrollTop = box.scrollHeight;
+    }
+
+    function promptRename(uid) {
+      var current = (state.profiles[uid] && state.profiles[uid].nickname) || "";
+      var next = prompt("ตั้งชื่อลูกค้านี้ (ID ไม่เปลี่ยน):", current);
+      if (next === null) return; // cancel
+      next = String(next).trim().slice(0, 80);
+      if (!state.fs) { if (window.U && U.toast) U.toast("ยังเชื่อม Firebase ไม่สำเร็จ", "err"); return; }
+      var fs = state.fs;
+      var ref = fs.doc(fs.db, "customer_profiles", uid);
+      var payload = next
+        ? { nickname: next, updatedAt: fs.serverTimestamp() }
+        : { nickname: fs.deleteField(), updatedAt: fs.serverTimestamp() };
+      fs.setDoc(ref, payload, { merge: true })
+        .then(function () { if (window.U && U.toast) U.toast(next ? "บันทึกชื่อแล้ว" : "ล้างชื่อแล้ว", "ok"); })
+        .catch(function (err) { if (window.U && U.toast) U.toast("บันทึกไม่สำเร็จ: " + (err.message || err), "err"); });
     }
 
     function fmtRelative(iso) {

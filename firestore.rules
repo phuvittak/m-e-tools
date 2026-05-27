@@ -52,6 +52,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // โปรไฟล์ลูกค้า (ชื่อเล่นที่แอดมินตั้ง) — แยกจาก ID ใน bot_messages
+    // อ่าน: ผู้ที่ผ่าน anonymous auth (ใช้ในหลังร้าน + ลูกค้าฝั่งเว็บเห็นชื่อตัวเอง)
+    // เขียน: ตอนนี้เปิดกว้าง — Phase D จะ tighten ด้วย custom claims/admin role
+    match /customer_profiles/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
     // อื่น ๆ ปิดทั้งหมด
     match /{document=**} {
       allow read, write: if false;
