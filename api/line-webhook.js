@@ -1,11 +1,12 @@
 /* =====================================================================
    LINE Messaging API — Webhook (Vercel Node.js Function)
    ---------------------------------------------------------------------
-   บอทตอบลูกค้าแบบทีละขั้น สุภาพ บอกราคาเป็นข้อมูลสุดท้าย
-   อ่านสินค้าสด ๆ จาก Firestore + จดจำบทสนทนาผ่าน bot_sessions
-
-   ✏️ จะแก้คำตอบของบอท แก้ในไฟล์นี้ — อ่านคู่มือใน README.md หัวข้อ
-      "แก้คำตอบบอท LINE"
+   บอท M.E.Tools ระดับมืออาชีพ
+   • Flex Message สีเหลือง-ดำ DEWALT (กรอบสวย ไม่ดูเป็น AI)
+   • Quick Reply ปุ่มลัดเด้งใต้ข้อความ
+   • Human handoff — ลูกค้าขอ "ติดต่อเจ้าของ" → บอทเงียบ + push ไป LINE
+     เจ้าของให้รู้ทันที
+   • AI (Claude Opus 4.7) สำหรับคำถามภาษาธรรมชาติ — fallback ไปกฎ
    ===================================================================== */
 
 import crypto from 'node:crypto';
@@ -13,24 +14,30 @@ import crypto from 'node:crypto';
 const FIREBASE_PROJECT = 'metools-724dc';
 const FIRESTORE_DB = 'default';
 
-// ===== ข้อมูลร้าน (แก้ตรงนี้ถ้าเปลี่ยน) =================================
+// ===== ข้อมูลร้าน ========================================================
 const SHOP = {
   company: 'บริษัท เอ็ม.อี.ทูลส์ จำกัด',
+  shortName: 'M.E.Tools ท่ารั้ว',
   address: '199/6 ม.7 ต.สันปูเลย อ.ดอยสะเก็ด จ.เชียงใหม่ 50220',
   phone: '081-3706466, 053-104699',
+  phoneCall: '0813706466', // tel: link
   hoursWeek: 'จันทร์ – เสาร์ 8:00 – 17:00 น.',
   hoursSun: 'อาทิตย์ 8:00 – 15:00 น.',
   line: 'https://lin.ee/so6euhT',
   website: 'https://metools-rho.vercel.app',
 };
 
-const HELP_TEXT =
-  'สอบถามได้เลยครับ 🙂\n' +
-  '• เลือกประเภท \n' +
-  '• ถ้าใส่รหัสสินค้าจะดูสเป็กทันที\n' +
-  '• "พนักงาน" — ขอคุยกับแอดมิน';
+// ===== สีแบรนด์ DEWALT ==================================================
+const COLOR = {
+  yellow: '#FFB81C',   // DEWALT yellow
+  black: '#000000',
+  white: '#FFFFFF',
+  gray: '#666666',
+  lightGray: '#E5E5E5',
+  green: '#22C55E',
+  red: '#EF4444',
+};
 
-// ===== ป้ายชื่อหมวด (สำหรับพูดให้ลูกค้าฟังเข้าใจ) ========================
 const CATEGORY_LABELS = {
   drill: 'สว่าน / ไขควง',
   saw: 'เลื่อย',
@@ -41,8 +48,9 @@ const CATEGORY_LABELS = {
   power: 'เครื่องมือไฟฟ้าอื่นๆ',
 };
 
-// ===== ตัวจับคำ (intent detection) =====================================
-// ✏️ เพิ่มคำที่ลูกค้าใช้บ่อยที่ตรงนี้ได้
+const HUMAN_HANDOFF_TTL_MS = 4 * 60 * 60 * 1000; // 4 ชั่วโมงให้คนคุยกันก่อน
+
+// ===== Intent detection ================================================
 function detectCategory(text) {
   const t = String(text || '').toLowerCase();
   if (/(สว่าน|ไขควง|กระแทก|drill|driver|โรตารี)/.test(t)) return 'drill';
@@ -63,7 +71,6 @@ function detectBrand(text) {
   if (/(OSUKA|โอสุกะ)/i.test(text)) return 'OSUKA';
   if (/(STANLEY|สแตนเลย์|สแตนลี่ย์)/i.test(text)) return 'STANLEY';
   if (/(INGCO|อิงโก)/i.test(text)) return 'INGCO';
-  // also match SKU prefix
   if (/^DW[-_]/i.test(t)) return 'DEWALT';
   if (/^MK[-_]/i.test(t)) return 'MAKITA';
   if (/^BS[-_]/i.test(t)) return 'BOSCH';
@@ -71,13 +78,17 @@ function detectBrand(text) {
 }
 
 function detectSku(text) {
-  // จับรูปแบบเช่น DW-DCD805, DCD805, MK-HR2470
   const m = String(text || '').toUpperCase().match(/(?:[A-Z]{2,3}-)?[A-Z]{2,4}\d{3,6}/);
   return m ? m[0] : null;
 }
 
 function isWildcardAny(text) {
   return /(ทั้งหมด|ทุกแบรนด์|ทุกยี่ห้อ|ไม่ระบุ|อะไรก็ได้|ใดก็ได้|ไม่เลือก)/i.test(text);
+}
+
+function wantsHuman(text) {
+  return /(ติดต่อเจ้าของ|คุยกับเจ้าของ|ขอคุยกับคน|พนักงานจริง|ติดต่อเจ้าหน้าที่|admin|คน|มนุษย์)/i.test(text)
+      && !/(\?|how|what|why|จะ|ทำไม|ยังไง)/i.test(text); // ไม่ใช่คำถาม
 }
 
 // ============================================================
@@ -97,7 +108,6 @@ async function getCatalog() {
     const itemsField = doc?.fields?.items;
     const items = itemsField ? (itemsField.arrayValue?.values || []).map(unwrapFsValue) : [];
     _catalogCache = items; _catalogFetchedAt = Date.now();
-    console.log('[catalog] loaded', items.length, 'products');
     return items;
   } catch (err) {
     console.error('[catalog] fetch threw', err?.message);
@@ -141,19 +151,21 @@ function toFsFields(obj) {
 }
 
 // ============================================================
-// Session: จำว่าลูกค้าคนนี้กำลังถามเรื่องอะไรอยู่ (TTL 10 นาที)
+// Session — จำว่าลูกค้ากำลังถามอะไร + โหมด AI/human
 // ============================================================
 const SESSION_TTL_MS = 10 * 60 * 1000;
 
 async function getSession(userId) {
   if (!userId) return null;
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_sessions/${userId}`;
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_sessions/${encodeURIComponent(userId)}`;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
     const doc = await res.json();
     const fields = {}; for (const k in doc.fields || {}) fields[k] = unwrapFsValue(doc.fields[k]);
-    if (fields.updatedAt && Date.now() - new Date(fields.updatedAt).getTime() > SESSION_TTL_MS) return null;
+    // โหมด human ใช้ TTL ยาวกว่า (4 ชม)
+    const ttl = fields.mode === 'human' ? HUMAN_HANDOFF_TTL_MS : SESSION_TTL_MS;
+    if (fields.updatedAt && Date.now() - new Date(fields.updatedAt).getTime() > ttl) return null;
     return fields;
   } catch { return null; }
 }
@@ -174,57 +186,228 @@ async function clearSession(userId) {
 }
 
 // ============================================================
-// ฟอร์แมตคำตอบ
+// 🎨 Flex Message builders — สีเหลือง-ดำ DEWALT
 // ============================================================
-function specsToText(specs) {
-  if (!Array.isArray(specs)) return '';
-  return specs.slice(0, 4).map((s) => {
-    if (Array.isArray(s)) return `  • ${s[0]}: ${s[1]}`;
-    if (s && typeof s === 'object') return `  • ${s.label}: ${s.value}`;
-    return '';
-  }).filter(Boolean).join('\n');
+function flexHeader(subtitle) {
+  return {
+    type: 'box',
+    layout: 'vertical',
+    backgroundColor: COLOR.black,
+    paddingAll: '12px',
+    contents: [
+      { type: 'text', text: 'M.E.TOOLS', color: COLOR.yellow, weight: 'bold', size: 'sm' },
+      ...(subtitle ? [{ type: 'text', text: subtitle, color: COLOR.white, size: 'xxs', margin: 'xs' }] : []),
+    ],
+  };
 }
 
-function formatProduct(p) {
-  const lines = [`🛠️ ${p.name}`, `แบรนด์: ${p.brand || '-'}    รหัส: ${p.sku || '-'}`];
-  const av = p.available != null ? p.available : Math.max(0, (p.stock || 0) - (p.rented || 0));
-  lines.push(av > 0 ? `📦 มีพร้อมส่ง ${av} ชิ้นครับ` : `📦 ขออภัย สินค้าหมดชั่วคราวครับ 🙏`);
-  const sp = specsToText(p.specs);
-  if (sp) lines.push('\n📋 สเป็ก:\n' + sp);
-  // ราคา = ข้อมูลสุดท้าย (ตามคำขอ)
-  const priceLines = [];
-  if (p.forSale && p.price) priceLines.push(`💰 ราคาขาย: ${Number(p.price).toLocaleString()} บาท`);
-  if (p.forRent && p.rentPerDay) priceLines.push(`📅 ค่าเช่า/วัน: ${Number(p.rentPerDay).toLocaleString()} บาท`);
-  if (priceLines.length) lines.push('', ...priceLines);
-  lines.push(`\nดูรูปเต็ม: ${SHOP.website}/product.html?id=${p.id || ''}`);
-  return lines.join('\n');
-}
-
-function formatProductList(matches) {
-  if (matches.length === 1) return formatProduct(matches[0]);
-  const lines = [`พบ ${matches.length} รุ่นครับ 🛠️\n`];
-  matches.slice(0, 5).forEach((p) => {
-    const av = p.available != null ? p.available : Math.max(0, (p.stock || 0) - (p.rented || 0));
-    const stock = av > 0 ? `มี ${av} ชิ้น` : 'หมด';
-    const price = p.forSale && p.price ? `${Number(p.price).toLocaleString()}฿` : '';
-    const rent = p.forRent && p.rentPerDay ? `เช่า ${Number(p.rentPerDay)}฿/วัน` : '';
-    lines.push(`• ${p.name}`);
-    lines.push(`  รหัส ${p.sku || '-'} · ${stock}${price ? ' · ' + price : ''}${rent ? ' · ' + rent : ''}`);
+function flexProductCard(p) {
+  const avail = p.available != null ? p.available : Math.max(0, (p.stock || 0) - (p.rented || 0));
+  const inStock = avail > 0;
+  const specRows = (p.specs || []).slice(0, 4).map((s) => {
+    let label = '', value = '';
+    if (Array.isArray(s)) { label = s[0]; value = s[1]; }
+    else if (s && typeof s === 'object') { label = s.label; value = s.value; }
+    return {
+      type: 'box', layout: 'baseline', spacing: 'sm',
+      contents: [
+        { type: 'text', text: String(label || ''), color: COLOR.gray, size: 'xs', flex: 3 },
+        { type: 'text', text: String(value || ''), color: COLOR.black, size: 'xs', flex: 4, weight: 'bold', wrap: true },
+      ],
+    };
   });
-  if (matches.length > 5) lines.push(`\n... และอีก ${matches.length - 5} รุ่น`);
-  lines.push(`\n💬 พิมพ์รหัสสินค้าที่สนใจ (เช่น DCD805) เพื่อดูสเป็กเต็มครับ`);
-  return lines.join('\n');
+
+  const priceBoxes = [];
+  if (p.forSale && p.price) {
+    priceBoxes.push({
+      type: 'box', layout: 'baseline',
+      contents: [
+        { type: 'text', text: '💰 ราคาขาย', color: COLOR.gray, size: 'sm', flex: 1 },
+        { type: 'text', text: `${Number(p.price).toLocaleString()} บาท`, color: COLOR.black, weight: 'bold', size: 'md', flex: 0, align: 'end' },
+      ],
+    });
+  }
+  if (p.forRent && p.rentPerDay) {
+    priceBoxes.push({
+      type: 'box', layout: 'baseline', margin: 'sm',
+      contents: [
+        { type: 'text', text: '📅 เช่า/วัน', color: COLOR.gray, size: 'sm', flex: 1 },
+        { type: 'text', text: `${Number(p.rentPerDay).toLocaleString()} บาท`, color: COLOR.black, weight: 'bold', size: 'md', flex: 0, align: 'end' },
+      ],
+    });
+  }
+
+  return {
+    type: 'bubble',
+    size: 'mega',
+    header: flexHeader(`${p.brand || ''} · ${CATEGORY_LABELS[p.category] || ''}`),
+    body: {
+      type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '16px',
+      contents: [
+        { type: 'text', text: p.name, weight: 'bold', size: 'lg', wrap: true, color: COLOR.black },
+        { type: 'text', text: `รหัสสินค้า: ${p.sku || '-'}`, size: 'xs', color: COLOR.gray },
+        { type: 'separator', margin: 'md' },
+        ...(specRows.length ? [{ type: 'box', layout: 'vertical', spacing: 'sm', margin: 'md', contents: specRows }] : []),
+        { type: 'separator', margin: 'md' },
+        {
+          type: 'box', layout: 'baseline', margin: 'md',
+          contents: [
+            { type: 'text', text: inStock ? `📦 มี ${avail} ชิ้น` : '📦 หมดชั่วคราว', color: inStock ? COLOR.green : COLOR.red, size: 'sm', weight: 'bold' },
+          ],
+        },
+        ...priceBoxes,
+      ],
+    },
+    footer: {
+      type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px',
+      contents: [
+        {
+          type: 'button', style: 'primary', color: COLOR.yellow, height: 'sm',
+          action: { type: 'uri', label: '🛒 ดู / สั่งซื้อในเว็บ', uri: `${SHOP.website}/product.html?id=${p.id || ''}` },
+        },
+        {
+          type: 'button', style: 'secondary', height: 'sm',
+          action: { type: 'message', label: '💬 ติดต่อเจ้าของร้าน', text: 'ติดต่อเจ้าของ' },
+        },
+      ],
+    },
+    styles: { footer: { separator: true } },
+  };
 }
 
+function flexProductCarousel(products) {
+  return {
+    type: 'flex',
+    altText: `พบสินค้า ${products.length} รุ่น`,
+    contents: {
+      type: 'carousel',
+      contents: products.slice(0, 10).map(flexProductCard),
+    },
+  };
+}
+
+function flexProduct(p) {
+  return { type: 'flex', altText: `${p.name} (${p.sku || ''})`, contents: flexProductCard(p) };
+}
+
+function flexContactMenu() {
+  return {
+    type: 'flex',
+    altText: 'ติดต่อร้าน M.E.Tools',
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: flexHeader('ติดต่อเรา'),
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '16px',
+        contents: [
+          { type: 'text', text: 'เลือกช่องทางที่สะดวกครับ 🙏', size: 'md', weight: 'bold', color: COLOR.black },
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'box', layout: 'vertical', spacing: 'sm', margin: 'md',
+            contents: [
+              { type: 'box', layout: 'baseline', contents: [
+                { type: 'text', text: '📍 ที่อยู่', size: 'sm', color: COLOR.gray, flex: 1 },
+              ]},
+              { type: 'text', text: SHOP.address, size: 'sm', color: COLOR.black, wrap: true },
+              { type: 'separator', margin: 'sm' },
+              { type: 'box', layout: 'baseline', contents: [
+                { type: 'text', text: '🕐 เวลาทำการ', size: 'sm', color: COLOR.gray, flex: 1 },
+              ]},
+              { type: 'text', text: `${SHOP.hoursWeek}\n${SHOP.hoursSun}`, size: 'sm', color: COLOR.black, wrap: true },
+            ],
+          },
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px',
+        contents: [
+          {
+            type: 'button', style: 'primary', color: COLOR.black, height: 'sm',
+            action: { type: 'uri', label: `📞 โทร ${SHOP.phone.split(',')[0].trim()}`, uri: `tel:${SHOP.phoneCall}` },
+          },
+          {
+            type: 'button', style: 'primary', color: COLOR.yellow, height: 'sm',
+            action: { type: 'message', label: '💬 ส่งข้อความถึงเจ้าของ', text: 'ติดต่อเจ้าของ' },
+          },
+          {
+            type: 'button', style: 'secondary', height: 'sm',
+            action: { type: 'uri', label: '🌐 ดูเว็บไซต์', uri: SHOP.website },
+          },
+        ],
+      },
+    },
+  };
+}
+
+function flexWelcome() {
+  return {
+    type: 'flex',
+    altText: `ยินดีต้อนรับ ${SHOP.shortName}`,
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: flexHeader('ยินดีต้อนรับ 🙏'),
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '20px',
+        contents: [
+          { type: 'text', text: 'สวัสดีครับ 🛠️', weight: 'bold', size: 'xxl', color: COLOR.black },
+          { type: 'text', text: `${SHOP.shortName} ยินดีให้บริการครับ`, size: 'md', color: COLOR.gray, wrap: true, margin: 'sm' },
+          { type: 'separator', margin: 'lg' },
+          { type: 'text', text: 'เครื่องมือช่าง DEWALT และแบรนด์โปร', size: 'sm', color: COLOR.gray, margin: 'lg' },
+          { type: 'text', text: 'เช่ารายวัน หรือ ซื้อขาด', size: 'sm', color: COLOR.gray },
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px',
+        contents: [
+          {
+            type: 'button', style: 'primary', color: COLOR.yellow, height: 'sm',
+            action: { type: 'message', label: '🛠️ ดูเครื่องมือ', text: 'ดูสินค้า' },
+          },
+          {
+            type: 'button', style: 'secondary', height: 'sm',
+            action: { type: 'message', label: '📞 ติดต่อร้าน', text: 'ติดต่อ' },
+          },
+        ],
+      },
+    },
+  };
+}
+
+// ===== Quick Reply (ปุ่มลัดเด้งใต้ข้อความ) ===============================
+function withQuickReply(message, items) {
+  if (!items?.length) return message;
+  const msg = typeof message === 'string' ? { type: 'text', text: message } : message;
+  return { ...msg, quickReply: { items: items.map((it) => ({ type: 'action', action: it })) } };
+}
+
+const QUICK_MAIN = [
+  { type: 'message', label: '🛠️ สว่าน', text: 'สว่าน' },
+  { type: 'message', label: '🪚 เลื่อย', text: 'เลื่อย' },
+  { type: 'message', label: '⚡ เจียร', text: 'เครื่องเจียร' },
+  { type: 'message', label: '🔋 แบต', text: 'แบต' },
+  { type: 'message', label: '📞 ติดต่อ', text: 'ติดต่อ' },
+];
+
+const QUICK_BRANDS = [
+  { type: 'message', label: 'DEWALT', text: 'DEWALT' },
+  { type: 'message', label: 'MAKITA', text: 'MAKITA' },
+  { type: 'message', label: 'BOSCH', text: 'BOSCH' },
+  { type: 'message', label: 'OSUKA', text: 'OSUKA' },
+  { type: 'message', label: 'STANLEY', text: 'STANLEY' },
+  { type: 'message', label: 'ทั้งหมด', text: 'ทั้งหมด' },
+];
+
+// ============================================================
+// 🤖 smartReply — return string OR Array<LINE message object>
+// ============================================================
 function uniqueBrandsForCategory(products, cat) {
   const set = new Set();
   products.filter((p) => p.category === cat).forEach((p) => p.brand && set.add(p.brand));
   return Array.from(set).sort();
 }
 
-// ============================================================
-// 🤖 หัวใจของบอท — ตัวเลือกคำตอบทีละขั้น
-// ============================================================
 async function smartReply(userId, text) {
   const products = await getCatalog();
   const session = await getSession(userId);
@@ -233,191 +416,183 @@ async function smartReply(userId, text) {
   const category = detectCategory(text);
   const brand = detectBrand(text);
 
-  // 1) ลูกค้าพิมพ์รหัสสินค้า → ตอบรายละเอียดทันที (รูปแบบ ราคาท้ายสุด)
+  // 1) รหัสสินค้า → Flex card
   if (sku) {
     const matches = products.filter((p) => {
       const ps = String(p.sku || '').toUpperCase();
       return ps && (ps === sku || ps.includes(sku) || sku.includes(ps));
     });
-    if (matches.length === 1) { await clearSession(userId); return formatProduct(matches[0]); }
-    if (matches.length > 1) { await clearSession(userId); return formatProductList(matches); }
+    if (matches.length === 1) { await clearSession(userId); return flexProduct(matches[0]); }
+    if (matches.length > 1) { await clearSession(userId); return flexProductCarousel(matches); }
   }
 
-  // 2) ลูกค้าเคยถามหมวดมาแล้ว → รอบนี้เป็นแบรนด์
+  // 2) Session รอแบรนด์
   if (session && session.expecting === 'brand' && session.category) {
     const cat = session.category;
     if (isWildcardAny(text)) {
       const all = products.filter((p) => p.category === cat);
       await clearSession(userId);
       if (!all.length) return `ขออภัย ตอนนี้${CATEGORY_LABELS[cat] || ''}ไม่มีในสต๊อกครับ 🙏`;
-      return formatProductList(all);
+      return flexProductCarousel(all);
     }
     if (brand) {
       const filtered = products.filter((p) => p.category === cat && String(p.brand || '').toUpperCase() === brand);
       await clearSession(userId);
       if (!filtered.length) {
         const brands = uniqueBrandsForCategory(products, cat);
-        return `ขออภัย ตอนนี้${brand} ${CATEGORY_LABELS[cat] || ''}ยังไม่มีในสต๊อกครับ 🙏\nที่มีคือ: ${brands.join(' / ') || '—'}`;
+        return withQuickReply(
+          `ขออภัย ${brand} ${CATEGORY_LABELS[cat] || ''}ไม่มีในสต็อกตอนนี้ครับ 🙏\nลองเลือกแบรนด์อื่นได้`,
+          brands.map((b) => ({ type: 'message', label: b, text: b }))
+        );
       }
-      return formatProductList(filtered);
+      return flexProductCarousel(filtered);
     }
-    // ตอบไม่ตรง — ถามอีกที สั้น ๆ
     const brands = uniqueBrandsForCategory(products, cat);
-    return `ขออภัยครับ ไม่เข้าใจ 🙏\nลองพิมพ์ชื่อแบรนด์ได้เลย เช่น: ${brands.join(', ')}\nหรือพิมพ์ "ทั้งหมด" ดูทุกแบรนด์ครับ`;
+    return withQuickReply(
+      `ขออภัยครับ ไม่เข้าใจ 🙏 ลองกดเลือกแบรนด์ด้านล่าง`,
+      [...brands.map((b) => ({ type: 'message', label: b, text: b })), { type: 'message', label: 'ทั้งหมด', text: 'ทั้งหมด' }]
+    );
   }
 
-  // 3) ระบุหมวด+แบรนด์ในข้อความเดียว → แสดงผลเลย ไม่ต้องถามต่อ
+  // 3) หมวด+แบรนด์ → แสดงผล
   if (category && brand) {
     const filtered = products.filter((p) => p.category === category && String(p.brand || '').toUpperCase() === brand);
-    if (filtered.length) { await clearSession(userId); return formatProductList(filtered); }
+    if (filtered.length) { await clearSession(userId); return flexProductCarousel(filtered); }
   }
 
-  // 4) ระบุแค่หมวด → ถามแบรนด์ก่อน (multi-turn)
+  // 4) แค่หมวด → ถามแบรนด์
   if (category) {
     const brands = uniqueBrandsForCategory(products, category);
-    await setSession(userId, { category, expecting: 'brand' });
-    return `สนใจ${CATEGORY_LABELS[category] || ''}ใช่ไหมคะ 🛠️\nอยากดูแบรนด์ไหนคะ?\n👉 ${brands.join(' / ')}\n\nหรือพิมพ์ "ทั้งหมด" ดูทุกแบรนด์ครับ`;
+    await setSession(userId, { category, expecting: 'brand', mode: 'ai' });
+    return withQuickReply(
+      `สนใจ${CATEGORY_LABELS[category] || ''} ใช่ไหมครับ 🛠️\nอยากดูแบรนด์ไหนครับ?`,
+      brands.map((b) => ({ type: 'message', label: b, text: b }))
+    );
   }
 
-  // 5) ระบุแค่แบรนด์ (ไม่บอกหมวด) → ลิสต์สินค้าทุกหมวดของแบรนด์นั้น
+  // 5) แค่แบรนด์
   if (brand) {
     const filtered = products.filter((p) => String(p.brand || '').toUpperCase() === brand);
-    if (filtered.length) { await clearSession(userId); return formatProductList(filtered); }
+    if (filtered.length) { await clearSession(userId); return flexProductCarousel(filtered); }
   }
 
-  // 6) คำสำคัญทั่วไป (ข้อมูลร้าน, ทักทาย)
+  // 6) คำสั่งทั่วไป
   return basicReply(text);
 }
 
 // ============================================================
-// 💬 คำตอบทั่วไป (ทักทาย / เวลาเปิด / ที่อยู่ / เบอร์)
-// ✏️ แก้คำตอบประเภทนี้ตรงนี้
+// 💬 คำตอบทั่วไป (สั้น สุภาพ "ครับ")
 // ============================================================
 function basicReply(text) {
   const t = String(text || '').toLowerCase().trim();
   if (!t) return null;
 
   if (/^(สวัสดี|หวัดดี|สวัด|hello|hi|hey|hej)/i.test(t)) {
-    return `สวัสดีครับ ขอบคุณที่ทักมา M.E.Tools ท่ารั้วยินดีบริการ 🛠️\n\n${HELP_TEXT}`;
+    return withQuickReply(`สวัสดีครับ 🙏\n${SHOP.shortName} ยินดีให้บริการ\nสนใจสิ่งใดครับ?`, QUICK_MAIN);
+  }
+  if (/(ดูสินค้า|catalog|product|รายการสินค้า|มีอะไรบ้าง)/i.test(t)) {
+    return withQuickReply(
+      `เครื่องมือของเรามี 7 หมวด ลองกดเลือกได้เลยครับ 🛠️`,
+      [
+        { type: 'message', label: 'สว่าน/ไขควง', text: 'สว่าน' },
+        { type: 'message', label: 'เลื่อย', text: 'เลื่อย' },
+        { type: 'message', label: 'เครื่องเจียร', text: 'เครื่องเจียร' },
+        { type: 'message', label: 'แบต/ชาร์จ', text: 'แบต' },
+        { type: 'message', label: 'เครื่องวัด', text: 'วัด' },
+        { type: 'message', label: 'ช่างมือ', text: 'ประแจ' },
+      ]
+    );
   }
   if (/(เวลา|เปิด|ปิด|กี่โมง|hours?|open)/i.test(t)) {
-    return `🕐 เวลาทำการ\n${SHOP.hoursWeek}\n${SHOP.hoursSun}\n\nมาทักก่อนได้นะคะ จะเตรียมของรอให้ครับ 🙂`;
+    return `🕐 เวลาทำการ\n${SHOP.hoursWeek}\n${SHOP.hoursSun}\n\nมาทักก่อนได้นะครับ จะเตรียมของรอให้`;
   }
-  if (/(ที่อยู่|ที่ตั้ง|address|location|แผนที่|map|ไป.*ร้าน)/i.test(t)) {
-    return `📍 ที่อยู่ร้าน\n${SHOP.address}\n\nLINE: ${SHOP.line}\nเว็บ: ${SHOP.website}`;
-  }
-  if (/(เบอร์|โทร|tel|phone|ติดต่อ|call)/i.test(t)) {
-    return `📞 โทรหาเราได้เลยครับ\n${SHOP.phone}\nLINE: ${SHOP.line}`;
-  }
-  if (/(พนักงาน|แอดมิน|admin|staff|คุย.*คน|ตอบ.*คน)/i.test(t)) {
-    return `รับทราบครับ จะแจ้งทีมงานให้นะคะ 🙏\nระหว่างนี้ลองดูสินค้าที่ ${SHOP.website} ก่อนได้ครับ`;
+  if (/(ที่อยู่|ที่ตั้ง|address|location|แผนที่|map|ไป.*ร้าน|ติดต่อ|เบอร์|โทร|tel|phone|call)/i.test(t)) {
+    return flexContactMenu();
   }
   if (/(ขอบคุณ|thanks?|thank you|thx)/i.test(t)) {
-    return `ยินดีครับ 🙏 ฝากร้านด้วยนะคะ 💪`;
+    return `ยินดีครับ 🙏 ฝากร้านด้วยนะครับ 💪`;
   }
   if (/^(help|ช่วย|menu|เมนู|\?)$/i.test(t)) {
-    return HELP_TEXT;
+    return withQuickReply('สอบถามได้เลยครับ 🙂', QUICK_MAIN);
   }
-  // ตอบสุภาพแบบ default
-  return `ขอบคุณสำหรับข้อความครับ 🙏\n\n${HELP_TEXT}`;
+  return null; // ให้ AI ตอบ
 }
 
 // ============================================================
-// 🧠 AI: Claude Opus 4.7 (ตอบลูกค้าด้วยภาษาธรรมชาติ)
-// - prompt caching ลด cost (catalog cache ครั้งแรก, อ่านครั้งต่อ ๆ ไปถูก 10x)
-// - adaptive thinking ให้ Claude คิดเองว่าควรไตร่ตรองนานแค่ไหน
-// - ทำงานเฉพาะเมื่อมี env var ANTHROPIC_API_KEY เท่านั้น
-//   ถ้าไม่มี = fallback ไป smartReply แบบกฎ
+// 🧠 AI: Claude Opus 4.7 + prompt caching + adaptive thinking
 // ============================================================
 function buildAISystemPrompt(products) {
   const catalogText = products.map((p) => {
     const avail = p.available != null ? p.available : Math.max(0, (p.stock || 0) - (p.rented || 0));
-    const stock = avail > 0 ? `เหลือ ${avail} ชิ้น` : 'หมด';
-    const price = p.forSale && p.price ? `${Number(p.price).toLocaleString()} บาท` : '-';
-    const rent = p.forRent && p.rentPerDay ? `${Number(p.rentPerDay).toLocaleString()} บาท/วัน` : '-';
-    const specs = (p.specs || []).map((s) => {
-      if (Array.isArray(s)) return `${s[0]}=${s[1]}`;
-      if (s && typeof s === 'object') return `${s.label}=${s.value}`;
-      return '';
-    }).filter(Boolean).join(', ');
-    return `${p.sku || ''} | ${p.name} | แบรนด์:${p.brand || '-'} | หมวด:${CATEGORY_LABELS[p.category] || p.category} | ขาย:${price} | เช่า/วัน:${rent} | สต็อก:${stock} | สเป็ก:${specs}`;
+    const stock = avail > 0 ? `เหลือ ${avail}` : 'หมด';
+    const price = p.forSale && p.price ? `${Number(p.price).toLocaleString()} บ.` : '-';
+    const rent = p.forRent && p.rentPerDay ? `${Number(p.rentPerDay).toLocaleString()} บ./วัน` : '-';
+    return `${p.sku || ''} | ${p.name} | ${p.brand || '-'} | ${CATEGORY_LABELS[p.category] || p.category} | ขาย:${price} | เช่า:${rent} | สต็อก:${stock}`;
   }).join('\n');
 
-  return `คุณคือพนักงานต้อนรับของร้าน ${SHOP.company} (M.E.Tools ท่ารั้ว) จ.เชียงใหม่
-ร้านเช่า–ซื้อเครื่องมือช่าง DEWALT และแบรนด์โปรอื่น ๆ มา ${products.length} รุ่น
+  return `คุณคือ "พี่ช่าง" — พนักงานต้อนรับร้าน ${SHOP.company} (${SHOP.shortName}) จ.เชียงใหม่
+ร้านเช่า–ซื้อเครื่องมือช่าง DEWALT และแบรนด์โปร มา ${products.length} รุ่น
 
 == ข้อมูลร้าน ==
 ที่อยู่: ${SHOP.address}
-เบอร์โทร: ${SHOP.phone}
+โทร: ${SHOP.phone}
 LINE: ${SHOP.line}
 เวลาทำการ: ${SHOP.hoursWeek} | ${SHOP.hoursSun}
-เว็บไซต์: ${SHOP.website}
 
-== แคตตาล็อกสินค้าปัจจุบัน ==
+== แคตตาล็อกปัจจุบัน ==
 ${catalogText}
 
-== กฎการตอบ (สำคัญ ห้ามผิด) ==
-1. ตอบเป็นภาษาไทยสุภาพ ใช้คำลงท้ายว่า "ครับ" เท่านั้น — **ห้ามใช้ "ค่ะ" เด็ดขาด**
-2. ตอบสั้น ทีละข้อความ ไม่ยัดข้อมูลเยอะในตอบเดียว
-3. **บอกราคาเป็นข้อมูลสุดท้าย** ไม่บอกราคาทันทีในการตอบครั้งแรก
-4. ลำดับการแนะนำสินค้า:
-   ขั้น 1) ลูกค้าบอกแค่ประเภท (เช่น "สว่าน") → ถามแบรนด์ที่สนใจ พร้อมบอกแบรนด์ที่ร้านมี
-   ขั้น 2) ลูกค้าระบุแบรนด์แล้ว → แนะนำ 1–3 รุ่นที่ตรงความต้องการ บอกชื่อ+สเป็กสั้น (ยังไม่บอกราคา)
-   ขั้น 3) ลูกค้าสนใจรุ่นใดรุ่นหนึ่ง → ตอบสเป็กละเอียด **ปิดท้ายด้วยราคา**
-   ข้อยกเว้น: ถ้าลูกค้าพิมพ์รหัสสินค้าตรง ๆ (เช่น DCD805) ตอบรายละเอียดเต็มได้เลย แต่ราคายังต้องอยู่ท้ายข้อความ
-5. ใช้ emoji เล็กน้อยพอเหมาะ (🛠️ 📦 💰 📅) ไม่เกิน 2–3 ตัวต่อข้อความ
-6. ถ้าไม่ทราบข้อมูล/ไม่ใช่สินค้าในแคตตาล็อก → ขอโทษและให้โทร ${SHOP.phone}
-7. ถ้าลูกค้าถามเรื่องไม่เกี่ยวกับร้าน → ขอโทษและพากลับมาคุยเรื่องเครื่องมือ
-8. ลูกค้าทักทาย → ทักทายกลับ + แนะนำสั้น ๆ ว่าช่วยอะไรได้บ้าง (ดูเครื่องมือ/เช่า/ซื้อ)
-9. ลูกค้าขอคุยกับ "พนักงาน/แอดมิน" → บอกว่าจะแจ้งให้ และให้เบอร์ ${SHOP.phone}`;
+== บุคลิก (สำคัญ! ห้ามดูเป็น AI) ==
+- พูดเหมือนคนจริง สุภาพ เรียบง่าย อบอุ่น แต่ไม่เว่อร์
+- ใช้ภาษาช่างนิดหน่อย ("รุ่นนี้ใช้ได้ดี", "งานทั่วไปก็พอ", "ตัวนี้แรงพอครับ")
+- ลงท้าย "ครับ" เท่านั้น (ห้ามใช้ "ค่ะ" เด็ดขาด)
+- ตอบสั้น 1-3 ประโยค ห้ามตอบยาว
+- ห้ามขึ้นต้น "ผมเข้าใจครับ...", "เป็นคำถามที่ดีครับ..." แบบ AI typical
+- ห้ามใช้คำว่า "ในฐานะ AI", "AI ของร้าน" — คุณเป็นคน
+
+== วิธีแนะนำสินค้า ==
+1. ลูกค้าบอกแค่ประเภท → ถามแบรนด์ พร้อมบอกแบรนด์ที่มี (อย่าลิสต์รุ่นเลย)
+2. ลูกค้าระบุแบรนด์ → แนะนำ 1-3 รุ่น บอกชื่อ+จุดเด่นสั้น (ยังไม่บอกราคา)
+3. ลูกค้าสนใจรุ่นใดรุ่นหนึ่ง → ตอบสเป็ก จบด้วยราคา
+- ข้อยกเว้น: ถ้าลูกค้าพิมพ์รหัส (DCD805) ตอบรายละเอียดเต็มได้เลย ราคาท้ายสุด
+
+== กฎเด็ดขาด ==
+- ถ้าไม่ทราบ → ให้โทร ${SHOP.phone}
+- ถ้าคำถามนอกเรื่องร้าน → ขอโทษและพากลับเรื่องเครื่องมือ
+- ถ้าคำถามต้องการตอบจากคนจริง (เช่น ขอต่อราคา, ขอใบเสนอราคา, ปัญหาเฉพาะ) → บอก "ขอแจ้งเจ้าของร้านนะครับ" และจบ`;
 }
 
 async function aiReply(text) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
-
   const products = await getCatalog();
   if (!products.length) return null;
-
   const systemPrompt = buildAISystemPrompt(products);
   const startedAt = Date.now();
   const ctrl = new AbortController();
-  // Vercel function timeout เป็น 60s บน Pro; เผื่อ 25s ให้ Claude ตอบ
   const timer = setTimeout(() => ctrl.abort(), 25000);
-
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: 'claude-opus-4-7',
-        max_tokens: 1024,
+        max_tokens: 512,
         thinking: { type: 'adaptive' },
-        system: [
-          // cache_control บน text block สุดท้ายของ system = cache ทั้ง catalog
-          // ครั้งแรกเขียน cache (~1.25x) ครั้งต่อ ๆ ไปอ่าน cache (~0.1x)
-          { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
-        ],
+        system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: text }],
       }),
       signal: ctrl.signal,
     });
-
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      console.error('[ai] Claude API failed', res.status, body.slice(0, 300));
+      console.error('[ai] failed', res.status, body.slice(0, 200));
       return null;
     }
-
     const data = await res.json();
     const ms = Date.now() - startedAt;
     const u = data.usage || {};
-    console.log('[ai] OK in', ms, 'ms — input:', u.input_tokens, '| cache_read:', u.cache_read_input_tokens, '| cache_create:', u.cache_creation_input_tokens, '| output:', u.output_tokens);
-
+    console.log('[ai] OK', ms, 'ms — in:', u.input_tokens, 'cache_r:', u.cache_read_input_tokens, 'cache_w:', u.cache_creation_input_tokens, 'out:', u.output_tokens);
     const textBlocks = (data.content || []).filter((b) => b.type === 'text');
     if (!textBlocks.length) return null;
     return textBlocks.map((b) => b.text).join('\n').trim();
@@ -430,55 +605,147 @@ async function aiReply(text) {
 }
 
 // ============================================================
-// 🎯 Hybrid: รวม smartReply (กฎ, เร็ว) + aiReply (Claude, ฉลาด)
+// 🎯 หลักการตัดสินใจ: human handoff → smartReply (กฎ) → AI → fallback
 // ============================================================
-async function handleMessage(userId, text) {
-  // เริ่มจากกฎ — รวดเร็ว ไม่เสียค่า API ถ้าคำสั่งชัดเจน (เช่น "DCD805")
-  const ruleReply = await smartReply(userId, text);
-
-  // ถ้า ruleReply เป็นแค่คำตอบ generic (basicReply fallback) ลอง AI
-  const isGenericFallback = ruleReply && /^ขอบคุณสำหรับข้อความ/.test(ruleReply);
-
-  if (isGenericFallback || !ruleReply) {
-    const ai = await aiReply(text);
-    if (ai) return ai;
+async function handleMessage(userId, text, token) {
+  // 0) ตรวจโหมด human — ถ้าคนกำลังคุยกัน บอทเงียบ
+  const session = await getSession(userId);
+  if (session?.mode === 'human') {
+    console.log('[handoff] session in human mode, bot stays silent');
+    return null; // null = ไม่ตอบ
   }
 
-  return ruleReply;
+  // 1) ตรวจคำขอ "ติดต่อเจ้าของ" → ผลักไป LINE เจ้าของ
+  if (wantsHuman(text)) {
+    await setSession(userId, { mode: 'human' });
+    await pushHandoffToAdmin(userId, text, token);
+    return withQuickReply(
+      `รับทราบครับ 🙏\nผมได้แจ้งเจ้าของร้านแล้ว เดี๋ยวเจ้าของจะตอบคุณในเร็ว ๆ นี้\n\nระหว่างนี้โทรหาเราได้ที่ ${SHOP.phone}`,
+      [{ type: 'message', label: '↩️ กลับมาคุยกับบอท', text: 'AI กลับมา' }]
+    );
+  }
+
+  // 1.5) คำสั่งกลับ AI mode
+  if (/^(ai กลับมา|กลับมาคุยกับบอท|reset ai)/i.test(text)) {
+    await clearSession(userId);
+    return withQuickReply('โอเคครับ บอทกลับมาแล้ว 🤖\nสอบถามได้เลย', QUICK_MAIN);
+  }
+
+  // 2) ลองกฎก่อน (เร็ว ฟรี)
+  const ruleReply = await smartReply(userId, text);
+  if (ruleReply) return ruleReply;
+
+  // 3) ใช้ AI (Claude)
+  const ai = await aiReply(text);
+  if (ai) return ai;
+
+  // 4) Fallback
+  return withQuickReply(
+    `ขอบคุณสำหรับข้อความครับ 🙏\nสนใจดูเครื่องมือหมวดไหนเป็นพิเศษครับ?`,
+    QUICK_MAIN
+  );
 }
 
 // ============================================================
-// บันทึก log สนทนาลง Firestore (ให้แอดมินดูในหลังร้าน)
+// 🔔 Push notification ไป LINE เจ้าของร้าน (human handoff)
+// ============================================================
+async function pushHandoffToAdmin(customerUserId, customerText, token) {
+  const adminId = process.env.ADMIN_LINE_USER_ID;
+  if (!adminId) {
+    console.warn('[handoff] ADMIN_LINE_USER_ID not set — skipping push');
+    return;
+  }
+  const url = 'https://api.line.me/v2/bot/message/push';
+  const tag = customerUserId ? customerUserId.slice(-8) : 'ไม่ทราบ';
+  const msg = {
+    type: 'flex',
+    altText: `🔔 ลูกค้าขอคุย: …${tag}`,
+    contents: {
+      type: 'bubble',
+      header: flexHeader('🔔 ลูกค้าขอคุยด้วย'),
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '16px',
+        contents: [
+          { type: 'text', text: `ลูกค้า: …${tag}`, weight: 'bold', size: 'md', color: COLOR.black },
+          { type: 'separator', margin: 'md' },
+          { type: 'text', text: 'ข้อความล่าสุด:', size: 'xs', color: COLOR.gray, margin: 'md' },
+          { type: 'text', text: String(customerText || '').slice(0, 300), size: 'sm', color: COLOR.black, wrap: true },
+          { type: 'separator', margin: 'md' },
+          { type: 'text', text: 'บอทถูกปิดเสียงให้คุยกับลูกค้าได้ 4 ชม.\nไปที่แท็บ "แชท" ใน LINE Official Account Manager เพื่อตอบ', size: 'xs', color: COLOR.gray, wrap: true, margin: 'md' },
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px',
+        contents: [
+          {
+            type: 'button', style: 'primary', color: COLOR.yellow, height: 'sm',
+            action: { type: 'uri', label: '📱 เปิด OA Manager', uri: 'https://manager.line.biz/' },
+          },
+        ],
+      },
+    },
+  };
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ to: adminId, messages: [msg] }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[handoff] push failed', res.status, body.slice(0, 200));
+    } else {
+      console.log('[handoff] pushed to admin');
+    }
+  } catch (err) { console.error('[handoff] push threw', err?.message); }
+}
+
+// ============================================================
+// log สนทนาลง Firestore
 // ============================================================
 async function logBotMessage(userId, text, reply) {
   if (!userId) return;
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_messages`;
   const safe = (s, max) => String(s || '').slice(0, max);
+  // ถ้า reply เป็น Flex/object เก็บ altText แทน
+  let replyText = '';
+  if (typeof reply === 'string') replyText = reply;
+  else if (Array.isArray(reply)) replyText = reply.map((m) => m?.altText || m?.text || '').filter(Boolean).join(' | ');
+  else if (reply?.altText) replyText = reply.altText;
+  else if (reply?.text) replyText = reply.text;
   try {
     const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fields: {
           userId: { stringValue: safe(userId, 99) },
           text: { stringValue: safe(text, 4999) },
-          reply: { stringValue: safe(reply, 4999) },
+          reply: { stringValue: safe(replyText, 4999) },
           source: { stringValue: 'line' },
           at: { timestampValue: new Date().toISOString() },
         },
       }),
     });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      console.error('[log] write failed', res.status, body.slice(0, 200));
-    }
-  } catch (err) { console.error('[log] write threw', err?.message); }
+    if (!res.ok) console.error('[log] failed', res.status);
+  } catch (err) { console.error('[log] threw', err?.message); }
 }
 
 // ============================================================
-// LINE Reply API
+// LINE Reply API — รองรับทั้ง text/flex/quickReply
 // ============================================================
-async function replyMessage(replyToken, text, token) {
+async function replyToLine(replyToken, content, token) {
+  // normalize content → array of LINE message objects
+  let messages = [];
+  if (!content) return;
+  if (typeof content === 'string') {
+    messages = [{ type: 'text', text: content }];
+  } else if (Array.isArray(content)) {
+    messages = content;
+  } else if (content.type) {
+    messages = [content];
+  }
+  if (!messages.length) return;
+
   const startedAt = Date.now();
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
@@ -486,20 +753,20 @@ async function replyMessage(replyToken, text, token) {
     const res = await fetch('https://api.line.me/v2/bot/message/reply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ replyToken, messages: [{ type: 'text', text }] }),
+      body: JSON.stringify({ replyToken, messages: messages.slice(0, 5) }), // LINE max 5 messages
       signal: ctrl.signal,
     });
     const body = await res.text().catch(() => '');
     const ms = Date.now() - startedAt;
-    if (res.ok) console.log('[reply] LINE OK', res.status, 'in', ms, 'ms');
-    else console.error('[reply] LINE FAILED', res.status, 'in', ms, 'ms — body:', body);
+    if (res.ok) console.log('[reply] OK', res.status, 'in', ms, 'ms,', messages.length, 'msgs');
+    else console.error('[reply] FAILED', res.status, 'in', ms, 'ms — body:', body);
   } catch (err) {
-    console.error('[reply] LINE THREW —', err?.name, err?.message);
+    console.error('[reply] THREW —', err?.name, err?.message);
   } finally { clearTimeout(timer); }
 }
 
 // ============================================================
-// ตรวจลายเซ็น + อ่าน raw body
+// Signature + raw body
 // ============================================================
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -547,26 +814,28 @@ export default async function handler(req, res) {
   catch { res.status(400).send('Bad JSON'); return; }
 
   const events = Array.isArray(payload.events) ? payload.events : [];
-  console.log('[webhook] events:', events.length, '| types:', events.map((e) => e.type).join(','));
 
   await Promise.all(events.map(async (event) => {
     try {
+      // log userId ของแอดมินตอน follow event (เพื่อหา ADMIN_LINE_USER_ID ได้ง่าย)
       if (event.type === 'follow') {
-        await replyMessage(event.replyToken,
-          `สวัสดีครับ ขอบคุณที่เพิ่มเพื่อน 🙏\nM.E.Tools ท่ารั้วยินดีให้บริการ\n\n${HELP_TEXT}`,
-          token);
+        console.log('[follow] new user userId =', event.source?.userId);
+        await replyToLine(event.replyToken, flexWelcome(), token);
         return;
       }
       if (event.type === 'message' && event.message?.type === 'text') {
         const userId = event.source?.userId;
         const userText = event.message.text;
-        const reply = await handleMessage(userId, userText);
-        console.log('[event] text:', JSON.stringify(userText).slice(0, 80), '| reply chars:', reply?.length);
+        console.log('[msg] from', userId?.slice(-8), '|', JSON.stringify(userText).slice(0, 80));
+        const reply = await handleMessage(userId, userText, token);
         if (reply) {
           await Promise.all([
-            replyMessage(event.replyToken, reply, token),
+            replyToLine(event.replyToken, reply, token),
             logBotMessage(userId, userText, reply),
           ]);
+        } else {
+          // โหมด human — บอทเงียบ แต่ยัง log ข้อความลูกค้า
+          await logBotMessage(userId, userText, '[human mode — bot silent]');
         }
       }
     } catch (err) {
@@ -574,6 +843,5 @@ export default async function handler(req, res) {
     }
   }));
 
-  console.log('[webhook] done');
   res.status(200).send('OK');
 }
