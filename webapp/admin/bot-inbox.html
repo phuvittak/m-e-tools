@@ -15,13 +15,23 @@
     .botinbox-split { display:grid; grid-template-columns:320px 1fr; gap:12px; min-height:560px }
     @media (max-width:900px) { .botinbox-split { grid-template-columns:1fr } }
 
-    .conv-list { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; overflow:auto; max-height:70vh }
-    .conv-row { padding:12px 14px; border-bottom:1px solid var(--border-3); cursor:pointer; transition:background .15s }
+    .conv-list { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; overflow:auto; max-height:70vh; padding:6px }
+    .conv-section { margin-bottom:10px }
+    .conv-section:last-child { margin-bottom:0 }
+    .conv-section-head { padding:8px 10px; font-size:11px; font-weight:700; color:var(--fg-2); text-transform:uppercase; letter-spacing:.04em; border-radius:6px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; background:var(--bg-2) }
+    .conv-section.human .conv-section-head { background:#fdecec; color:#a00 }
+    .conv-section-empty { padding:10px 12px; font-size:12px; color:var(--fg-2); font-family:var(--font-body) }
+    .conv-row { padding:10px 12px; border-bottom:1px solid var(--border-3); cursor:pointer; transition:background .15s; border-radius:6px }
+    .conv-row:last-child { border-bottom:none }
     .conv-row:hover { background:var(--bg-2) }
-    .conv-row.on { background:var(--bg-2); border-left:3px solid var(--accent) }
+    .conv-row.on { background:var(--bg-2); border-left:3px solid var(--accent, #FFB81C) }
     .conv-row .who { font-weight:600; font-size:13px; color:var(--fg); display:flex; justify-content:space-between }
     .conv-row .last { font-size:12px; color:var(--fg-2); margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-    .conv-row .meta { font-size:11px; color:var(--fg-2); margin-top:4px; display:flex; gap:8px }
+    .conv-row .meta { font-size:11px; color:var(--fg-2); margin-top:4px; display:flex; gap:8px; justify-content:space-between; align-items:center }
+    .conv-row .conv-actions button { font-size:11px; padding:3px 10px; border-radius:4px; border:1px solid var(--border-3); cursor:pointer; font-family:inherit }
+    .conv-row .conv-actions button:hover { filter:brightness(.95) }
+    .conv-row .conv-actions .pause { background:#fdecec; border-color:#f5b0b0; color:#a00 }
+    .conv-row .conv-actions .resume { background:#e8f5e9; border-color:#c8e6d0; color:#1b5e20 }
 
     .thread { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:0 16px 16px; overflow:auto; max-height:70vh; display:flex; flex-direction:column }
     .thread-empty { color:var(--fg-2); text-align:center; padding:40px 20px; font-family:var(--font-body); margin:auto }

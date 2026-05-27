@@ -372,7 +372,7 @@
       alertBox.style.background = kind === "err" ? "#fee" : "#efe";
     }
 
-    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, unsubProfiles: null, prevCount: 0, fs: null, profiles: {} };
+    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, unsubProfiles: null, unsubSessions: null, prevCount: 0, fs: null, profiles: {}, sessions: {} };
 
     if (refresh) refresh.addEventListener("click", function () {
       // listener อัปเดตเองอยู่แล้ว — ปุ่มนี้กลายเป็นปุ่ม re-subscribe เผื่อ connection ขาด
@@ -389,23 +389,55 @@
     load();
 
     function sendReply() {
-      if (!state.activeUid || !state.fs) return;
+      if (!state.activeUid) return;
       var text = (replyInput.value || "").trim();
       if (!text) return;
       replySend.disabled = true;
-      var fs = state.fs;
-      var msg = {
-        userId: state.activeUid,
-        role: "admin",
-        text: text,
-        source: "admin",
-        at: fs.serverTimestamp()
-      };
-      fs.addDoc(fs.collection(fs.db, "bot_messages"), msg)
-        .then(function () { replyInput.value = ""; replySend.disabled = false; replyInput.focus(); })
-        .catch(function (err) {
+      // ส่งผ่าน Vercel function: push เข้า LINE + เขียน Firestore + ตั้ง human mode ในขั้นเดียว
+      fetch("/api/admin-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: state.activeUid, text: text }),
+      })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (r) {
           replySend.disabled = false;
-          if (window.U && U.toast) U.toast("ส่งไม่สำเร็จ: " + (err.message || err), "err");
+          if (!r.ok) {
+            if (window.U && U.toast) U.toast("ส่งไม่สำเร็จ: " + (r.body.error || ""), "err");
+            return;
+          }
+          replyInput.value = "";
+          replyInput.focus();
+          if (r.body.linePushed && window.U && U.toast) U.toast("ส่งเข้า LINE ลูกค้าแล้ว ✓", "ok");
+        })
+        .catch(function (e) {
+          replySend.disabled = false;
+          if (window.U && U.toast) U.toast("เครือข่ายผิดพลาด: " + (e.message || e), "err");
+        });
+    }
+
+    function pauseBotFor(uid) {
+      if (!state.fs) return;
+      var fs = state.fs;
+      fs.setDoc(fs.doc(fs.db, "bot_sessions", uid), {
+        mode: "human", updatedAt: fs.serverTimestamp()
+      }, { merge: true })
+        .then(function () { if (window.U && U.toast) U.toast("ปิดบอท — ลูกค้าจะคุยกับเจ้าของ", "ok"); })
+        .catch(function (err) { if (window.U && U.toast) U.toast("ปิดบอทไม่สำเร็จ: " + err.message, "err"); });
+    }
+
+    function resumeBotFor(uid) {
+      fetch("/api/admin-resume-bot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: uid }),
+      })
+        .then(function (r) {
+          if (r.ok) { if (window.U && U.toast) U.toast("เปิดบอทแล้ว — ลูกค้าย้ายไปช่องบอทตอบ", "ok"); }
+          else { if (window.U && U.toast) U.toast("เปิดบอทไม่สำเร็จ", "err"); }
+        })
+        .catch(function (e) {
+          if (window.U && U.toast) U.toast("เครือข่ายผิดพลาด: " + (e.message || e), "err");
         });
     }
 
@@ -445,6 +477,14 @@
             state.profiles = map;
             if (state.messages.length) groupAndRender();
           }, function (err) { console.warn("[profiles listener]", err); });
+          // ฟัง bot_sessions — รู้ว่าใครอยู่โหมด human (รอเจ้าของตอบ) vs ai (บอทตอบเอง)
+          var sessCol = fsMod.collection(db, "bot_sessions");
+          state.unsubSessions = fsMod.onSnapshot(sessCol, function (ss) {
+            var map = {};
+            ss.docs.forEach(function (d) { map[d.id] = d.data() || {}; });
+            state.sessions = map;
+            if (state.messages.length) groupAndRender();
+          }, function (err) { console.warn("[sessions listener]", err); });
           var col = fsMod.collection(db, "bot_messages");
           state.unsub = fsMod.onSnapshot(col, function (snap) {
             alert("");
@@ -520,7 +560,7 @@
         ? top.map(function (p) { return '<span class="keyword-pill"><b>' + p[1] + '</b>' + esc(p[0]) + '</span>'; }).join("")
         : '<span style="color:var(--fg-2); font-size:13px">ยังไม่มีข้อความใน 7 วันที่ผ่านมา</span>';
 
-      // conversation list
+      // conversation list — แยก 2 ช่อง: รอเจ้าของตอบ (human mode) vs บอทตอบเอง
       var convs = Object.values(byUser).sort(function (a, b) { return (b.lastAt || "").localeCompare(a.lastAt || ""); });
       var list = document.querySelector("[data-convs]");
       if (!convs.length) {
@@ -528,36 +568,66 @@
         renderEmpty();
         return;
       }
-      list.innerHTML = convs.map(function (c) {
-        var when = fmtRelative(c.lastAt);
-        var nameTag = c.userId.slice(-8);
-        var nick = (state.profiles[c.userId] && state.profiles[c.userId].nickname) || "";
-        // badge เลือกจากแหล่งของข้อความ "ฝั่งลูกค้า" ล่าสุด (กรอง admin/bot ออก)
-        // ลูกค้า = role:"user" หรือ doc paired เก่า (มี text แต่ไม่มี role)
-        var customerMsgs = c.messages.filter(function (m) { return !m.role || m.role === "user"; });
-        var lastSrc = (customerMsgs[0] && customerMsgs[0].source) || "line";
-        var srcBadge = lastSrc === "web"
-          ? '<span style="background:#e8f5e9;color:#1b5e20;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600">เว็บ</span>'
-          : '<span style="background:#06c755;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600">LINE</span>';
-        var displayName = nick ? esc(nick) : '…' + esc(nameTag);
-        return '<div class="conv-row" data-uid="' + esc(c.userId) + '">' +
-          '<div class="who"><span>' + srcBadge + ' ' + displayName + '</span><span>' + c.messages.length + ' ข้อความ</span></div>' +
-          '<div class="last">' + esc(c.lastText) + '</div>' +
-          '<div class="meta"><span>' + when + '</span></div>' +
-          '</div>';
-      }).join("");
+      var humanConvs = convs.filter(function (c) { return state.sessions[c.userId] && state.sessions[c.userId].mode === "human"; });
+      var botConvs   = convs.filter(function (c) { return !state.sessions[c.userId] || state.sessions[c.userId].mode !== "human"; });
+
+      list.innerHTML =
+        '<div class="conv-section human">' +
+          '<div class="conv-section-head"><span>🔴 รอเจ้าของตอบ</span><span>' + humanConvs.length + '</span></div>' +
+          (humanConvs.length ? humanConvs.map(rowHtml).join("") : '<div class="conv-section-empty">ไม่มีลูกค้ารออยู่</div>') +
+        '</div>' +
+        '<div class="conv-section bot">' +
+          '<div class="conv-section-head"><span>🤖 บอทตอบเอง</span><span>' + botConvs.length + '</span></div>' +
+          (botConvs.length ? botConvs.map(rowHtml).join("") : '<div class="conv-section-empty">ไม่มีลูกค้าใหม่</div>') +
+        '</div>';
+
       list.querySelectorAll("[data-uid]").forEach(function (row) {
-        row.addEventListener("click", function () {
+        row.addEventListener("click", function (e) {
+          // คลิกที่ปุ่ม toggle อย่าให้สลับบทสนทนา
+          if (e.target.closest("[data-toggle-bot]")) return;
           list.querySelectorAll(".conv-row").forEach(function (r) { r.classList.remove("on"); });
           row.classList.add("on");
           state.activeUid = row.dataset.uid;
           renderThread(state.activeUid);
         });
       });
-      // auto-select first
-      if (!state.activeUid || !byUser[state.activeUid]) state.activeUid = convs[0].userId;
+      list.querySelectorAll("[data-toggle-bot]").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var uid = btn.getAttribute("data-toggle-bot");
+          var action = btn.getAttribute("data-action");
+          if (action === "pause") pauseBotFor(uid);
+          else resumeBotFor(uid);
+        });
+      });
+
+      // auto-select: คงบทสนทนาที่เปิดอยู่ ถ้าไม่มี → เลือกจากกลุ่ม human ก่อน, ไม่มีค่อย bot
+      if (!state.activeUid || !byUser[state.activeUid]) {
+        state.activeUid = (humanConvs[0] || botConvs[0] || convs[0]).userId;
+      }
       var firstRow = list.querySelector('[data-uid="' + cssEsc(state.activeUid) + '"]');
       if (firstRow) { firstRow.classList.add("on"); renderThread(state.activeUid); }
+    }
+
+    function rowHtml(c) {
+      var when = fmtRelative(c.lastAt);
+      var nameTag = c.userId.slice(-8);
+      var nick = (state.profiles[c.userId] && state.profiles[c.userId].nickname) || "";
+      var customerMsgs = c.messages.filter(function (m) { return !m.role || m.role === "user"; });
+      var lastSrc = (customerMsgs[0] && customerMsgs[0].source) || "line";
+      var srcBadge = lastSrc === "web"
+        ? '<span style="background:#e8f5e9;color:#1b5e20;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600">เว็บ</span>'
+        : '<span style="background:#06c755;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600">LINE</span>';
+      var displayName = nick ? esc(nick) : '…' + esc(nameTag);
+      var inHuman = state.sessions[c.userId] && state.sessions[c.userId].mode === "human";
+      var toggleBtn = inHuman
+        ? '<button class="resume" data-toggle-bot="' + esc(c.userId) + '" data-action="resume" type="button">เปิดบอท</button>'
+        : '<button class="pause" data-toggle-bot="' + esc(c.userId) + '" data-action="pause" type="button">ปิดบอท</button>';
+      return '<div class="conv-row" data-uid="' + esc(c.userId) + '">' +
+        '<div class="who"><span>' + srcBadge + ' ' + displayName + '</span><span>' + c.messages.length + ' ข้อความ</span></div>' +
+        '<div class="last">' + esc(c.lastText) + '</div>' +
+        '<div class="meta"><span>' + when + '</span><span class="conv-actions">' + toggleBtn + '</span></div>' +
+        '</div>';
     }
 
     function renderEmpty() {
