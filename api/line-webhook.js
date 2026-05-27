@@ -24,7 +24,7 @@ const SHOP = {
   hoursWeek: 'จันทร์ – เสาร์ 8:00 – 17:00 น.',
   hoursSun: 'อาทิตย์ 8:00 – 15:00 น.',
   line: 'https://lin.ee/so6euhT',
-  website: 'https://metools-rho.vercel.app',
+  website: 'https://metools.vercel.app',
 };
 
 // ===== สีแบรนด์ DEWALT ==================================================
