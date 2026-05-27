@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>สร้างรูป Rich Menu — M.E.Tools</title>
+  <link rel="stylesheet" href="../assets/admin.css">
+  <style>
+    body { background: #f5f5f5; padding: 24px; font-family: system-ui, -apple-system, sans-serif }
+    .wrap { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,.08) }
+    h1 { color: #000; margin-bottom: 8px }
+    .sub { color: #666; margin-bottom: 24px }
+    canvas { max-width: 100%; border: 2px solid #FFB81C; border-radius: 8px; display: block; margin: 16px auto; background: #fff }
+    .row { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap }
+    button { background: #FFB81C; color: #000; border: none; padding: 12px 24px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 14px }
+    button:hover { background: #e6a619 }
+    button.dark { background: #000; color: #FFB81C }
+    .specs { background: #fafafa; border-left: 4px solid #FFB81C; padding: 12px 16px; margin-top: 16px; font-size: 13px; line-height: 1.7 }
+    code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-family: monospace }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🎨 Rich Menu Generator</h1>
+    <div class="sub">สร้างรูป Rich Menu ขนาด 2500×1686 px (สเปก LINE) แล้วโหลดไปอัปใน LINE OA Manager</div>
+
+    <canvas id="cv" width="2500" height="1686"></canvas>
+
+    <div class="row">
+      <button onclick="downloadPng()">⬇ ดาวน์โหลด PNG</button>
+      <button class="dark" onclick="window.open('https://manager.line.biz/', '_blank')">↗ เปิด LINE OA Manager</button>
+    </div>
+
+    <div class="specs">
+      <b>วิธีใช้:</b><br>
+      1. กด <b>ดาวน์โหลด PNG</b> → ได้ไฟล์ <code>richmenu-metools.png</code><br>
+      2. เปิด <b>LINE OA Manager</b> → ริชเมนู → + สร้างใหม่<br>
+      3. เลย์เอาต์: เลือก <b>"ใหญ่ - 6 ช่อง 2×3"</b><br>
+      4. กด <b>เลือกรูป</b> → อัปโหลดไฟล์ที่เพิ่งดาวน์โหลด<br>
+      5. ตั้ง action ของแต่ละช่อง:<br>
+      &nbsp;&nbsp;• ช่อง 1 (ซ้ายบน "ดูเครื่องมือ") → ส่งข้อความ: <code>ดูสินค้า</code><br>
+      &nbsp;&nbsp;• ช่อง 2 (กลางบน "โปรโมชั่น") → ส่งข้อความ: <code>โปร</code><br>
+      &nbsp;&nbsp;• ช่อง 3 (ขวาบน "เช่ารายวัน") → ส่งข้อความ: <code>เช่า</code><br>
+      &nbsp;&nbsp;• ช่อง 4 (ซ้ายล่าง "ที่อยู่") → ส่งข้อความ: <code>ที่อยู่</code><br>
+      &nbsp;&nbsp;• ช่อง 5 (กลางล่าง "โทรหาเรา") → URL: <code>tel:0813706466</code><br>
+      &nbsp;&nbsp;• ช่อง 6 (ขวาล่าง "ติดต่อเจ้าของ") → ส่งข้อความ: <code>ติดต่อเจ้าของ</code><br>
+      6. ชื่อเมนู: <b>เมนูหลัก</b> | ช่วงเวลาแสดง: <b>ไม่จำกัด</b> | ติ๊ก <b>"แสดงเป็นเริ่มต้น"</b><br>
+      7. กด <b>บันทึก</b> → เปิดใช้งาน
+    </div>
+  </div>
+
+  <script>
+    var canvas = document.getElementById('cv');
+    var ctx = canvas.getContext('2d');
+    var W = 2500, H = 1686;
+
+    // 6 ปุ่ม 2×3 grid
+    var BUTTONS = [
+      { icon: '🛠️', title: 'ดูเครื่องมือ', sub: 'ทุกหมวด' },
+      { icon: '🎯', title: 'โปรโมชั่น',   sub: 'ส่วนลดวันนี้' },
+      { icon: '📅', title: 'เช่ารายวัน',  sub: 'รายวัน/รายสัปดาห์' },
+      { icon: '📍', title: 'ที่อยู่ร้าน',  sub: 'แผนที่ + เวลาเปิด' },
+      { icon: '📞', title: 'โทรหาเรา',    sub: '081-3706466' },
+      { icon: '💬', title: 'ติดต่อเจ้าของ', sub: 'คุยตรงกับร้าน' },
+    ];
+
+    // พื้นหลังดำสนิท
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, W, H);
+
+    // โลโก้แบนด์ด้านบน (แถบเหลือง 80px)
+    ctx.fillStyle = '#FFB81C';
+    ctx.fillRect(0, 0, W, 80);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 56px "Helvetica Neue", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('M.E.TOOLS · ท่ารั้ว · เชียงใหม่', W/2, 40);
+
+    // วาด 6 ปุ่ม
+    var startY = 80;
+    var cellW = W / 3;
+    var cellH = (H - startY) / 2;
+    var pad = 24;
+
+    BUTTONS.forEach(function (b, i) {
+      var col = i % 3, row = Math.floor(i / 3);
+      var x = col * cellW + pad;
+      var y = startY + row * cellH + pad;
+      var w = cellW - pad * 2;
+      var h = cellH - pad * 2;
+
+      // กล่องสีเทาเข้ม (เกือบดำ) มี border เหลือง
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = '#FFB81C';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(x, y, w, h);
+
+      // icon (emoji ใหญ่)
+      ctx.font = '180px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#FFB81C';
+      ctx.fillText(b.icon, x + w/2, y + h/2 - 80);
+
+      // ชื่อปุ่ม
+      ctx.font = 'bold 72px "Helvetica Neue", sans-serif';
+      ctx.fillStyle = '#FFB81C';
+      ctx.fillText(b.title, x + w/2, y + h/2 + 80);
+
+      // sub label
+      ctx.font = '40px "Helvetica Neue", sans-serif';
+      ctx.fillStyle = '#888';
+      ctx.fillText(b.sub, x + w/2, y + h/2 + 150);
+    });
+
+    function downloadPng() {
+      var link = document.createElement('a');
+      link.download = 'richmenu-metools.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
