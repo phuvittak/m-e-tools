@@ -393,7 +393,13 @@
             var docs = r.body.documents || [];
             state.messages = docs.map(function (d) {
               var f = fromFsFields(d.fields || {});
-              return { userId: f.userId || "", text: f.text || "", reply: f.reply || "", at: f.at || d.createTime || "" };
+              return {
+                userId: f.userId || "",
+                text: f.text || "",
+                reply: f.reply || "",
+                source: f.source || "line",
+                at: f.at || d.createTime || ""
+              };
             }).sort(function (a, b) { return (b.at || "").localeCompare(a.at || ""); });
             groupAndRender();
           })
@@ -454,8 +460,13 @@
       list.innerHTML = convs.map(function (c) {
         var when = fmtRelative(c.lastAt);
         var nameTag = c.userId.slice(-8);
+        // source tag — ส่วนใหญ่จะเป็น LINE; ในอนาคตอาจรวม web ด้วย
+        var lastSrc = (c.messages[0] && c.messages[0].source) || "line";
+        var srcBadge = lastSrc === "web"
+          ? '<span style="background:#e8f5e9;color:#1b5e20;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600">เว็บ</span>'
+          : '<span style="background:#06c755;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600">LINE</span>';
         return '<div class="conv-row" data-uid="' + esc(c.userId) + '">' +
-          '<div class="who"><span>👤 …' + esc(nameTag) + '</span><span>' + c.messages.length + ' ข้อความ</span></div>' +
+          '<div class="who"><span>' + srcBadge + ' …' + esc(nameTag) + '</span><span>' + c.messages.length + ' ข้อความ</span></div>' +
           '<div class="last">' + esc(c.lastText) + '</div>' +
           '<div class="meta"><span>' + when + '</span></div>' +
           '</div>';
