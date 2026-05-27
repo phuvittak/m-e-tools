@@ -758,11 +758,35 @@ async function replyToLine(replyToken, content, token) {
     });
     const body = await res.text().catch(() => '');
     const ms = Date.now() - startedAt;
-    if (res.ok) console.log('[reply] OK', res.status, 'in', ms, 'ms,', messages.length, 'msgs');
-    else console.error('[reply] FAILED', res.status, 'in', ms, 'ms — body:', body);
+    if (res.ok) {
+      console.log('[reply] OK', res.status, 'in', ms, 'ms,', messages.length, 'msgs');
+    } else if (body.includes('Invalid reply token')) {
+      // benign — LINE redelivery sent duplicate event with same (already-used) token
+      console.warn('[reply] duplicate event (token already used) — first reply went through');
+    } else {
+      console.error('[reply] FAILED', res.status, 'in', ms, 'ms — body:', body);
+    }
   } catch (err) {
     console.error('[reply] THREW —', err?.name, err?.message);
   } finally { clearTimeout(timer); }
+}
+
+// ============================================================
+// Dedupe: skip events we've already processed (in-memory, per cold start)
+// LINE redelivery can send the same event multiple times — only reply once
+// ============================================================
+const _seenEventIds = new Set();
+const _seenEventIdsMaxSize = 500;
+function alreadySeen(eventId) {
+  if (!eventId) return false;
+  if (_seenEventIds.has(eventId)) return true;
+  _seenEventIds.add(eventId);
+  if (_seenEventIds.size > _seenEventIdsMaxSize) {
+    // drop oldest entry
+    const first = _seenEventIds.values().next().value;
+    _seenEventIds.delete(first);
+  }
+  return false;
 }
 
 // ============================================================
@@ -817,6 +841,11 @@ export default async function handler(req, res) {
 
   await Promise.all(events.map(async (event) => {
     try {
+      // กัน LINE webhook redelivery ส่ง event ซ้ำ
+      if (alreadySeen(event.webhookEventId)) {
+        console.log('[dedup] skipping duplicate event', event.webhookEventId?.slice(-8));
+        return;
+      }
       // log userId ของแอดมินตอน follow event (เพื่อหา ADMIN_LINE_USER_ID ได้ง่าย)
       if (event.type === 'follow') {
         console.log('[follow] new user userId =', event.source?.userId);
