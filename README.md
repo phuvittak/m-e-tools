@@ -161,7 +161,7 @@ Rich Menu **ไม่ได้สร้างในโค้ด** — ต้อ�
 
 **ขั้นตอน (~5 นาที):**
 
-1) เปิด `https://metools.vercel.app/admin/richmenu.html` → กดปุ่ม **⬇ ดาวน์โหลด PNG** → ได้ไฟล์ `richmenu-metools.png`
+1) เปิด `https://metoolsshop.vercel.app/admin/richmenu.html` → กดปุ่ม **⬇ ดาวน์โหลด PNG** → ได้ไฟล์ `richmenu-metools.png`
 2) เปิด https://manager.line.biz/ → OA `M.E.Tools ท่ารั้ว`
 3) เมนูซ้าย **ริชเมนู** → **+ สร้างใหม่**
 4) ชื่อเมนู: `เมนูหลัก` | ช่วงเวลาแสดง: เลือก "ไม่มีกำหนด"
