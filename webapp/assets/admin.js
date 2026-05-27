@@ -53,7 +53,6 @@
       }).join("") + "</nav>" +
       '<div class="side-foot"><div class="side-user">' + roleTag + "<b>" + sess.name + "</b></div>" +
       '<a href="../index.html" target="_blank">↗ ดูหน้าร้าน</a>' +
-      '<a href="https://lin.ee/so6euhT" target="_blank" rel="noopener">↗ LINE ของร้าน</a>' +
       '<button data-logout>⎋ ออกจากระบบ</button></div></aside>';
 
     var shell = document.querySelector("[data-shell]");
@@ -379,40 +378,46 @@
     function load() {
       alert("กำลังโหลดข้อความ…");
       // ใช้ Firestore modular SDK ผ่าน dynamic import — รองรับ named database "default"
-      // (compat SDK ระบุ databaseId ไม่ได้ จะเชื่อม "(default)" system db ที่ว่างเปล่า)
-      withFirebaseAuth(function (auth, err) {
-        if (err) { alert("ไม่สามารถเชื่อม Firebase: " + err.message, "err"); return; }
-        var base = "https://www.gstatic.com/firebasejs/10.12.2/";
-        Promise.all([
-          import(base + "firebase-app.js"),
-          import(base + "firebase-firestore.js")
-        ]).then(function (mods) {
-          var appMod = mods[0], fsMod = mods[1];
-          var app = appMod.getApp(); // ใช้ app ที่ compat init ไว้แล้ว
+      // (compat กับ modular โหลดคนละ bundle จาก gstatic ไม่แชร์ app registry กัน
+      //  จึง init แอป modular แยกชื่อ "botinbox" และ sign in anonymously ในนั้นเอง)
+      var cfg = window.parseFbConfig ? window.parseFbConfig(S.firebaseCfg ? S.firebaseCfg() : "") : null;
+      if (!cfg) { alert("ยังไม่ได้ตั้ง Firebase Config ในหน้า ตั้งค่าเว็บไซต์", "err"); return; }
+      var base = "https://www.gstatic.com/firebasejs/10.12.2/";
+      Promise.all([
+        import(base + "firebase-app.js"),
+        import(base + "firebase-auth.js"),
+        import(base + "firebase-firestore.js")
+      ]).then(function (mods) {
+        var appMod = mods[0], authMod = mods[1], fsMod = mods[2];
+        var app;
+        try { app = appMod.getApp("botinbox"); }
+        catch (e) { app = appMod.initializeApp(cfg, "botinbox"); }
+        var authInst = authMod.getAuth(app);
+        return authMod.signInAnonymously(authInst).then(function () {
           var db = fsMod.getFirestore(app, "default");
           return fsMod.getDocs(fsMod.collection(db, "bot_messages"));
-        }).then(function (snap) {
-          alert("");
-          state.messages = snap.docs.map(function (d) {
-            var f = d.data() || {};
-            // at อาจเป็น Firestore Timestamp (มาจาก SDK) หรือ string — ทำให้เป็น ISO เสมอ
-            var atStr = "";
-            if (f.at && typeof f.at.toDate === "function") atStr = f.at.toDate().toISOString();
-            else if (f.at) atStr = String(f.at);
-            return {
-              userId: f.userId || "",
-              text: f.text || "",
-              reply: f.reply || "",
-              source: f.source || "line",
-              at: atStr
-            };
-          }).sort(function (a, b) { return (b.at || "").localeCompare(a.at || ""); });
-          groupAndRender();
-        }).catch(function (e) {
-          var code = e && e.code ? " [" + e.code + "]" : "";
-          alert("โหลดไม่สำเร็จ" + code + ": " + (e.message || e), "err");
-          renderEmpty();
         });
+      }).then(function (snap) {
+        alert("");
+        state.messages = snap.docs.map(function (d) {
+          var f = d.data() || {};
+          // at อาจเป็น Firestore Timestamp (มาจาก SDK) หรือ string — ทำให้เป็น ISO เสมอ
+          var atStr = "";
+          if (f.at && typeof f.at.toDate === "function") atStr = f.at.toDate().toISOString();
+          else if (f.at) atStr = String(f.at);
+          return {
+            userId: f.userId || "",
+            text: f.text || "",
+            reply: f.reply || "",
+            source: f.source || "line",
+            at: atStr
+          };
+        }).sort(function (a, b) { return (b.at || "").localeCompare(a.at || ""); });
+        groupAndRender();
+      }).catch(function (e) {
+        var code = e && e.code ? " [" + e.code + "]" : "";
+        alert("โหลดไม่สำเร็จ" + code + ": " + (e.message || e), "err");
+        renderEmpty();
       });
     }
 
