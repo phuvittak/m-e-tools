@@ -6,9 +6,9 @@
   var S = window.MEStore, U = window.MEUI;
   var view = document.body.getAttribute("data-admin");
 
-  // permission gate per page (owner bypasses all). staff page is owner-only.
+  // permission gate per page (owner bypasses all). staff/botreplies are owner-only.
   var permFor = { dashboard: "dashboard", inventory: "inventory", orders: "orders", erp: "erp", settings: "settings" };
-  if (view === "staff") {
+  if (view === "staff" || view === "botreplies") {
     if (!S.requirePerm(null, "../login.html")) return;
     if (!S.isOwner()) { window.location.href = "dashboard.html"; return; }
   } else if (view === "chat" || view === "botinbox") {
@@ -16,7 +16,7 @@
   } else if (!S.requirePerm(permFor[view] || "dashboard", "../login.html")) return;
 
   mountShell(view);
-  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox }[view] || function () {})();
+  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies }[view] || function () {})();
 
   /* ---------- shell / sidebar ---------- */
   function mountShell(active) {
@@ -30,6 +30,7 @@
       staff: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
       chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
       botinbox: '<path d="M12 2C6.48 2 2 6.04 2 11c0 2.5 1.16 4.74 3 6.33V22l3.83-2.1c1.01.23 2.07.35 3.17.35 5.52 0 10-4.04 10-9s-4.48-9-10-9z"/><circle cx="8.5" cy="11" r="1.2" fill="currentColor"/><circle cx="12" cy="11" r="1.2" fill="currentColor"/><circle cx="15.5" cy="11" r="1.2" fill="currentColor"/>',
+      botreplies: '<path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M7 8h10M7 12h7" stroke-linecap="round"/>',
     };
     var nav = [
       ["dashboard.html", "dashboard", "แดชบอร์ด", "dashboard"],
@@ -40,6 +41,7 @@
     ].filter(function (n) { return S.hasPerm(n[3]); });
     // แชทลูกค้าหน้าเว็บถูกถอดออก — ลูกค้าทักผ่าน LINE OA ตรง ดูทุกบทสนทนาในหน้า "แชทบอท LINE"
     nav.push(["bot-inbox.html", "botinbox", "แชทบอท LINE", "botinbox"]);
+    if (S.isOwner()) nav.push(["bot-replies.html", "botreplies", "คำตอบของบอท", "botreplies"]);
     if (S.isOwner()) nav.push(["staff.html", "staff", "จัดการทีมงาน", "staff"]);
 
     var roleTag = sess.role === "owner" ? "เจ้าของร้าน" : "พนักงาน";
@@ -642,6 +644,179 @@
       return new Date(iso).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
     }
     function cssEsc(s) { return String(s).replace(/[^a-zA-Z0-9_-]/g, "\\$&"); }
+  }
+
+  /* ===================== BOT REPLIES EDITOR (Phase B) ===================== */
+  // เจ้าของร้านแก้คำตอบของบอท + คีย์เวิร์ดที่บอทใช้จับคำสั้นๆ จากข้อความลูกค้า
+  // เก็บใน Firestore: bot_config/replies { greeting, fallback, rules: [{id,label,keywords[],answer}] }
+  // line-webhook.js จะอ่านจาก doc นี้ (B4 ต่อจากนี้)
+  function initBotReplies() {
+    var alertBox = document.querySelector("[data-alert]");
+    var greetingEl = document.querySelector("[data-greeting]");
+    var fallbackEl = document.querySelector("[data-fallback]");
+    var rulesBox = document.querySelector("[data-rules]");
+    var addBtn = document.querySelector("[data-add]");
+    var saveBtn = document.querySelector("[data-save]");
+    var statusEl = document.querySelector("[data-status]");
+
+    var state = { fs: null, config: null, dirty: false };
+
+    function setAlert(msg, kind) {
+      if (!msg) { alertBox.style.display = "none"; return; }
+      alertBox.textContent = msg; alertBox.style.display = "block";
+      alertBox.style.background = kind === "err" ? "#fee" : "#efe";
+    }
+    function setStatus(msg) { statusEl.textContent = msg || ""; }
+
+    function defaultConfig() {
+      return {
+        greeting: "สวัสดีครับ ยินดีต้อนรับสู่ M.E.Tools 🙏\nสนใจดูเครื่องมือหมวดไหนเป็นพิเศษครับ?",
+        fallback: "ขอบคุณสำหรับข้อความครับ 🙏\nสนใจดูเครื่องมือหมวดไหนเป็นพิเศษครับ?",
+        rules: [
+          { id: genId(), label: "ราคา", keywords: ["ราคา", "เท่าไหร่", "เท่าไร", "กี่บาท"], answer: "ราคาตามรุ่นครับ ดูสินค้าทั้งหมดได้ที่ https://metoolsshop.vercel.app/shop.html 🛒" },
+          { id: genId(), label: "เวลาเปิด", keywords: ["เปิด", "ปิด", "เวลา", "กี่โมง"], answer: "ร้านเปิด จันทร์–เสาร์ 8:00–17:00 / อาทิตย์ 8:00–15:00 ครับ" },
+          { id: genId(), label: "ที่อยู่", keywords: ["ที่อยู่", "ร้านอยู่", "แผนที่"], answer: "199/6 ม.7 ต.สันปูเลย อ.ดอยสะเก็ด จ.เชียงใหม่ 50220" },
+          { id: genId(), label: "ส่งสินค้า", keywords: ["ส่ง", "ขนส่ง", "ค่าส่ง"], answer: "ส่งทั่วประเทศครับ — ค่าส่งคิดตามขนาดสินค้า สอบถามตอบกลับได้ทันที 🚚" },
+        ]
+      };
+    }
+
+    function genId() { return "r" + Date.now().toString(36) + Math.floor(Math.random() * 1000); }
+
+    function load() {
+      setAlert("กำลังโหลด…");
+      var cfg = window.parseFbConfig ? window.parseFbConfig(S.firebaseCfg ? S.firebaseCfg() : "") : null;
+      if (!cfg) { setAlert("ยังไม่ได้ตั้ง Firebase Config ในหน้า ตั้งค่าเว็บไซต์", "err"); return; }
+      var base = "https://www.gstatic.com/firebasejs/10.12.2/";
+      Promise.all([
+        import(base + "firebase-app.js"),
+        import(base + "firebase-auth.js"),
+        import(base + "firebase-firestore.js")
+      ]).then(function (mods) {
+        var appMod = mods[0], authMod = mods[1], fsMod = mods[2];
+        var app;
+        try { app = appMod.getApp("botreplies"); }
+        catch (e) { app = appMod.initializeApp(cfg, "botreplies"); }
+        var authInst = authMod.getAuth(app);
+        return authMod.signInAnonymously(authInst).then(function () {
+          var db = fsMod.getFirestore(app, "default");
+          state.fs = {
+            db: db,
+            doc: fsMod.doc,
+            getDoc: fsMod.getDoc,
+            setDoc: fsMod.setDoc,
+            serverTimestamp: fsMod.serverTimestamp
+          };
+          var ref = fsMod.doc(db, "bot_config", "replies");
+          return fsMod.getDoc(ref);
+        });
+      }).then(function (snap) {
+        setAlert("");
+        if (snap && snap.exists && snap.exists()) {
+          var data = snap.data() || {};
+          // เก่าอาจไม่มี rules array
+          state.config = {
+            greeting: data.greeting || "",
+            fallback: data.fallback || "",
+            rules: Array.isArray(data.rules) ? data.rules.map(function (r) {
+              return { id: r.id || genId(), label: r.label || "", keywords: r.keywords || [], answer: r.answer || "" };
+            }) : []
+          };
+        } else {
+          state.config = defaultConfig();
+          setAlert("ยังไม่มีการตั้งค่า — แสดงค่าเริ่มต้น (กดบันทึกเพื่อเริ่มใช้)", "ok");
+        }
+        render();
+      }).catch(function (e) {
+        var code = e && e.code ? " [" + e.code + "]" : "";
+        setAlert("โหลดไม่สำเร็จ" + code + ": " + (e.message || e), "err");
+      });
+    }
+
+    function render() {
+      greetingEl.value = state.config.greeting || "";
+      fallbackEl.value = state.config.fallback || "";
+      var rules = state.config.rules || [];
+      if (!rules.length) {
+        rulesBox.innerHTML = '<div class="br-empty">ยังไม่มีกฎ — กด "+ เพิ่มคีย์เวิร์ด"</div>';
+        return;
+      }
+      rulesBox.innerHTML = rules.map(function (r, i) {
+        return '<div class="br-rule" data-rid="' + esc(r.id) + '">' +
+          '<div class="br-rule-head">' +
+            '<input data-rule-label placeholder="ชื่อกฎ (เช่น ราคา)" value="' + esc(r.label) + '">' +
+            '<button class="br-rule-del" type="button" data-del>ลบ</button>' +
+          '</div>' +
+          '<div class="br-field">' +
+            '<label>คีย์เวิร์ด (คั่นด้วย , — เจอตัวใดตัวหนึ่งก็ใช้ได้)</label>' +
+            '<input data-rule-kw placeholder="ราคา, เท่าไหร่, กี่บาท" value="' + esc((r.keywords || []).join(", ")) + '">' +
+          '</div>' +
+          '<div class="br-field">' +
+            '<label>คำตอบ</label>' +
+            '<textarea data-rule-ans placeholder="ราคาตามรุ่นครับ ดูได้ที่ shop.html">' + esc(r.answer) + '</textarea>' +
+          '</div>' +
+        '</div>';
+      }).join("");
+      // wire up delete buttons
+      rulesBox.querySelectorAll(".br-rule").forEach(function (card) {
+        card.querySelector("[data-del]").addEventListener("click", function () {
+          var id = card.getAttribute("data-rid");
+          state.config.rules = state.config.rules.filter(function (r) { return r.id !== id; });
+          render();
+        });
+      });
+    }
+
+    function collectFromDom() {
+      state.config.greeting = greetingEl.value.trim();
+      state.config.fallback = fallbackEl.value.trim();
+      var rules = [];
+      rulesBox.querySelectorAll(".br-rule").forEach(function (card) {
+        var id = card.getAttribute("data-rid");
+        var label = card.querySelector("[data-rule-label]").value.trim();
+        var kw = card.querySelector("[data-rule-kw]").value
+          .split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+        var ans = card.querySelector("[data-rule-ans]").value.trim();
+        if (!kw.length && !ans) return; // skip empty
+        rules.push({ id: id || genId(), label: label, keywords: kw, answer: ans });
+      });
+      state.config.rules = rules;
+    }
+
+    function save() {
+      if (!state.fs) { setAlert("ยังเชื่อม Firebase ไม่สำเร็จ", "err"); return; }
+      collectFromDom();
+      saveBtn.disabled = true;
+      setStatus("กำลังบันทึก…");
+      var fs = state.fs;
+      var ref = fs.doc(fs.db, "bot_config", "replies");
+      var sess = S.session() || {};
+      fs.setDoc(ref, {
+        greeting: state.config.greeting,
+        fallback: state.config.fallback,
+        rules: state.config.rules,
+        updatedAt: fs.serverTimestamp(),
+        updatedBy: sess.email || sess.name || "owner"
+      }).then(function () {
+        saveBtn.disabled = false;
+        setStatus("บันทึกแล้ว ✓");
+        setTimeout(function () { setStatus(""); }, 2500);
+        if (U && U.toast) U.toast("บันทึกคำตอบของบอทเรียบร้อย", "ok");
+      }).catch(function (e) {
+        saveBtn.disabled = false;
+        setStatus("");
+        setAlert("บันทึกไม่สำเร็จ: " + (e.message || e), "err");
+      });
+    }
+
+    addBtn.addEventListener("click", function () {
+      collectFromDom();
+      state.config.rules.push({ id: genId(), label: "", keywords: [], answer: "" });
+      render();
+    });
+    saveBtn.addEventListener("click", save);
+
+    load();
   }
 
   function openProductModal(p) {

@@ -60,6 +60,14 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // ตั้งค่าคำตอบของบอท (Phase B) — เจ้าของแก้จากหน้า bot-replies.html
+    // อ่าน: เปิดสาธารณะ — line-webhook อ่านโดยไม่มี auth (เหมือน products/catalog)
+    // เขียน: ต้อง auth — Phase D จะ tighten ด้วย admin custom claim
+    match /bot_config/{cfgId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
     // อื่น ๆ ปิดทั้งหมด
     match /{document=**} {
       allow read, write: if false;

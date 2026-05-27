@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>คำตอบของบอท — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css">
+  <style>
+    .br-section { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:18px 20px; margin-bottom:16px }
+    .br-section h2 { margin:0 0 6px; font-size:16px; font-family:var(--font-display, inherit) }
+    .br-section .sub { font-size:13px; color:var(--fg-2); margin-bottom:14px; line-height:1.5 }
+
+    .br-field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px }
+    .br-field label { font-weight:600; font-size:13px; color:var(--fg) }
+    .br-field textarea,
+    .br-field input { padding:10px 12px; border:1px solid var(--border-3); border-radius:8px; font-family:var(--font-body); font-size:14px; resize:vertical; outline:none; background:#fff; color:var(--fg) }
+    .br-field textarea { min-height:60px; max-height:240px }
+    .br-field textarea:focus,
+    .br-field input:focus { border-color:var(--accent, #FFB81C); box-shadow:0 0 0 3px rgba(255,184,28,.2) }
+    .br-hint { font-size:11px; color:var(--fg-2); margin-top:-2px }
+
+    .br-rules { display:flex; flex-direction:column; gap:12px }
+    .br-rule { background:#fff; border:1px solid var(--border-3); border-radius:10px; padding:14px 16px }
+    .br-rule-head { display:flex; gap:10px; align-items:center; margin-bottom:8px }
+    .br-rule-head input { flex:1; font-weight:600 }
+    .br-rule-del { background:#fee; border:1px solid #f5b0b0; color:#a00; border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer }
+    .br-rule-del:hover { background:#fdd }
+
+    .br-toolbar { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:center }
+    .br-toolbar .btn { padding:8px 16px; font-family:var(--font-body); font-weight:600; font-size:14px; border-radius:8px; border:1px solid var(--ink, #0b0b0b); cursor:pointer }
+    .br-toolbar .btn-primary { background:var(--accent, #FFB81C); color:var(--ink, #0b0b0b) }
+    .br-toolbar .btn-secondary { background:#fff }
+    .br-toolbar .btn:disabled { opacity:.5; cursor:not-allowed }
+    .br-toolbar .save-status { color:var(--fg-2); font-size:12px; margin-left:auto }
+
+    .br-empty { text-align:center; padding:30px; color:var(--fg-2); font-family:var(--font-body) }
+  </style>
+</head>
+<body data-admin="botreplies">
+  <div class="admin" data-shell>
+    <main class="main">
+      <div class="topbar">
+        <div><h1>คำตอบของบอท</h1><div class="sub">เฉพาะเจ้าของร้าน — แก้คำพูดของบอท + เพิ่มคีย์เวิร์ดที่ให้บอทจับคำสั้นๆ จากข้อความลูกค้าเพื่อตอบ</div></div>
+      </div>
+
+      <div class="alert" data-alert style="display:none"></div>
+
+      <div class="br-section">
+        <h2>คำทักทายเริ่มต้น</h2>
+        <div class="sub">บอทจะส่งข้อความนี้เมื่อลูกค้าทักครั้งแรก หรือเมื่อลูกค้าพิมพ์ "สวัสดี" / "หวัดดี"</div>
+        <div class="br-field">
+          <textarea data-greeting placeholder="เช่น สวัสดีครับ ยินดีต้อนรับสู่ M.E.Tools 🙏 สนใจดูเครื่องมือหมวดไหนเป็นพิเศษครับ?"></textarea>
+        </div>
+      </div>
+
+      <div class="br-section">
+        <h2>ข้อความเริ่มต้น (เมื่อบอทตอบไม่ได้)</h2>
+        <div class="sub">ใช้เมื่อบอทไม่เจอคีย์เวิร์ดที่ตรง + ไม่ได้ระบุหมวดสินค้า — ข้อความนี้จะพยายามให้ลูกค้าพิมพ์อะไรที่ชัดขึ้น</div>
+        <div class="br-field">
+          <textarea data-fallback placeholder="เช่น ขอบคุณสำหรับข้อความครับ 🙏 สนใจดูเครื่องมือหมวดไหนเป็นพิเศษครับ? เช่น สว่าน, เลื่อย, เจียร, แบตเตอรี่"></textarea>
+        </div>
+      </div>
+
+      <div class="br-section">
+        <h2>คีย์เวิร์ดและคำตอบเฉพาะ</h2>
+        <div class="sub">เมื่อลูกค้าพิมพ์ข้อความยาว ๆ บอทจะค้นหาคีย์เวิร์ดที่ตรงกัน (เรียงตามลำดับด้านล่าง — กฎที่อยู่บนสุดมาก่อน) แล้วตอบด้วยข้อความที่ตั้งไว้ ถ้าไม่เจอคีย์เวิร์ดใดเลย → ใช้ข้อความเริ่มต้นด้านบน</div>
+        <div class="br-rules" data-rules>
+          <div class="br-empty">กำลังโหลด…</div>
+        </div>
+        <div class="br-toolbar">
+          <button class="btn btn-secondary" data-add type="button">+ เพิ่มคีย์เวิร์ด</button>
+          <button class="btn btn-primary" data-save type="button">บันทึก</button>
+          <span class="save-status" data-status></span>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="../assets/thai-geo.js"></script>
+  <script src="../assets/store.js"></script>
+  <script src="../assets/ui.js"></script>
+  <script src="../assets/admin.js"></script>
+</body>
+</html>
