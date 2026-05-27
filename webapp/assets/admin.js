@@ -38,7 +38,7 @@
       ["erp.html", "erp", "ระบบ ERP / บัญชี", "erp"],
       ["settings.html", "settings", "ตั้งค่าเว็บไซต์", "settings"],
     ].filter(function (n) { return S.hasPerm(n[3]); });
-    nav.push(["chat.html", "chat", "แชทลูกค้า", "chat"]);
+    // แชทลูกค้าหน้าเว็บถูกถอดออก — ลูกค้าทักผ่าน LINE OA ตรง ดูทุกบทสนทนาในหน้า "แชทบอท LINE"
     nav.push(["bot-inbox.html", "botinbox", "แชทบอท LINE", "botinbox"]);
     if (S.isOwner()) nav.push(["staff.html", "staff", "จัดการทีมงาน", "staff"]);
 

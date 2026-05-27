@@ -16,19 +16,18 @@ const FIRESTORE_DB = 'default';
 // ===== ข้อมูลร้าน (แก้ตรงนี้ถ้าเปลี่ยน) =================================
 const SHOP = {
   company: 'บริษัท เอ็ม.อี.ทูลส์ จำกัด',
-  address: 'แยกท่ารั้ว ต.ท่าวังตาล อ.สารภี จ.เชียงใหม่ 50140',
-  phone: '053-XXX-XXXX',
+  address: '199/6 ม.7 ต.สันปูเลย อ.ดอยสะเก็ด จ.เชียงใหม่ 50220',
+  phone: '081-3706466, 053-104699',
   hoursWeek: 'จันทร์ – เสาร์ 8:00 – 17:00 น.',
   hoursSun: 'อาทิตย์ 8:00 – 15:00 น.',
-  line: '@metools',
+  line: 'https://lin.ee/so6euhT',
   website: 'https://metools-rho.vercel.app',
 };
 
 const HELP_TEXT =
-  'พิมพ์ได้เลยค่ะ เช่น 🙂\n' +
-  '• "สว่าน" หรือ "เลื่อย" — เลือกประเภท บอทจะถามแบรนด์ต่อ\n' +
-  '• "DCD805" — ใส่รหัสสินค้า ดูสเป็ก+ราคาทันที\n' +
-  '• "เวลาเปิด" / "ที่อยู่" / "เบอร์โทร" — ข้อมูลร้าน\n' +
+  'สอบถามได้เลยครับ 🙂\n' +
+  '• เลือกประเภท \n' +
+  '• ถ้าใส่รหัสสินค้าจะดูสเป็กทันที\n' +
   '• "พนักงาน" — ขอคุยกับแอดมิน';
 
 // ===== ป้ายชื่อหมวด (สำหรับพูดให้ลูกค้าฟังเข้าใจ) ========================
@@ -189,7 +188,7 @@ function specsToText(specs) {
 function formatProduct(p) {
   const lines = [`🛠️ ${p.name}`, `แบรนด์: ${p.brand || '-'}    รหัส: ${p.sku || '-'}`];
   const av = p.available != null ? p.available : Math.max(0, (p.stock || 0) - (p.rented || 0));
-  lines.push(av > 0 ? `📦 มีพร้อมส่ง ${av} ชิ้นค่ะ` : `📦 ขออภัย สินค้าหมดชั่วคราวค่ะ 🙏`);
+  lines.push(av > 0 ? `📦 มีพร้อมส่ง ${av} ชิ้นครับ` : `📦 ขออภัย สินค้าหมดชั่วคราวครับ 🙏`);
   const sp = specsToText(p.specs);
   if (sp) lines.push('\n📋 สเป็ก:\n' + sp);
   // ราคา = ข้อมูลสุดท้าย (ตามคำขอ)
@@ -203,7 +202,7 @@ function formatProduct(p) {
 
 function formatProductList(matches) {
   if (matches.length === 1) return formatProduct(matches[0]);
-  const lines = [`พบ ${matches.length} รุ่นค่ะ 🛠️\n`];
+  const lines = [`พบ ${matches.length} รุ่นครับ 🛠️\n`];
   matches.slice(0, 5).forEach((p) => {
     const av = p.available != null ? p.available : Math.max(0, (p.stock || 0) - (p.rented || 0));
     const stock = av > 0 ? `มี ${av} ชิ้น` : 'หมด';
@@ -213,7 +212,7 @@ function formatProductList(matches) {
     lines.push(`  รหัส ${p.sku || '-'} · ${stock}${price ? ' · ' + price : ''}${rent ? ' · ' + rent : ''}`);
   });
   if (matches.length > 5) lines.push(`\n... และอีก ${matches.length - 5} รุ่น`);
-  lines.push(`\n💬 พิมพ์รหัสสินค้าที่สนใจ (เช่น DCD805) เพื่อดูสเป็กเต็มค่ะ`);
+  lines.push(`\n💬 พิมพ์รหัสสินค้าที่สนใจ (เช่น DCD805) เพื่อดูสเป็กเต็มครับ`);
   return lines.join('\n');
 }
 
@@ -250,7 +249,7 @@ async function smartReply(userId, text) {
     if (isWildcardAny(text)) {
       const all = products.filter((p) => p.category === cat);
       await clearSession(userId);
-      if (!all.length) return `ขออภัย ตอนนี้${CATEGORY_LABELS[cat] || ''}ไม่มีในสต๊อกค่ะ 🙏`;
+      if (!all.length) return `ขออภัย ตอนนี้${CATEGORY_LABELS[cat] || ''}ไม่มีในสต๊อกครับ 🙏`;
       return formatProductList(all);
     }
     if (brand) {
@@ -258,13 +257,13 @@ async function smartReply(userId, text) {
       await clearSession(userId);
       if (!filtered.length) {
         const brands = uniqueBrandsForCategory(products, cat);
-        return `ขออภัย ตอนนี้${brand} ${CATEGORY_LABELS[cat] || ''}ยังไม่มีในสต๊อกค่ะ 🙏\nที่มีคือ: ${brands.join(' / ') || '—'}`;
+        return `ขออภัย ตอนนี้${brand} ${CATEGORY_LABELS[cat] || ''}ยังไม่มีในสต๊อกครับ 🙏\nที่มีคือ: ${brands.join(' / ') || '—'}`;
       }
       return formatProductList(filtered);
     }
     // ตอบไม่ตรง — ถามอีกที สั้น ๆ
     const brands = uniqueBrandsForCategory(products, cat);
-    return `ขออภัยค่ะ ไม่เข้าใจ 🙏\nลองพิมพ์ชื่อแบรนด์ได้เลย เช่น: ${brands.join(', ')}\nหรือพิมพ์ "ทั้งหมด" ดูทุกแบรนด์ค่ะ`;
+    return `ขออภัยครับ ไม่เข้าใจ 🙏\nลองพิมพ์ชื่อแบรนด์ได้เลย เช่น: ${brands.join(', ')}\nหรือพิมพ์ "ทั้งหมด" ดูทุกแบรนด์ครับ`;
   }
 
   // 3) ระบุหมวด+แบรนด์ในข้อความเดียว → แสดงผลเลย ไม่ต้องถามต่อ
@@ -277,7 +276,7 @@ async function smartReply(userId, text) {
   if (category) {
     const brands = uniqueBrandsForCategory(products, category);
     await setSession(userId, { category, expecting: 'brand' });
-    return `สนใจ${CATEGORY_LABELS[category] || ''}ใช่ไหมคะ 🛠️\nอยากดูแบรนด์ไหนคะ?\n👉 ${brands.join(' / ')}\n\nหรือพิมพ์ "ทั้งหมด" ดูทุกแบรนด์ค่ะ`;
+    return `สนใจ${CATEGORY_LABELS[category] || ''}ใช่ไหมคะ 🛠️\nอยากดูแบรนด์ไหนคะ?\n👉 ${brands.join(' / ')}\n\nหรือพิมพ์ "ทั้งหมด" ดูทุกแบรนด์ครับ`;
   }
 
   // 5) ระบุแค่แบรนด์ (ไม่บอกหมวด) → ลิสต์สินค้าทุกหมวดของแบรนด์นั้น
@@ -299,28 +298,153 @@ function basicReply(text) {
   if (!t) return null;
 
   if (/^(สวัสดี|หวัดดี|สวัด|hello|hi|hey|hej)/i.test(t)) {
-    return `สวัสดีค่ะ ขอบคุณที่ทักมา M.E.Tools ท่ารั้วยินดีบริการ 🛠️\n\n${HELP_TEXT}`;
+    return `สวัสดีครับ ขอบคุณที่ทักมา M.E.Tools ท่ารั้วยินดีบริการ 🛠️\n\n${HELP_TEXT}`;
   }
   if (/(เวลา|เปิด|ปิด|กี่โมง|hours?|open)/i.test(t)) {
-    return `🕐 เวลาทำการ\n${SHOP.hoursWeek}\n${SHOP.hoursSun}\n\nมาทักก่อนได้นะคะ จะเตรียมของรอให้ค่ะ 🙂`;
+    return `🕐 เวลาทำการ\n${SHOP.hoursWeek}\n${SHOP.hoursSun}\n\nมาทักก่อนได้นะคะ จะเตรียมของรอให้ครับ 🙂`;
   }
   if (/(ที่อยู่|ที่ตั้ง|address|location|แผนที่|map|ไป.*ร้าน)/i.test(t)) {
     return `📍 ที่อยู่ร้าน\n${SHOP.address}\n\nLINE: ${SHOP.line}\nเว็บ: ${SHOP.website}`;
   }
   if (/(เบอร์|โทร|tel|phone|ติดต่อ|call)/i.test(t)) {
-    return `📞 โทรหาเราได้เลยค่ะ\n${SHOP.phone}\nLINE: ${SHOP.line}`;
+    return `📞 โทรหาเราได้เลยครับ\n${SHOP.phone}\nLINE: ${SHOP.line}`;
   }
   if (/(พนักงาน|แอดมิน|admin|staff|คุย.*คน|ตอบ.*คน)/i.test(t)) {
-    return `รับทราบค่ะ จะแจ้งทีมงานให้นะคะ 🙏\nระหว่างนี้ลองดูสินค้าที่ ${SHOP.website} ก่อนได้ค่ะ`;
+    return `รับทราบครับ จะแจ้งทีมงานให้นะคะ 🙏\nระหว่างนี้ลองดูสินค้าที่ ${SHOP.website} ก่อนได้ครับ`;
   }
   if (/(ขอบคุณ|thanks?|thank you|thx)/i.test(t)) {
-    return `ยินดีค่ะ 🙏 ฝากร้านด้วยนะคะ 💪`;
+    return `ยินดีครับ 🙏 ฝากร้านด้วยนะคะ 💪`;
   }
   if (/^(help|ช่วย|menu|เมนู|\?)$/i.test(t)) {
     return HELP_TEXT;
   }
   // ตอบสุภาพแบบ default
-  return `ขอบคุณสำหรับข้อความค่ะ 🙏\n\n${HELP_TEXT}`;
+  return `ขอบคุณสำหรับข้อความครับ 🙏\n\n${HELP_TEXT}`;
+}
+
+// ============================================================
+// 🧠 AI: Claude Opus 4.7 (ตอบลูกค้าด้วยภาษาธรรมชาติ)
+// - prompt caching ลด cost (catalog cache ครั้งแรก, อ่านครั้งต่อ ๆ ไปถูก 10x)
+// - adaptive thinking ให้ Claude คิดเองว่าควรไตร่ตรองนานแค่ไหน
+// - ทำงานเฉพาะเมื่อมี env var ANTHROPIC_API_KEY เท่านั้น
+//   ถ้าไม่มี = fallback ไป smartReply แบบกฎ
+// ============================================================
+function buildAISystemPrompt(products) {
+  const catalogText = products.map((p) => {
+    const avail = p.available != null ? p.available : Math.max(0, (p.stock || 0) - (p.rented || 0));
+    const stock = avail > 0 ? `เหลือ ${avail} ชิ้น` : 'หมด';
+    const price = p.forSale && p.price ? `${Number(p.price).toLocaleString()} บาท` : '-';
+    const rent = p.forRent && p.rentPerDay ? `${Number(p.rentPerDay).toLocaleString()} บาท/วัน` : '-';
+    const specs = (p.specs || []).map((s) => {
+      if (Array.isArray(s)) return `${s[0]}=${s[1]}`;
+      if (s && typeof s === 'object') return `${s.label}=${s.value}`;
+      return '';
+    }).filter(Boolean).join(', ');
+    return `${p.sku || ''} | ${p.name} | แบรนด์:${p.brand || '-'} | หมวด:${CATEGORY_LABELS[p.category] || p.category} | ขาย:${price} | เช่า/วัน:${rent} | สต็อก:${stock} | สเป็ก:${specs}`;
+  }).join('\n');
+
+  return `คุณคือพนักงานต้อนรับของร้าน ${SHOP.company} (M.E.Tools ท่ารั้ว) จ.เชียงใหม่
+ร้านเช่า–ซื้อเครื่องมือช่าง DEWALT และแบรนด์โปรอื่น ๆ มา ${products.length} รุ่น
+
+== ข้อมูลร้าน ==
+ที่อยู่: ${SHOP.address}
+เบอร์โทร: ${SHOP.phone}
+LINE: ${SHOP.line}
+เวลาทำการ: ${SHOP.hoursWeek} | ${SHOP.hoursSun}
+เว็บไซต์: ${SHOP.website}
+
+== แคตตาล็อกสินค้าปัจจุบัน ==
+${catalogText}
+
+== กฎการตอบ (สำคัญ ห้ามผิด) ==
+1. ตอบเป็นภาษาไทยสุภาพ ใช้คำลงท้ายว่า "ครับ" เท่านั้น — **ห้ามใช้ "ค่ะ" เด็ดขาด**
+2. ตอบสั้น ทีละข้อความ ไม่ยัดข้อมูลเยอะในตอบเดียว
+3. **บอกราคาเป็นข้อมูลสุดท้าย** ไม่บอกราคาทันทีในการตอบครั้งแรก
+4. ลำดับการแนะนำสินค้า:
+   ขั้น 1) ลูกค้าบอกแค่ประเภท (เช่น "สว่าน") → ถามแบรนด์ที่สนใจ พร้อมบอกแบรนด์ที่ร้านมี
+   ขั้น 2) ลูกค้าระบุแบรนด์แล้ว → แนะนำ 1–3 รุ่นที่ตรงความต้องการ บอกชื่อ+สเป็กสั้น (ยังไม่บอกราคา)
+   ขั้น 3) ลูกค้าสนใจรุ่นใดรุ่นหนึ่ง → ตอบสเป็กละเอียด **ปิดท้ายด้วยราคา**
+   ข้อยกเว้น: ถ้าลูกค้าพิมพ์รหัสสินค้าตรง ๆ (เช่น DCD805) ตอบรายละเอียดเต็มได้เลย แต่ราคายังต้องอยู่ท้ายข้อความ
+5. ใช้ emoji เล็กน้อยพอเหมาะ (🛠️ 📦 💰 📅) ไม่เกิน 2–3 ตัวต่อข้อความ
+6. ถ้าไม่ทราบข้อมูล/ไม่ใช่สินค้าในแคตตาล็อก → ขอโทษและให้โทร ${SHOP.phone}
+7. ถ้าลูกค้าถามเรื่องไม่เกี่ยวกับร้าน → ขอโทษและพากลับมาคุยเรื่องเครื่องมือ
+8. ลูกค้าทักทาย → ทักทายกลับ + แนะนำสั้น ๆ ว่าช่วยอะไรได้บ้าง (ดูเครื่องมือ/เช่า/ซื้อ)
+9. ลูกค้าขอคุยกับ "พนักงาน/แอดมิน" → บอกว่าจะแจ้งให้ และให้เบอร์ ${SHOP.phone}`;
+}
+
+async function aiReply(text) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  const products = await getCatalog();
+  if (!products.length) return null;
+
+  const systemPrompt = buildAISystemPrompt(products);
+  const startedAt = Date.now();
+  const ctrl = new AbortController();
+  // Vercel function timeout เป็น 60s บน Pro; เผื่อ 25s ให้ Claude ตอบ
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-7',
+        max_tokens: 1024,
+        thinking: { type: 'adaptive' },
+        system: [
+          // cache_control บน text block สุดท้ายของ system = cache ทั้ง catalog
+          // ครั้งแรกเขียน cache (~1.25x) ครั้งต่อ ๆ ไปอ่าน cache (~0.1x)
+          { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
+        ],
+        messages: [{ role: 'user', content: text }],
+      }),
+      signal: ctrl.signal,
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[ai] Claude API failed', res.status, body.slice(0, 300));
+      return null;
+    }
+
+    const data = await res.json();
+    const ms = Date.now() - startedAt;
+    const u = data.usage || {};
+    console.log('[ai] OK in', ms, 'ms — input:', u.input_tokens, '| cache_read:', u.cache_read_input_tokens, '| cache_create:', u.cache_creation_input_tokens, '| output:', u.output_tokens);
+
+    const textBlocks = (data.content || []).filter((b) => b.type === 'text');
+    if (!textBlocks.length) return null;
+    return textBlocks.map((b) => b.text).join('\n').trim();
+  } catch (err) {
+    console.error('[ai] threw —', err?.name, err?.message);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ============================================================
+// 🎯 Hybrid: รวม smartReply (กฎ, เร็ว) + aiReply (Claude, ฉลาด)
+// ============================================================
+async function handleMessage(userId, text) {
+  // เริ่มจากกฎ — รวดเร็ว ไม่เสียค่า API ถ้าคำสั่งชัดเจน (เช่น "DCD805")
+  const ruleReply = await smartReply(userId, text);
+
+  // ถ้า ruleReply เป็นแค่คำตอบ generic (basicReply fallback) ลอง AI
+  const isGenericFallback = ruleReply && /^ขอบคุณสำหรับข้อความ/.test(ruleReply);
+
+  if (isGenericFallback || !ruleReply) {
+    const ai = await aiReply(text);
+    if (ai) return ai;
+  }
+
+  return ruleReply;
 }
 
 // ============================================================
@@ -429,14 +553,14 @@ export default async function handler(req, res) {
     try {
       if (event.type === 'follow') {
         await replyMessage(event.replyToken,
-          `สวัสดีค่ะ ขอบคุณที่เพิ่มเพื่อน 🙏\nM.E.Tools ท่ารั้วยินดีให้บริการ\n\n${HELP_TEXT}`,
+          `สวัสดีครับ ขอบคุณที่เพิ่มเพื่อน 🙏\nM.E.Tools ท่ารั้วยินดีให้บริการ\n\n${HELP_TEXT}`,
           token);
         return;
       }
       if (event.type === 'message' && event.message?.type === 'text') {
         const userId = event.source?.userId;
         const userText = event.message.text;
-        const reply = await smartReply(userId, userText);
+        const reply = await handleMessage(userId, userText);
         console.log('[event] text:', JSON.stringify(userText).slice(0, 80), '| reply chars:', reply?.length);
         if (reply) {
           await Promise.all([
