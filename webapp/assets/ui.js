@@ -145,6 +145,134 @@
     renderChrome();
     S.onChange(renderChrome);
     mountLineFab();
+    mountWebChat();
+  }
+
+  /* ---------- Phase A4-A5: web chat widget → Firestore bot_messages ---------- */
+  // ลูกค้าคลิก "แชท" → sign in anonymous (lazy, ตอนเปิด) → write/listen bot_messages
+  // ใช้ named DB "default" เดียวกับ bot-inbox เห็นแชทเรียลไทม์ + แอดมินตอบกลับได้
+  var webchatState = { initted: false, unsub: null, db: null, fs: null, userId: null };
+  function mountWebChat() {
+    if (document.querySelector("[data-webchat]")) return;
+    var box = document.createElement("div");
+    box.className = "me-chat me-chat-right";
+    box.setAttribute("data-webchat", "");
+    box.innerHTML =
+      '<button class="me-chat-fab" data-webchat-fab>' +
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> แชทกับร้าน</button>' +
+      '<div class="me-chat-panel" data-webchat-panel hidden>' +
+        '<div class="me-chat-head"><span>แชทกับ M.E.Tools</span><button data-webchat-close aria-label="ปิด">×</button></div>' +
+        '<div class="me-chat-body" data-webchat-body><div class="me-chat-empty">พิมพ์ข้อความด้านล่างเพื่อเริ่มสนทนา</div></div>' +
+        '<form class="me-chat-input" data-webchat-form><input data-webchat-text placeholder="พิมพ์ข้อความ…" autocomplete="off" maxlength="2000"><button class="me-btn me-btn-sm" type="submit">ส่ง</button></form>' +
+      "</div>";
+    document.body.appendChild(box);
+    box.querySelector("[data-webchat-fab]").addEventListener("click", function () {
+      var pn = box.querySelector("[data-webchat-panel]");
+      if (pn.hidden) openWebChat(); else closeWebChat();
+    });
+    box.querySelector("[data-webchat-close]").addEventListener("click", closeWebChat);
+    box.querySelector("[data-webchat-form]").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var inp = box.querySelector("[data-webchat-text]");
+      var t = (inp.value || "").trim();
+      if (!t) return;
+      inp.value = "";
+      sendWebChat(t);
+    });
+  }
+  function openWebChat() {
+    var box = document.querySelector("[data-webchat]"); if (!box) return;
+    box.querySelector("[data-webchat-panel]").hidden = false;
+    box.querySelector("[data-webchat-text]").focus();
+    initWebChatFirestore();
+  }
+  function closeWebChat() {
+    var p = document.querySelector("[data-webchat-panel]");
+    if (p) p.hidden = true;
+  }
+  function initWebChatFirestore() {
+    if (webchatState.initted) return;
+    webchatState.initted = true;
+    var cfg = window.parseFbConfig ? window.parseFbConfig(S.firebaseCfg ? S.firebaseCfg() : "") : null;
+    if (!cfg) {
+      setWebChatBody('<div class="me-chat-empty">ระบบยังไม่ได้ตั้ง Firebase — ทักผ่าน LINE ก่อนได้เลย</div>');
+      return;
+    }
+    var base = "https://www.gstatic.com/firebasejs/10.12.2/";
+    Promise.all([
+      import(base + "firebase-app.js"),
+      import(base + "firebase-auth.js"),
+      import(base + "firebase-firestore.js")
+    ]).then(function (mods) {
+      var appMod = mods[0], authMod = mods[1], fsMod = mods[2];
+      var app;
+      try { app = appMod.getApp("webchat"); }
+      catch (e) { app = appMod.initializeApp(cfg, "webchat"); }
+      var authInst = authMod.getAuth(app);
+      return authMod.signInAnonymously(authInst).then(function (cred) {
+        webchatState.userId = cred.user.uid;
+        webchatState.db = fsMod.getFirestore(app, "default");
+        webchatState.fs = {
+          collection: fsMod.collection, addDoc: fsMod.addDoc,
+          query: fsMod.query, where: fsMod.where, onSnapshot: fsMod.onSnapshot,
+          serverTimestamp: fsMod.serverTimestamp
+        };
+        var q = fsMod.query(
+          fsMod.collection(webchatState.db, "bot_messages"),
+          fsMod.where("userId", "==", webchatState.userId)
+        );
+        webchatState.unsub = fsMod.onSnapshot(q, function (snap) {
+          renderWebChatMsgs(snap.docs.map(function (d) { return d.data() || {}; }));
+        }, function (err) {
+          console.error("[webchat listener]", err);
+        });
+      });
+    }).catch(function (err) {
+      setWebChatBody('<div class="me-chat-empty">เชื่อมระบบไม่สำเร็จ — ลองทักผ่าน LINE</div>');
+      console.error("[webchat init]", err);
+    });
+  }
+  function sendWebChat(text) {
+    if (!webchatState.initted) { initWebChatFirestore(); return; }
+    if (!webchatState.userId || !webchatState.db) return;
+    var fs = webchatState.fs;
+    fs.addDoc(fs.collection(webchatState.db, "bot_messages"), {
+      userId: webchatState.userId, role: "user", text: text,
+      source: "web", at: fs.serverTimestamp()
+    }).catch(function (err) { console.error("[webchat send]", err); });
+  }
+  function renderWebChatMsgs(msgs) {
+    var body = document.querySelector("[data-webchat-body]"); if (!body) return;
+    if (!msgs || !msgs.length) {
+      body.innerHTML = '<div class="me-chat-empty">เริ่มสนทนาเลย</div>';
+      return;
+    }
+    // sort เก่า → ใหม่ ใช้ at ทั้งแบบ Timestamp และ string
+    msgs.sort(function (a, b) {
+      var aa = (a.at && a.at.toDate) ? a.at.toDate().getTime() : (a.at ? new Date(a.at).getTime() : 0);
+      var bb = (b.at && b.at.toDate) ? b.at.toDate().getTime() : (b.at ? new Date(b.at).getTime() : 0);
+      return aa - bb;
+    });
+    // flatten: paired (text + reply) → 2 bubbles, flat (role) → 1 bubble
+    var bubbles = [];
+    msgs.forEach(function (m) {
+      if (m.role === "user") bubbles.push({ side: "me", text: m.text });
+      else if (m.role === "admin") bubbles.push({ side: "shop", text: m.text, who: "ร้าน" });
+      else if (m.role === "bot") bubbles.push({ side: "bot", text: m.text });
+      else {
+        if (m.text) bubbles.push({ side: "me", text: m.text });
+        if (m.reply) bubbles.push({ side: "bot", text: m.reply });
+      }
+    });
+    body.innerHTML = bubbles.map(function (b) {
+      return '<div class="me-chat-msg ' + b.side + '">' +
+        (b.who ? '<span class="chat-who">' + esc(b.who) + '</span>' : "") +
+        esc(b.text) + '</div>';
+    }).join("");
+    body.scrollTop = body.scrollHeight;
+  }
+  function setWebChatBody(html) {
+    var body = document.querySelector("[data-webchat-body]"); if (body) body.innerHTML = html;
   }
 
   /* ---------- LINE FAB (replaces in-page chat) ---------- */
