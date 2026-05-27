@@ -21,7 +21,7 @@ html, body { margin: 0; padding: 0; background: var(--concrete-100); color: var(
 .side-brand { font-family: var(--font-wordmark); font-weight: 900; font-size: 22px; line-height: 1; padding: 0 8px 4px; }
 .side-brand span { color: var(--price-red); }
 .side-tag { font-family: var(--font-display-en); font-size: 10px; letter-spacing: .16em; color: var(--dw-yellow); text-transform: uppercase; padding: 0 8px 16px; border-bottom: 1px solid var(--concrete-700); margin-bottom: 10px; }
-.side-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.side-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; overflow-y: auto; min-height: 0; }
 .side-nav a { display: flex; align-items: center; gap: 12px; color: var(--concrete-300); text-decoration: none; font-family: var(--font-body); font-weight: 600; font-size: 15px; padding: 11px 12px; border-left: 3px solid transparent; }
 .side-nav a:hover { background: var(--ink-soft); color: var(--paper); }
 .side-nav a.on { background: var(--ink-soft); color: var(--dw-yellow); border-left-color: var(--dw-yellow); }
