@@ -370,14 +370,42 @@
       alertBox.style.background = kind === "err" ? "#fee" : "#efe";
     }
 
-    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, prevCount: 0 };
+    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, prevCount: 0, fs: null };
 
     if (refresh) refresh.addEventListener("click", function () {
       // listener อัปเดตเองอยู่แล้ว — ปุ่มนี้กลายเป็นปุ่ม re-subscribe เผื่อ connection ขาด
       if (state.unsub) { try { state.unsub(); } catch (e) {} state.unsub = null; }
       load();
     });
+    // reply bar — แอดมินตอบลูกค้าตรงในหน้า bot-inbox
+    var replyInput = document.querySelector("[data-reply-input]");
+    var replySend = document.querySelector("[data-reply-send]");
+    if (replySend) replySend.addEventListener("click", sendReply);
+    if (replyInput) replyInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); }
+    });
     load();
+
+    function sendReply() {
+      if (!state.activeUid || !state.fs) return;
+      var text = (replyInput.value || "").trim();
+      if (!text) return;
+      replySend.disabled = true;
+      var fs = state.fs;
+      var msg = {
+        userId: state.activeUid,
+        role: "admin",
+        text: text,
+        source: "admin",
+        at: fs.serverTimestamp()
+      };
+      fs.addDoc(fs.collection(fs.db, "bot_messages"), msg)
+        .then(function () { replyInput.value = ""; replySend.disabled = false; replyInput.focus(); })
+        .catch(function (err) {
+          replySend.disabled = false;
+          if (window.U && U.toast) U.toast("ส่งไม่สำเร็จ: " + (err.message || err), "err");
+        });
+    }
 
     function load() {
       alert("กำลังโหลดข้อความ…");
@@ -397,6 +425,13 @@
         var authInst = authMod.getAuth(app);
         return authMod.signInAnonymously(authInst).then(function () {
           var db = fsMod.getFirestore(app, "default");
+          // เก็บ helpers ที่ sendReply() ใช้ — ไม่ต้องโหลด SDK ซ้ำ
+          state.fs = {
+            db: db,
+            collection: fsMod.collection,
+            addDoc: fsMod.addDoc,
+            serverTimestamp: fsMod.serverTimestamp
+          };
           var col = fsMod.collection(db, "bot_messages");
           state.unsub = fsMod.onSnapshot(col, function (snap) {
             alert("");
@@ -510,12 +545,20 @@
 
     function renderEmpty() {
       document.querySelector("[data-thread]").innerHTML = '<div class="thread-empty">ยังไม่มีบทสนทนา</div>';
+      var bar = document.querySelector("[data-reply-bar]");
+      if (bar) bar.style.display = "none";
     }
 
     function renderThread(uid) {
       var conv = state.byUser[uid];
       var box = document.querySelector("[data-thread]");
-      if (!conv) { box.innerHTML = '<div class="thread-empty">เลือกบทสนทนาทางซ้าย</div>'; return; }
+      var bar = document.querySelector("[data-reply-bar]");
+      if (!conv) {
+        box.innerHTML = '<div class="thread-empty">เลือกบทสนทนาทางซ้าย</div>';
+        if (bar) bar.style.display = "none";
+        return;
+      }
+      if (bar) bar.style.display = "flex";
       var pairs = conv.messages.slice().sort(function (a, b) { return (a.at || "").localeCompare(b.at || ""); });
       // แยก doc paired เก่า (text + reply) เป็น bubble ลูกค้าซ้าย + bot ขวา 2 ก้อน
       // doc flat ใหม่ (role: "user"|"admin"|"bot") เป็น 1 bubble — ฝั่งซ้ายถ้า user, ขวาถ้าตอบ

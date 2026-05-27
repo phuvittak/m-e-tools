@@ -28,9 +28,12 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
-    // log บทสนทนาลูกค้า ↔ บอท LINE (ดูในหลังร้าน "แชทบอท")
-    // create: บอทเขียนจาก Vercel โดยไม่มี auth — validate field shape กันสแปม
-    // read:   เฉพาะแอดมิน (anonymous auth) — ลูกค้าคนอื่นเห็นไม่ได้
+    // log บทสนทนาลูกค้า ↔ บอท ↔ แอดมิน (ดูในหลังร้าน "แชทบอท")
+    // create: บอท Vercel เขียนแบบ paired (text + reply) ไม่มี auth
+    //          แอดมินตอบจากหน้า bot-inbox เขียนแบบ flat (text + role:"admin") มี auth
+    //          เว็บลูกค้าเขียนแบบ flat (text + role:"user") มี auth (Phase A4-A5)
+    // read:   ต้อง auth — แอดมินอ่านได้ทั้งหมด ลูกค้าควรเห็นเฉพาะของตัวเอง
+    //         (rules ตอนนี้ยังกว้าง จะ tighten ใน Phase D หลังมี Firebase Auth)
     // update/delete: ห้าม
     match /bot_messages/{msgId} {
       allow read: if request.auth != null;
@@ -39,8 +42,13 @@ service cloud.firestore {
                  && request.resource.data.userId.size() < 100
                  && request.resource.data.text is string
                  && request.resource.data.text.size() < 5000
-                 && request.resource.data.reply is string
-                 && request.resource.data.reply.size() < 5000;
+                 && (
+                      // paired format จาก LINE webhook
+                      (request.resource.data.reply is string
+                        && request.resource.data.reply.size() < 5000)
+                      // flat format จากแอดมิน/เว็บ
+                      || (request.resource.data.role in ["user", "admin", "bot"])
+                    );
       allow update, delete: if false;
     }
 

@@ -38,6 +38,13 @@
     .bubble-row.right .bubble-meta { text-align:right }
     .bubble-role { font-size:10px; font-weight:700; color:var(--fg-2); margin-bottom:2px; padding:0 6px; text-transform:uppercase; letter-spacing:.04em }
 
+    .reply-bar { display:flex; gap:8px; padding-top:12px; margin-top:10px; border-top:1px solid var(--border-3); flex-shrink:0 }
+    .reply-bar textarea { flex:1; min-height:42px; max-height:120px; padding:10px 12px; border:1px solid var(--border-3); border-radius:8px; font-family:var(--font-body); font-size:14px; resize:vertical; outline:none; background:#fff }
+    .reply-bar textarea:focus { border-color:var(--accent, #FFB81C); box-shadow:0 0 0 3px rgba(255,184,28,.2) }
+    .reply-bar button { padding:0 20px; font-family:var(--font-body); font-weight:600; font-size:14px; background:var(--accent, #FFB81C); color:var(--ink, #0b0b0b); border:1px solid var(--ink, #0b0b0b); border-radius:8px; cursor:pointer; white-space:nowrap }
+    .reply-bar button:hover { filter:brightness(.95) }
+    .reply-bar button:disabled { opacity:.5; cursor:not-allowed }
+
     .botinbox-toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center }
     .botinbox-toolbar .grow { flex:1 }
     .keyword-cloud { display:flex; flex-wrap:wrap; gap:6px }
@@ -71,8 +78,14 @@
         <div class="conv-list" data-convs>
           <div class="thread-empty">กำลังโหลด…</div>
         </div>
-        <div class="thread" data-thread>
-          <div class="thread-empty">เลือกบทสนทนาทางซ้ายเพื่อดูข้อความ</div>
+        <div>
+          <div class="thread" data-thread>
+            <div class="thread-empty">เลือกบทสนทนาทางซ้ายเพื่อดูข้อความ</div>
+          </div>
+          <div class="reply-bar" data-reply-bar style="display:none">
+            <textarea data-reply-input placeholder="พิมพ์ตอบลูกค้า… (Enter เพื่อส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"></textarea>
+            <button data-reply-send type="button">ส่ง</button>
+          </div>
         </div>
       </div>
     </main>
