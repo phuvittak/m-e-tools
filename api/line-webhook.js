@@ -656,27 +656,19 @@ async function aiReply(text) {
 // 🎯 หลักการตัดสินใจ: human handoff → smartReply (กฎ) → AI → fallback
 // ============================================================
 async function handleMessage(userId, text, token) {
-  // -1) Escape command FIRST (ต้องทำงานได้แม้อยู่ในโหมด human)
-  if (/^(ai กลับมา|กลับมาคุยกับบอท|reset ai|reset|กลับมา)$/i.test(String(text || '').trim())) {
-    await clearSession(userId);
-    return withQuickReply('โอเคครับ บอทกลับมาแล้ว 🤖\nสอบถามได้เลย', QUICK_MAIN);
-  }
-
   // 0) ตรวจโหมด human — ถ้าคนกำลังคุยกัน บอทเงียบ
+  //    เจ้าของจะกลับเปิดบอทเองจาก bot-inbox (ปุ่ม "เปิดบอท") — ลูกค้าไม่ต้องพิมพ์อะไร
   const session = await getSession(userId);
   if (session?.mode === 'human') {
     console.log('[handoff] session in human mode, bot stays silent');
     return null; // null = ไม่ตอบ
   }
 
-  // 1) ตรวจคำขอ "ติดต่อเจ้าของ" → ผลักไป LINE เจ้าของ
+  // 1) ตรวจคำขอ "ติดต่อเจ้าของ" → ผลักไป LINE เจ้าของ + เข้าโหมด human
   if (wantsHuman(text)) {
     await setSession(userId, { mode: 'human' });
     await pushHandoffToAdmin(userId, text, token);
-    return withQuickReply(
-      `รับทราบครับ 🙏\nผมได้แจ้งเจ้าของร้านแล้ว เดี๋ยวเจ้าของจะตอบคุณในเร็ว ๆ นี้\n\nระหว่างนี้โทรหาเราได้ที่ ${SHOP.phone}\n\nถ้าอยากกลับมาคุยกับบอทพิมพ์ "AI กลับมา"`,
-      [{ type: 'message', label: '↩️ กลับมาคุยกับบอท', text: 'AI กลับมา' }]
-    );
+    return `รับทราบครับ 🙏\nผมได้แจ้งเจ้าของร้านแล้ว เดี๋ยวเจ้าของจะตอบคุณในเร็ว ๆ นี้\n\nระหว่างนี้โทรหาเราได้ที่ ${SHOP.phone}`;
   }
 
   // 1.5) โหลด config ที่เจ้าของตั้งไว้จาก Firestore (cache 5 นาที)
