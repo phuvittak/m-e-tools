@@ -608,6 +608,12 @@ async function aiReply(text) {
 // 🎯 หลักการตัดสินใจ: human handoff → smartReply (กฎ) → AI → fallback
 // ============================================================
 async function handleMessage(userId, text, token) {
+  // -1) Escape command FIRST (ต้องทำงานได้แม้อยู่ในโหมด human)
+  if (/^(ai กลับมา|กลับมาคุยกับบอท|reset ai|reset|กลับมา)$/i.test(String(text || '').trim())) {
+    await clearSession(userId);
+    return withQuickReply('โอเคครับ บอทกลับมาแล้ว 🤖\nสอบถามได้เลย', QUICK_MAIN);
+  }
+
   // 0) ตรวจโหมด human — ถ้าคนกำลังคุยกัน บอทเงียบ
   const session = await getSession(userId);
   if (session?.mode === 'human') {
@@ -620,15 +626,9 @@ async function handleMessage(userId, text, token) {
     await setSession(userId, { mode: 'human' });
     await pushHandoffToAdmin(userId, text, token);
     return withQuickReply(
-      `รับทราบครับ 🙏\nผมได้แจ้งเจ้าของร้านแล้ว เดี๋ยวเจ้าของจะตอบคุณในเร็ว ๆ นี้\n\nระหว่างนี้โทรหาเราได้ที่ ${SHOP.phone}`,
+      `รับทราบครับ 🙏\nผมได้แจ้งเจ้าของร้านแล้ว เดี๋ยวเจ้าของจะตอบคุณในเร็ว ๆ นี้\n\nระหว่างนี้โทรหาเราได้ที่ ${SHOP.phone}\n\nถ้าอยากกลับมาคุยกับบอทพิมพ์ "AI กลับมา"`,
       [{ type: 'message', label: '↩️ กลับมาคุยกับบอท', text: 'AI กลับมา' }]
     );
-  }
-
-  // 1.5) คำสั่งกลับ AI mode
-  if (/^(ai กลับมา|กลับมาคุยกับบอท|reset ai)/i.test(text)) {
-    await clearSession(userId);
-    return withQuickReply('โอเคครับ บอทกลับมาแล้ว 🤖\nสอบถามได้เลย', QUICK_MAIN);
   }
 
   // 2) ลองกฎก่อน (เร็ว ฟรี)
