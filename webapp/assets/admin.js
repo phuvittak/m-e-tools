@@ -377,37 +377,58 @@
 
     function load() {
       alert("กำลังโหลดข้อความ…");
+      // ใช้ Firestore SDK (gRPC runQuery) แทน REST documents.list — rules ตีความตรงกัน
       withFirebaseAuth(function (auth, err) {
         if (err) { alert("ไม่สามารถเชื่อม Firebase: " + err.message, "err"); return; }
-        var url = "https://firestore.googleapis.com/v1/projects/" + auth.projectId +
-          "/databases/default/documents/bot_messages?pageSize=500";
-        fetch(url, { headers: { "Authorization": "Bearer " + auth.token } })
-          .then(function (res) { return res.json().then(function (j) { return { ok: res.ok, status: res.status, body: j }; }); })
-          .then(function (r) {
-            if (!r.ok) {
-              alert("โหลดไม่สำเร็จ [HTTP " + r.status + "]: " + (r.body.error && r.body.error.message ? r.body.error.message : ""), "err");
-              renderEmpty();
+        ensureFirestoreSDK(function (sdkErr) {
+          if (sdkErr) { alert("โหลด Firestore SDK ไม่สำเร็จ: " + sdkErr.message, "err"); return; }
+          var db;
+          try {
+            // compat v10.12+ รองรับ named database ผ่าน arg ที่ 2
+            db = firebase.firestore(firebase.app(), "default");
+          } catch (e1) {
+            try { db = firebase.app().firestore("default"); }
+            catch (e2) {
+              alert("เชื่อม named database 'default' ไม่สำเร็จ: " + (e1.message || e2.message), "err");
               return;
             }
-            alert("");
-            var docs = r.body.documents || [];
-            state.messages = docs.map(function (d) {
-              var f = fromFsFields(d.fields || {});
-              return {
-                userId: f.userId || "",
-                text: f.text || "",
-                reply: f.reply || "",
-                source: f.source || "line",
-                at: f.at || d.createTime || ""
-              };
-            }).sort(function (a, b) { return (b.at || "").localeCompare(a.at || ""); });
-            groupAndRender();
-          })
-          .catch(function (e) {
-            alert("โหลดผิดพลาด: " + (e.message || e), "err");
-            renderEmpty();
-          });
+          }
+          db.collection("bot_messages").get()
+            .then(function (snap) {
+              alert("");
+              state.messages = snap.docs.map(function (d) {
+                var f = d.data() || {};
+                return {
+                  userId: f.userId || "",
+                  text: f.text || "",
+                  reply: f.reply || "",
+                  source: f.source || "line",
+                  at: f.at || ""
+                };
+              }).sort(function (a, b) { return (b.at || "").localeCompare(a.at || ""); });
+              groupAndRender();
+            })
+            .catch(function (e) {
+              var code = e && e.code ? " [" + e.code + "]" : "";
+              alert("โหลดไม่สำเร็จ" + code + ": " + (e.message || e), "err");
+              renderEmpty();
+            });
+        });
       });
+    }
+
+    function ensureFirestoreSDK(cb) {
+      if (window.firebase && firebase.firestore && firebase.firestore.Firestore) return cb(null);
+      function loadScript(src, ok, err) {
+        if (document.querySelector('script[src="' + src + '"]')) { ok(); return; }
+        var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = err || ok;
+        document.head.appendChild(s);
+      }
+      var base = "https://www.gstatic.com/firebasejs/10.12.2/";
+      loadScript(base + "firebase-firestore-compat.js",
+        function () { cb(null); },
+        function () { cb(new Error("โหลด firebase-firestore-compat.js ไม่สำเร็จ — ลองปิด ad blocker")); }
+      );
     }
 
     function groupAndRender() {
