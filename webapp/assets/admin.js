@@ -370,16 +370,18 @@
       alertBox.style.background = kind === "err" ? "#fee" : "#efe";
     }
 
-    var state = { messages: [], byUser: {}, activeUid: null };
+    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, prevCount: 0 };
 
-    if (refresh) refresh.addEventListener("click", load);
+    if (refresh) refresh.addEventListener("click", function () {
+      // listener อัปเดตเองอยู่แล้ว — ปุ่มนี้กลายเป็นปุ่ม re-subscribe เผื่อ connection ขาด
+      if (state.unsub) { try { state.unsub(); } catch (e) {} state.unsub = null; }
+      load();
+    });
     load();
 
     function load() {
       alert("กำลังโหลดข้อความ…");
-      // ใช้ Firestore modular SDK ผ่าน dynamic import — รองรับ named database "default"
-      // (compat กับ modular โหลดคนละ bundle จาก gstatic ไม่แชร์ app registry กัน
-      //  จึง init แอป modular แยกชื่อ "botinbox" และ sign in anonymously ในนั้นเอง)
+      // ใช้ Firestore modular SDK + onSnapshot — อัปเดตเรียลไทม์ไม่ต้องกดรีเฟรช
       var cfg = window.parseFbConfig ? window.parseFbConfig(S.firebaseCfg ? S.firebaseCfg() : "") : null;
       if (!cfg) { alert("ยังไม่ได้ตั้ง Firebase Config ในหน้า ตั้งค่าเว็บไซต์", "err"); return; }
       var base = "https://www.gstatic.com/firebasejs/10.12.2/";
@@ -395,28 +397,38 @@
         var authInst = authMod.getAuth(app);
         return authMod.signInAnonymously(authInst).then(function () {
           var db = fsMod.getFirestore(app, "default");
-          return fsMod.getDocs(fsMod.collection(db, "bot_messages"));
+          var col = fsMod.collection(db, "bot_messages");
+          state.unsub = fsMod.onSnapshot(col, function (snap) {
+            alert("");
+            state.messages = snap.docs.map(function (d) {
+              var f = d.data() || {};
+              var atStr = "";
+              if (f.at && typeof f.at.toDate === "function") atStr = f.at.toDate().toISOString();
+              else if (f.at) atStr = String(f.at);
+              return {
+                userId: f.userId || "",
+                text: f.text || "",
+                reply: f.reply || "",
+                source: f.source || "line",
+                at: atStr
+              };
+            }).sort(function (a, b) { return (b.at || "").localeCompare(a.at || ""); });
+            // แจ้ง toast เมื่อมีข้อความใหม่ (ครั้งแรก prevCount=0 ไม่แจ้ง)
+            if (state.prevCount > 0 && state.messages.length > state.prevCount) {
+              var diff = state.messages.length - state.prevCount;
+              if (window.U && U.toast) U.toast("มีข้อความใหม่ " + diff + " ข้อความ", "ok");
+            }
+            state.prevCount = state.messages.length;
+            groupAndRender();
+          }, function (err) {
+            var code = err && err.code ? " [" + err.code + "]" : "";
+            alert("โหลดไม่สำเร็จ" + code + ": " + (err.message || err), "err");
+            renderEmpty();
+          });
         });
-      }).then(function (snap) {
-        alert("");
-        state.messages = snap.docs.map(function (d) {
-          var f = d.data() || {};
-          // at อาจเป็น Firestore Timestamp (มาจาก SDK) หรือ string — ทำให้เป็น ISO เสมอ
-          var atStr = "";
-          if (f.at && typeof f.at.toDate === "function") atStr = f.at.toDate().toISOString();
-          else if (f.at) atStr = String(f.at);
-          return {
-            userId: f.userId || "",
-            text: f.text || "",
-            reply: f.reply || "",
-            source: f.source || "line",
-            at: atStr
-          };
-        }).sort(function (a, b) { return (b.at || "").localeCompare(a.at || ""); });
-        groupAndRender();
       }).catch(function (e) {
         var code = e && e.code ? " [" + e.code + "]" : "";
-        alert("โหลดไม่สำเร็จ" + code + ": " + (e.message || e), "err");
+        alert("เชื่อม Firebase ไม่สำเร็จ" + code + ": " + (e.message || e), "err");
         renderEmpty();
       });
     }
