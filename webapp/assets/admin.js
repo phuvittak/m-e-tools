@@ -516,19 +516,41 @@
       var conv = state.byUser[uid];
       var box = document.querySelector("[data-thread]");
       if (!conv) { box.innerHTML = '<div class="thread-empty">เลือกบทสนทนาทางซ้าย</div>'; return; }
-      var msgs = conv.messages.slice().sort(function (a, b) { return (a.at || "").localeCompare(b.at || ""); });
+      var pairs = conv.messages.slice().sort(function (a, b) { return (a.at || "").localeCompare(b.at || ""); });
+      // แยก doc paired เก่า (text + reply) เป็น bubble ลูกค้าซ้าย + bot ขวา 2 ก้อน
+      // doc flat ใหม่ (role: "user"|"admin"|"bot") เป็น 1 bubble — ฝั่งซ้ายถ้า user, ขวาถ้าตอบ
+      var bubbles = [];
+      pairs.forEach(function (m) {
+        if (m.role) {
+          bubbles.push({ side: m.role === "user" ? "left" : "right", role: m.role, text: m.text || "", at: m.at });
+        } else {
+          if (m.text) bubbles.push({ side: "left", role: "user", text: m.text, at: m.at });
+          if (m.reply) bubbles.push({ side: "right", role: "bot", text: m.reply, at: m.at });
+        }
+      });
+      var roleLabel = { user: "ลูกค้า", admin: "แอดมิน", bot: "บอท" };
       box.innerHTML =
-        '<div style="margin-bottom:14px; padding-bottom:10px; border-bottom:2px solid var(--border-3)">' +
-        '<div style="font-weight:600; font-size:14px">👤 ลูกค้า ID: …' + esc(uid.slice(-12)) + '</div>' +
-        '<div style="font-size:12px; color:var(--fg-2); margin-top:2px">' + msgs.length + ' ข้อความทั้งหมด · เริ่มทัก ' + fmtAbsolute(msgs[0].at) + '</div>' +
+        '<div class="thread-head">' +
+          '<div style="font-weight:600; font-size:14px">👤 ลูกค้า ID: …' + esc(uid.slice(-12)) + '</div>' +
+          '<div style="font-size:12px; color:var(--fg-2); margin-top:2px">' + pairs.length + ' บทสนทนา · เริ่มทัก ' + fmtAbsolute(pairs[0].at) + '</div>' +
         '</div>' +
-        msgs.map(function (m) {
-          return '<div class="msg-pair">' +
-            '<div class="msg-line user"><span class="role">ลูกค้า</span><div class="body">' + esc(m.text) + '</div></div>' +
-            '<div class="msg-line bot"><span class="role">บอท</span><div class="body">' + esc(m.reply) + '</div></div>' +
-            '<div class="msg-time">' + fmtAbsolute(m.at) + '</div>' +
-            '</div>';
-        }).join("");
+        '<div class="thread-body">' +
+          bubbles.map(function (b) {
+            var bubbleClass = b.role === "bot" ? "bot" : b.side;
+            return '<div class="bubble-row ' + b.side + '">' +
+              (b.side === "left"
+                ? '<div><div class="bubble-role">' + esc(roleLabel[b.role] || "") + '</div>' +
+                  '<div class="bubble ' + bubbleClass + '">' + esc(b.text) + '</div>' +
+                  '<div class="bubble-meta">' + fmtAbsolute(b.at) + '</div></div>'
+                : '<div style="text-align:right"><div class="bubble-role">' + esc(roleLabel[b.role] || "") + '</div>' +
+                  '<div class="bubble ' + bubbleClass + '">' + esc(b.text) + '</div>' +
+                  '<div class="bubble-meta">' + fmtAbsolute(b.at) + '</div></div>'
+              ) +
+              '</div>';
+          }).join("") +
+        '</div>';
+      // auto-scroll ไปข้อความล่าสุดด้านล่าง
+      box.scrollTop = box.scrollHeight;
     }
 
     function fmtRelative(iso) {
