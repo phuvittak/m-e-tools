@@ -92,6 +92,54 @@ function wantsHuman(text) {
 }
 
 // ============================================================
+// Firestore bot_config/replies (5 min cache) — เจ้าของแก้ผ่าน /admin/bot-replies.html
+// ============================================================
+let _botCfgCache = null;
+let _botCfgFetchedAt = 0;
+const BOT_CFG_TTL_MS = 5 * 60 * 1000;
+
+async function getBotConfig() {
+  if (_botCfgCache && Date.now() - _botCfgFetchedAt < BOT_CFG_TTL_MS) return _botCfgCache;
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_config/replies`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      _botCfgCache = { greeting: '', fallback: '', rules: [] };
+      _botCfgFetchedAt = Date.now();
+      return _botCfgCache;
+    }
+    const doc = await res.json();
+    const fields = {};
+    for (const k in doc.fields || {}) fields[k] = unwrapFsValue(doc.fields[k]);
+    _botCfgCache = {
+      greeting: String(fields.greeting || ''),
+      fallback: String(fields.fallback || ''),
+      rules: Array.isArray(fields.rules) ? fields.rules.map((r) => ({
+        keywords: Array.isArray(r?.keywords) ? r.keywords.map((k) => String(k).toLowerCase().trim()).filter(Boolean) : [],
+        answer: String(r?.answer || ''),
+      })).filter((r) => r.keywords.length && r.answer) : [],
+    };
+    _botCfgFetchedAt = Date.now();
+    return _botCfgCache;
+  } catch (err) {
+    console.error('[bot_config] fetch threw', err?.message);
+    return _botCfgCache || { greeting: '', fallback: '', rules: [] };
+  }
+}
+
+// จับคีย์เวิร์ดเจอตัวใดตัวหนึ่ง → ใช้ answer ของ rule นั้น
+function customRuleReply(text, config) {
+  const t = String(text || '').toLowerCase();
+  if (!t || !config?.rules?.length) return null;
+  for (const r of config.rules) {
+    for (const kw of r.keywords) {
+      if (kw && t.indexOf(kw) >= 0) return r.answer;
+    }
+  }
+  return null;
+}
+
+// ============================================================
 // Firestore catalog (5 min cache)
 // ============================================================
 let _catalogCache = null;
@@ -631,7 +679,19 @@ async function handleMessage(userId, text, token) {
     );
   }
 
-  // 2) ลองกฎก่อน (เร็ว ฟรี)
+  // 1.5) โหลด config ที่เจ้าของตั้งไว้จาก Firestore (cache 5 นาที)
+  const botCfg = await getBotConfig();
+
+  // 1.6) ทักทาย — ใช้ greeting ที่เจ้าของตั้ง ถ้ามี
+  if (/^(สวัสดี|หวัดดี|สวัด|hello|hi|hey|hej)/i.test(String(text || '').trim())) {
+    if (botCfg.greeting) return withQuickReply(botCfg.greeting, QUICK_MAIN);
+  }
+
+  // 1.7) คีย์เวิร์ดที่เจ้าของกำหนดเอง — มาก่อน smartReply (กฎที่ owner แก้ได้ ชนะ hardcode)
+  const custom = customRuleReply(text, botCfg);
+  if (custom) return custom;
+
+  // 2) ลองกฎ hardcode (เร็ว ฟรี)
   const ruleReply = await smartReply(userId, text);
   if (ruleReply) return ruleReply;
 
@@ -639,7 +699,8 @@ async function handleMessage(userId, text, token) {
   const ai = await aiReply(text);
   if (ai) return ai;
 
-  // 4) Fallback
+  // 4) Fallback — ใช้ของเจ้าของถ้ามี ไม่งั้น default
+  if (botCfg.fallback) return withQuickReply(botCfg.fallback, QUICK_MAIN);
   return withQuickReply(
     `ขอบคุณสำหรับข้อความครับ 🙏\nสนใจดูเครื่องมือหมวดไหนเป็นพิเศษครับ?`,
     QUICK_MAIN
