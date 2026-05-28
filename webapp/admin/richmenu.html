@@ -27,25 +27,25 @@
     <canvas id="cv" width="2500" height="1686"></canvas>
 
     <div class="row">
-      <button onclick="downloadPng()">⬇ ดาวน์โหลด PNG</button>
-      <button class="dark" onclick="window.open('https://manager.line.biz/', '_blank')">↗ เปิด LINE OA Manager</button>
+      <button class="dark" onclick="applyToLine()" id="applyBtn">⚡ Apply to LINE Now (อัตโนมัติ)</button>
+      <button onclick="downloadPng()">⬇ ดาวน์โหลด PNG (manual)</button>
     </div>
+    <div id="status" style="margin-top:14px; padding:10px 14px; border-radius:6px; display:none"></div>
 
     <div class="specs">
-      <b>วิธีใช้:</b><br>
-      1. กด <b>ดาวน์โหลด PNG</b> → ได้ไฟล์ <code>richmenu-metools.png</code><br>
-      2. เปิด <b>LINE OA Manager</b> → ริชเมนู → + สร้างใหม่<br>
-      3. เลย์เอาต์: เลือก <b>"ใหญ่ - 6 ช่อง 2×3"</b><br>
-      4. กด <b>เลือกรูป</b> → อัปโหลดไฟล์ที่เพิ่งดาวน์โหลด<br>
-      5. ตั้ง action ของแต่ละช่อง:<br>
-      &nbsp;&nbsp;• ช่อง 1 (ซ้ายบน "ดูเครื่องมือ") → ส่งข้อความ: <code>ดูสินค้า</code><br>
-      &nbsp;&nbsp;• ช่อง 2 (กลางบน "โปรโมชั่น") → ส่งข้อความ: <code>โปร</code><br>
-      &nbsp;&nbsp;• ช่อง 3 (ขวาบน "เช่ารายวัน") → ส่งข้อความ: <code>เช่า</code><br>
-      &nbsp;&nbsp;• ช่อง 4 (ซ้ายล่าง "ที่อยู่") → ส่งข้อความ: <code>ที่อยู่</code><br>
-      &nbsp;&nbsp;• ช่อง 5 (กลางล่าง "โทรหาเรา") → URL: <code>tel:0813706466</code><br>
-      &nbsp;&nbsp;• ช่อง 6 (ขวาล่าง "ติดต่อเจ้าของ") → ส่งข้อความ: <code>ติดต่อเจ้าของ</code><br>
-      6. ชื่อเมนู: <b>เมนูหลัก</b> | ช่วงเวลาแสดง: <b>ไม่จำกัด</b> | ติ๊ก <b>"แสดงเป็นเริ่มต้น"</b><br>
-      7. กด <b>บันทึก</b> → เปิดใช้งาน
+      <b>วิธีใช้ (อัตโนมัติ):</b><br>
+      1. กด <b>⚡ Apply to LINE Now</b> — ระบบจะอัปโหลดรูป + ตั้ง action ของแต่ละช่อง + เปิดใช้งานทั้งหมดทันที<br>
+      2. เปิด LINE OA — เมนูจะเปลี่ยนภายในไม่กี่วิ ลูกค้าใหม่ที่เพิ่มเพื่อนจะเห็นเมนูนี้เป็น default<br>
+      <br>
+      <b>Action ที่ตั้งไว้ในแต่ละช่อง:</b><br>
+      &nbsp;&nbsp;• ซ้ายบน "ดูเครื่องมือ" → ส่งข้อความ: <code>ดูสินค้า</code><br>
+      &nbsp;&nbsp;• กลางบน "โปรโมชั่น" → ส่งข้อความ: <code>โปร</code><br>
+      &nbsp;&nbsp;• ขวาบน "เช่ารายวัน" → ส่งข้อความ: <code>เช่า</code><br>
+      &nbsp;&nbsp;• ซ้ายล่าง "ที่อยู่ร้าน" → ส่งข้อความ: <code>ที่อยู่</code><br>
+      &nbsp;&nbsp;• กลางล่าง "โทรหาเรา" → URL: <code>tel:0813706466</code><br>
+      &nbsp;&nbsp;• ขวาล่าง "ติดต่อเจ้าของ" → ส่งข้อความ: <code>ติดต่อเจ้าของ</code><br>
+      <br>
+      <i>หมายเหตุ:</i> ต้องมี <code>LINE_CHANNEL_ACCESS_TOKEN</code> ตั้งไว้ใน Vercel env vars และ uid ของคุณต้องอยู่ใน <code>admins/{uid}</code> ใน Firestore (ดูใน /admin/bot-inbox)
     </div>
   </div>
 
@@ -120,6 +120,103 @@
       link.download = 'richmenu-metools.png';
       link.href = canvas.toDataURL('image/png');
       link.click();
+    }
+
+    // Action ของแต่ละช่อง (ตรงกับเลย์เอาต์ที่วาดไว้ด้านบน — 2×3 grid, y เริ่มหลังแถบเหลือง 80px)
+    function buildAreas() {
+      var startY = 80;
+      var cellH = (1686 - startY) / 2;
+      var cellW = 2500 / 3;
+      var actions = [
+        { type: 'message', text: 'ดูสินค้า' },
+        { type: 'message', text: 'โปร' },
+        { type: 'message', text: 'เช่า' },
+        { type: 'message', text: 'ที่อยู่' },
+        { type: 'uri', uri: 'tel:0813706466' },
+        { type: 'message', text: 'ติดต่อเจ้าของ' },
+      ];
+      var areas = [];
+      for (var i = 0; i < 6; i++) {
+        var col = i % 3, row = Math.floor(i / 3);
+        areas.push({
+          bounds: { x: Math.round(col * cellW), y: Math.round(startY + row * cellH), width: Math.round(cellW), height: Math.round(cellH) },
+          action: actions[i],
+        });
+      }
+      return areas;
+    }
+
+    function showStatus(msg, kind) {
+      var el = document.getElementById('status');
+      el.style.display = 'block';
+      el.textContent = msg;
+      el.style.background = kind === 'err' ? '#fee' : (kind === 'ok' ? '#e8f5e9' : '#fff8dc');
+      el.style.color = kind === 'err' ? '#a00' : (kind === 'ok' ? '#1b5e20' : '#7a5d00');
+      el.style.border = '1px solid ' + (kind === 'err' ? '#f5b0b0' : (kind === 'ok' ? '#c8e6d0' : '#f0d568'));
+    }
+
+    // อ่าน Firebase Config จาก localStorage โดยไม่พึ่ง MEStore (richmenu.html เป็น standalone tool)
+    function getFirebaseConfig() {
+      try {
+        var raw = localStorage.getItem('me_settings');
+        if (!raw) return null;
+        var s = JSON.parse(raw);
+        var fc = (s && s.firebaseConfig || '').trim();
+        if (!fc) return null;
+        try { return JSON.parse(fc); } catch (e) {}
+        // tolerate JS-object style (unquoted keys, single quotes)
+        var fixed = fc.replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":').replace(/,(\s*[}\]])/g, '$1').replace(/'/g, '"');
+        return JSON.parse(fixed);
+      } catch (e) { return null; }
+    }
+
+    async function applyToLine() {
+      var btn = document.getElementById('applyBtn');
+      btn.disabled = true;
+      showStatus('กำลังโหลด Firebase SDK + sign in…', '');
+      try {
+        var cfg = getFirebaseConfig();
+        if (!cfg) throw new Error('ยังไม่ได้ตั้ง Firebase Config — ตั้งใน /admin/settings.html ก่อน');
+        var base = 'https://www.gstatic.com/firebasejs/10.12.2/';
+        var [appMod, authMod] = await Promise.all([
+          import(base + 'firebase-app.js'),
+          import(base + 'firebase-auth.js'),
+        ]);
+        var app;
+        try { app = appMod.getApp('richmenu'); }
+        catch (e) { app = appMod.initializeApp(cfg, 'richmenu'); }
+        var auth = authMod.getAuth(app);
+        var cred = await authMod.signInAnonymously(auth);
+        var idToken = await cred.user.getIdToken();
+
+        showStatus('กำลังอัปโหลด rich menu ไปยัง LINE…', '');
+        var imageDataUrl = canvas.toDataURL('image/png');
+        var res = await fetch('/api/setup-richmenu', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+          body: JSON.stringify({
+            image: imageDataUrl,
+            name: 'M.E.Tools Main Menu',
+            chatBarText: 'เมนู',
+            areas: buildAreas(),
+          }),
+        });
+        var data = await res.json();
+        if (!res.ok) {
+          if (data.error === 'not-admin') {
+            showStatus('คุณยังไม่ใช่ admin — เพิ่ม admins/' + (data.uid || cred.user.uid) + ' ใน Firestore ก่อน', 'err');
+          } else {
+            showStatus('ตั้ง rich menu ไม่สำเร็จ: ' + (data.error || res.status) + ' ' + (data.body || ''), 'err');
+          }
+          btn.disabled = false;
+          return;
+        }
+        showStatus('✓ ตั้ง rich menu สำเร็จ! richMenuId: ' + data.richMenuId + (data.warning ? ' (' + data.warning + ')' : '') + ' — เปิด LINE OA ของคุณดูได้เลย', 'ok');
+      } catch (err) {
+        showStatus('ผิดพลาด: ' + (err.message || err), 'err');
+      } finally {
+        btn.disabled = false;
+      }
     }
   </script>
 </body>

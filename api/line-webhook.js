@@ -388,6 +388,29 @@ function flexContactMenu() {
   };
 }
 
+// ข้อความต้อนรับเริ่มต้น (plain text + emoji) — เลียนสไตล์ DeWalt Thailand OA
+// เจ้าของแก้ได้ใน /admin/bot-replies.html (override ผ่าน bot_config.greeting)
+function defaultWelcomeText() {
+  return [
+    `🛠️ สวัสดีครับ ${SHOP.shortName}`,
+    `ยินดีต้อนรับ — แจ้งข้อมูลที่ต้องการสอบถามได้โดย`,
+    ``,
+    `🔧 อะไหล่ — แจ้งชื่อรุ่นสินค้าและอะไหล่ที่ต้องการ`,
+    `⚙️ การใช้งาน — แจ้งปัญหาที่เกิดขึ้น`,
+    `📦 สินค้า — แจ้งชื่อรุ่นสินค้าที่สนใจ`,
+    `💰 เช่า — เครื่องมือเช่ารายวัน`,
+    ``,
+    `ทางแอดมินจะตอบกลับเร็วที่สุดภายใน 24 ชม.`,
+    ``,
+    `⏰ เวลาทำการ`,
+    `${SHOP.hoursWeek}`,
+    `${SHOP.hoursSun}`,
+    ``,
+    `📞 หากไม่มีการตอบกลับภายใน 24 ชม.`,
+    `ติดต่อได้ที่ ${SHOP.phone}`,
+  ].join('\n');
+}
+
 function flexWelcome() {
   return {
     type: 'flex',
@@ -902,7 +925,13 @@ export default async function handler(req, res) {
       // log userId ของแอดมินตอน follow event (เพื่อหา ADMIN_LINE_USER_ID ได้ง่าย)
       if (event.type === 'follow') {
         console.log('[follow] new user userId =', event.source?.userId);
-        await replyToLine(event.replyToken, flexWelcome(), token);
+        // ใช้ greeting ที่เจ้าของตั้งใน /admin/bot-replies.html ก่อน (style DeWalt OA)
+        // ถ้าไม่มี ใช้ default plain text (ไม่ใช่ Flex) — สะอาดและอ่านง่ายเหมือนของ DeWalt
+        const cfg = await getBotConfig();
+        const welcome = cfg.greeting
+          ? withQuickReply(cfg.greeting, QUICK_MAIN)
+          : withQuickReply(defaultWelcomeText(), QUICK_MAIN);
+        await replyToLine(event.replyToken, welcome, token);
         return;
       }
       if (event.type === 'message' && event.message?.type === 'text') {
