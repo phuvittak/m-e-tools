@@ -372,13 +372,20 @@
       alertBox.style.background = kind === "err" ? "#fee" : "#efe";
     }
 
-    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, unsubProfiles: null, unsubSessions: null, prevCount: 0, fs: null, profiles: {}, sessions: {} };
+    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, unsubProfiles: null, unsubSessions: null, prevCount: 0, fs: null, profiles: {}, sessions: {}, search: "" };
 
     if (refresh) refresh.addEventListener("click", function () {
       // listener อัปเดตเองอยู่แล้ว — ปุ่มนี้กลายเป็นปุ่ม re-subscribe เผื่อ connection ขาด
       if (state.unsub) { try { state.unsub(); } catch (e) {} state.unsub = null; }
       load();
     });
+    // ค้นหาลูกค้า — กรองรายการบทสนทนาแบบเรียลไทม์
+    var searchInput = document.querySelector("[data-search]");
+    if (searchInput) searchInput.addEventListener("input", function () {
+      state.search = (searchInput.value || "").trim().toLowerCase();
+      if (state.messages.length) groupAndRender();
+    });
+
     // reply bar — แอดมินตอบลูกค้าตรงในหน้า bot-inbox
     var replyInput = document.querySelector("[data-reply-input]");
     var replySend = document.querySelector("[data-reply-send]");
@@ -568,6 +575,22 @@
         renderEmpty();
         return;
       }
+      // กรองด้วย search — เช็คในชื่อเล่น, ID, ทุก text + reply ในบทสนทนา
+      var q = state.search;
+      if (q) {
+        convs = convs.filter(function (c) {
+          var nick = (state.profiles[c.userId] && state.profiles[c.userId].nickname || "").toLowerCase();
+          if (nick.indexOf(q) >= 0) return true;
+          if (c.userId.toLowerCase().indexOf(q) >= 0) return true;
+          for (var i = 0; i < c.messages.length; i++) {
+            var m = c.messages[i];
+            if ((m.text || "").toLowerCase().indexOf(q) >= 0) return true;
+            if ((m.reply || "").toLowerCase().indexOf(q) >= 0) return true;
+          }
+          return false;
+        });
+      }
+
       var humanConvs = convs.filter(function (c) { return state.sessions[c.userId] && state.sessions[c.userId].mode === "human"; });
       var botConvs   = convs.filter(function (c) { return !state.sessions[c.userId] || state.sessions[c.userId].mode !== "human"; });
 
