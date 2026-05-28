@@ -563,10 +563,32 @@
   function initOrders() {
     var root = document.querySelector("[data-orders]");
     var newIds = (U.qp("new") || "").split(",").filter(Boolean);
+    var pageState = { cloudOrders: [] };
 
     if (newIds.length) {
       var banner = document.querySelector("[data-confirm]");
       if (banner) { banner.hidden = false; banner.querySelector("[data-ids]").textContent = newIds.join(", "); }
+    }
+
+    // Phase E: ลูกค้าที่ login Firebase Auth (มี uid) → subscribe คำสั่งซื้อตัวเองจาก Firestore
+    // ทำให้เห็นออเดอร์ที่สั่งจากอุปกรณ์อื่นได้ + เห็นการเปลี่ยนสถานะที่แอดมินอัปเดต
+    var sess0 = S.session();
+    if (sess0 && sess0.uid && S.loadFirebaseAuthAndDb) {
+      S.loadFirebaseAuthAndDb().then(function (m) {
+        var fs = m.fsMod;
+        var q = fs.query(
+          fs.collection(m.db, "orders"),
+          fs.where("userId", "==", sess0.uid)
+        );
+        fs.onSnapshot(q, function (snap) {
+          pageState.cloudOrders = snap.docs.map(function (d) {
+            var data = d.data() || {};
+            if (data.createdAtTs && data.createdAtTs.toDate) data.createdAt = data.createdAtTs.toDate().getTime();
+            return data;
+          });
+          render();
+        }, function (err) { console.warn("[customer orders listener]", err && err.message); });
+      }).catch(function () {});
     }
 
     function render() {
@@ -576,7 +598,13 @@
         return;
       }
       var myEmail = (sess.email || "").toLowerCase();
-      var orders = S.getOrders().filter(function (o) { return ((o.userEmail || (o.customer && o.customer.email) || "").toLowerCase()) === myEmail; });
+      // รวม local + cloud — cloud ชนะถ้า id ตรงกัน (cloud คือ source of truth)
+      var byId = {};
+      S.getOrders().forEach(function (o) {
+        if (((o.userEmail || (o.customer && o.customer.email) || "").toLowerCase()) === myEmail) byId[o.id] = o;
+      });
+      pageState.cloudOrders.forEach(function (o) { byId[o.id] = o; });
+      var orders = Object.values(byId).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
       if (!orders.length) {
         root.innerHTML = '<div class="empty"><h3>ยังไม่มีคำสั่งซื้อ</h3><p>เมื่อคุณสั่งซื้อหรือเช่า รายการจะแสดงที่นี่</p><a class="me-btn" href="shop.html">เริ่มเลือกซื้อ</a></div>';
         return;
