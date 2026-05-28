@@ -87,7 +87,7 @@ function isWildcardAny(text) {
 }
 
 function wantsHuman(text) {
-  return /(ติดต่อเจ้าของ|คุยกับเจ้าของ|ขอคุยกับคน|พนักงานจริง|ติดต่อเจ้าหน้าที่|admin|คน|มนุษย์)/i.test(text)
+  return /(ติดต่อแอดมิน|คุยกับแอดมิน|ติดต่อเจ้าของ|คุยกับเจ้าของ|ขอคุยกับคน|พนักงานจริง|ติดต่อเจ้าหน้าที่|admin|คน|มนุษย์)/i.test(text)
       && !/(\?|how|what|why|จะ|ทำไม|ยังไง)/i.test(text); // ไม่ใช่คำถาม
 }
 
@@ -316,7 +316,7 @@ function flexProductCard(p) {
         },
         {
           type: 'button', style: 'secondary', height: 'sm',
-          action: { type: 'message', label: '💬 ติดต่อเจ้าของร้าน', text: 'ติดต่อเจ้าของ' },
+          action: { type: 'message', label: '💬 ติดต่อแอดมิน', text: 'ติดต่อแอดมิน' },
         },
       ],
     },
@@ -377,7 +377,7 @@ function flexContactMenu() {
           },
           {
             type: 'button', style: 'primary', color: COLOR.yellow, height: 'sm',
-            action: { type: 'message', label: '💬 ส่งข้อความถึงเจ้าของ', text: 'ติดต่อเจ้าของ' },
+            action: { type: 'message', label: '💬 ส่งข้อความถึงแอดมิน', text: 'ติดต่อแอดมิน' },
           },
           {
             type: 'button', style: 'secondary', height: 'sm',
@@ -648,7 +648,7 @@ ${catalogText}
 == กฎเด็ดขาด ==
 - ถ้าไม่ทราบ → ให้โทร ${SHOP.phone}
 - ถ้าคำถามนอกเรื่องร้าน → ขอโทษและพากลับเรื่องเครื่องมือ
-- ถ้าคำถามต้องการตอบจากคนจริง (เช่น ขอต่อราคา, ขอใบเสนอราคา, ปัญหาเฉพาะ) → บอก "ขอแจ้งเจ้าของร้านนะครับ" และจบ`;
+- ถ้าคำถามต้องการตอบจากคนจริง (เช่น ขอต่อราคา, ขอใบเสนอราคา, ปัญหาเฉพาะ) → บอก "ขอแจ้งแอดมินนะครับ" และจบ`;
 }
 
 async function aiReply(text) {
@@ -709,7 +709,7 @@ async function handleMessage(userId, text, token) {
   if (wantsHuman(text)) {
     await setSession(userId, { mode: 'human' });
     await pushHandoffToAdmin(userId, text, token);
-    return `รับทราบครับ 🙏\nผมได้แจ้งเจ้าของร้านแล้ว เดี๋ยวเจ้าของจะตอบคุณในเร็ว ๆ นี้\n\nระหว่างนี้โทรหาเราได้ที่ ${SHOP.phone}`;
+    return `รับทราบครับ 🙏\nผมได้แจ้งแอดมินแล้ว เดี๋ยวแอดมินจะตอบคุณในเร็ว ๆ นี้\n\nระหว่างนี้โทรหาเราได้ที่ ${SHOP.phone}`;
   }
 
   // 1.5) โหลด config ที่เจ้าของตั้งไว้จาก Firestore (cache 5 นาที)

@@ -270,6 +270,14 @@
     fs.addDoc(fs.collection(webchatState.db, "bot_messages"), {
       userId: webchatState.userId, role: "user", text: text,
       source: "web", at: fs.serverTimestamp()
+    }).then(function () {
+      // เรียก bot ให้ตอบกลับ — server-side คำนวณ reply + เขียน Firestore (role:"bot")
+      // ถ้า admin กำลังคุย (human mode) server จะข้าม ไม่ตอบทับ
+      return fetch("/api/web-bot-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: webchatState.userId, text: text }),
+      });
     }).catch(function (err) { console.error("[webchat send]", err); });
   }
   function renderWebChatMsgs(msgs) {

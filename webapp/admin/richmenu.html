@@ -43,7 +43,7 @@
       &nbsp;&nbsp;• ขวาบน "เช่ารายวัน" → ส่งข้อความ: <code>เช่า</code><br>
       &nbsp;&nbsp;• ซ้ายล่าง "ที่อยู่ร้าน" → ส่งข้อความ: <code>ที่อยู่</code><br>
       &nbsp;&nbsp;• กลางล่าง "โทรหาเรา" → URL: <code>tel:0813706466</code><br>
-      &nbsp;&nbsp;• ขวาล่าง "ติดต่อเจ้าของ" → ส่งข้อความ: <code>ติดต่อเจ้าของ</code><br>
+      &nbsp;&nbsp;• ขวาล่าง "ติดต่อแอดมิน" → ส่งข้อความ: <code>ติดต่อแอดมิน</code><br>
       <br>
       <i>หมายเหตุ:</i> ต้องมี <code>LINE_CHANNEL_ACCESS_TOKEN</code> ตั้งไว้ใน Vercel env vars และ uid ของคุณต้องอยู่ใน <code>admins/{uid}</code> ใน Firestore (ดูใน /admin/bot-inbox)
     </div>
@@ -66,7 +66,7 @@
           : { icon: '🔧', title: 'บริการซ่อม', sub: 'รับซ่อมเครื่องมือ' },
         { icon: '📍', title: 'ที่อยู่ร้าน',  sub: 'แผนที่ + เวลาเปิด' },
         { icon: '📞', title: 'โทรหาเรา',    sub: '081-3706466' },
-        { icon: '💬', title: 'ติดต่อเจ้าของ', sub: 'คุยตรงกับร้าน' },
+        { icon: '💬', title: 'ติดต่อแอดมิน', sub: 'คุยตรงกับร้าน' },
       ];
     }
     function drawCanvas() {
@@ -144,7 +144,7 @@
         rentEnabled ? { type: 'message', text: 'เช่า' } : { type: 'message', text: 'ซ่อม' },
         { type: 'message', text: 'ที่อยู่' },
         { type: 'uri', uri: 'tel:0813706466' },
-        { type: 'message', text: 'ติดต่อเจ้าของ' },
+        { type: 'message', text: 'ติดต่อแอดมิน' },
       ];
       var areas = [];
       for (var i = 0; i < 6; i++) {

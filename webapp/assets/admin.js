@@ -46,7 +46,7 @@
     if (S.isOwner()) nav.push(["bot-replies.html", "botreplies", "คำตอบของบอท", "botreplies"]);
     if (S.isOwner()) nav.push(["staff.html", "staff", "จัดการทีมงาน", "staff"]);
 
-    var roleTag = sess.role === "owner" ? "เจ้าของร้าน" : "พนักงาน";
+    var roleTag = sess.role === "owner" ? "แอดมิน" : "พนักงาน";
     var side =
       '<aside class="side"><div class="side-brand">M.E.<span>T</span>ools</div>' +
       '<div class="side-tag">ระบบหลังร้าน · ท่ารั้ว</div>' +
@@ -440,7 +440,7 @@
       fs.setDoc(fs.doc(fs.db, "bot_sessions", uid), {
         mode: "human", updatedAt: fs.serverTimestamp()
       }, { merge: true })
-        .then(function () { if (window.U && U.toast) U.toast("ปิดบอท — ลูกค้าจะคุยกับเจ้าของ", "ok"); })
+        .then(function () { if (window.U && U.toast) U.toast("ปิดบอท — ลูกค้าจะคุยกับแอดมิน", "ok"); })
         .catch(function (err) { if (window.U && U.toast) U.toast("ปิดบอทไม่สำเร็จ: " + err.message, "err"); });
     }
 
@@ -647,7 +647,7 @@
 
       list.innerHTML =
         '<div class="conv-section human">' +
-          '<div class="conv-section-head"><span>🔴 รอเจ้าของตอบ</span><span>' + humanConvs.length + '</span></div>' +
+          '<div class="conv-section-head"><span>🔴 รอแอดมินตอบ</span><span>' + humanConvs.length + '</span></div>' +
           (humanConvs.length ? humanConvs.map(rowHtml).join("") : '<div class="conv-section-empty">ไม่มีลูกค้ารออยู่</div>') +
         '</div>' +
         '<div class="conv-section bot">' +
@@ -1146,7 +1146,7 @@
       (owner
         ? '<div class="field"><label>รูปสินค้า — เพิ่มได้หลายรูป (รูปแรก = รูปหลัก)</label><div class="gal-edit" data-gallery></div>' +
           '<label class="btn btn-ghost btn-sm filebtn" style="margin-top:8px">+ เพิ่มรูป…<input type="file" accept="image/*" multiple data-imgfile></label></div>'
-        : '<div class="img-hint" style="margin-bottom:6px">เฉพาะเจ้าของร้านเท่านั้นที่จัดการรูปสินค้าได้</div>') +
+        : '<div class="img-hint" style="margin-bottom:6px">เฉพาะแอดมินเท่านั้นที่จัดการรูปสินค้าได้</div>') +
       '<div class="field"><label>ชื่อสินค้า</label><input data-f="name" value="' + esc(p.name) + '" placeholder="เช่น สว่านกระแทกไร้สาย 20V"></div>' +
       '<div class="f2"><div class="field"><label>แบรนด์</label><input data-f="brand" value="' + esc(p.brand) + '"></div>' +
       '<div class="field"><label>รหัส SKU</label><input data-f="sku" value="' + esc(p.sku) + '"></div></div>' +
@@ -1669,12 +1669,12 @@
       var staff = S.getStaff();
       root.innerHTML = staff.map(function (m) {
         var owner = m.role === "owner";
-        return '<div class="panel"><div class="panel-head"><h2>' + (owner ? "⭐ เจ้าของร้าน" : "👷 พนักงาน") + "</h2>" +
+        return '<div class="panel"><div class="panel-head"><h2>' + (owner ? "⭐ แอดมิน" : "👷 พนักงาน") + "</h2>" +
           (owner ? "" : '<button class="btn btn-sm btn-danger" data-del="' + m.id + '">ลบพนักงาน</button>') + "</div>" +
           '<div class="f2"><div class="field"><label>ชื่อ</label><input data-f="name" data-id="' + m.id + '" value="' + esc(m.name) + '"></div>' +
           '<div class="field"><label>อีเมล (ใช้เข้าสู่ระบบ)</label><input data-f="email" data-id="' + m.id + '" value="' + esc(m.email) + '"></div></div>' +
           '<div class="field"><label>รหัสผ่าน</label><input data-f="password" data-id="' + m.id + '" value="' + esc(m.password) + '"></div>' +
-          (owner ? '<div class="img-hint">เจ้าของมีสิทธิ์ใช้งานทุกระบบโดยอัตโนมัติ</div>'
+          (owner ? '<div class="img-hint">แอดมินมีสิทธิ์ใช้งานทุกระบบโดยอัตโนมัติ</div>'
             : '<div class="field"><label>สิทธิ์การใช้ระบบหลังร้าน</label><div class="perm-grid">' +
               S.PERM_KEYS.map(function (k) { return '<label class="f-check"><input type="checkbox" data-perm="' + k + '" data-id="' + m.id + '"' + (m.perms && m.perms[k] ? " checked" : "") + "> " + permLabels[k] + "</label>"; }).join("") + "</div></div>") +
           '<button class="btn" data-save="' + m.id + '">บันทึก</button></div>';

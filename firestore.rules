@@ -23,13 +23,17 @@ service cloud.firestore {
     }
 
     // รายการแอดมิน
-    // - อ่าน: เฉพาะ admin ด้วยกัน
-    // - สร้าง: เปิดให้ user เพิ่มตัวเองได้ (uid == auth.uid) — bootstrap ผ่านปุ่มใน bot-inbox
-    //   ⚠️ security tradeoff: ใครก็ขึ้นเป็น admin ได้ ตราบใดที่เข้าเว็บได้
-    //   หลัง bootstrap แล้ว แนะนำให้แก้บรรทัด allow create เป็น `if isAdmin()` แทน
-    // - อัปเดต/ลบ: เฉพาะ admin
+    // - get (อ่านที่ละ doc): public — แต่ uid เป็น random ขุดหายาก + API ใช้ check
+    //   isAdmin จาก server-side (ไม่งั้น chicken-and-egg: API ที่ไม่มี auth จะ check
+    //   admins/{uid} ไม่ได้ → ทุก API call fail แม้ user เป็น admin จริง)
+    // - list (ดู collection): เฉพาะ admin — กันไม่ให้คนเอา uids ไปทั้งหมด
+    // - create: เปิดให้ user เพิ่มตัวเองได้ (uid == auth.uid) — bootstrap ผ่านปุ่มใน bot-inbox
+    //   ⚠️ tradeoff: ใครก็ขึ้นเป็น admin ได้ ตราบใดที่เข้าเว็บได้
+    //   หลัง bootstrap แล้ว แนะนำให้แก้ allow create เป็น `if isAdmin()` แทน
+    // - update/delete: เฉพาะ admin
     match /admins/{uid} {
-      allow read: if isAdmin();
+      allow get: if true;
+      allow list: if isAdmin();
       allow create: if request.auth != null && request.auth.uid == uid;
       allow update, delete: if isAdmin();
     }
