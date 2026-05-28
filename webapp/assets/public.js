@@ -246,7 +246,7 @@
       '<div class="filter-group"><span class="lbl">รูปแบบ</span>' +
       '<label class="check"><input type="radio" name="mode" data-f="mode" value="all" checked> ทั้งหมด</label>' +
       '<label class="check"><input type="radio" name="mode" data-f="mode" value="buy"> ซื้อสินค้า</label>' +
-      '<label class="check"><input type="radio" name="mode" data-f="mode" value="rent"> เช่าสินค้า</label></div>' +
+      '<label class="check" data-rent-only><input type="radio" name="mode" data-f="mode" value="rent"> เช่าสินค้า</label></div>' +
       '<button class="me-btn me-btn-ghost me-btn-sm" data-clear>ล้างตัวกรอง</button>';
 
     var sinput = document.querySelector("[data-q]");
@@ -316,7 +316,7 @@
           '<p class="pd-desc">' + p.desc + "</p>" +
           '<div class="pd-prices">' +
             (p.forSale ? '<div class="pd-price-box"><div class="k">ราคาขาย</div><div class="v">' + S.money(p.price) + "</div></div>" : "") +
-            (p.forRent ? '<div class="pd-price-box"><div class="k">ค่าเช่า / วัน</div><div class="v rent">' + S.money(p.rentPerDay) + "</div></div>" : "") +
+            (p.forRent ? '<div class="pd-price-box" data-rent-only><div class="k">ค่าเช่า / วัน</div><div class="v rent">' + S.money(p.rentPerDay) + "</div></div>" : "") +
           "</div><div class=\"buybox\" data-buybox></div>" +
           "<table class=specs><tbody><tr><th>รหัสสินค้า (SKU)</th><td>" + p.sku + "</td></tr>" +
             "<tr><th>การรับประกัน</th><td>" + (p.warrantyYears ? "ศูนย์ " + p.warrantyYears + " ปี" : "ตามเงื่อนไขร้าน") + "</td></tr>" +
@@ -334,7 +334,7 @@
       bb.innerHTML =
         '<div class="mode-toggle">' +
           '<button data-mode="buy" class="' + (mode === "buy" ? "on" : "") + '"' + (p.forSale ? "" : " disabled") + ">ซื้อสินค้า</button>" +
-          '<button data-mode="rent" class="' + (mode === "rent" ? "on" : "") + '"' + (p.forRent ? "" : " disabled") + ">เช่าสินค้า</button>" +
+          '<button data-mode="rent" data-rent-only class="' + (mode === "rent" ? "on" : "") + '"' + (p.forRent ? "" : " disabled") + ">เช่าสินค้า</button>" +
         "</div>" +
         '<div class="buybox-line"><span>จำนวน</span><div class="qty"><button data-q="-1">−</button><input data-qty value="' + qty + '" inputmode="numeric"><button data-q="1">+</button></div></div>' +
         (mode === "rent"
@@ -708,7 +708,7 @@
         '<a class="card-name" href="product.html?id=' + p.id + '">' + p.name + "</a>" +
         '<div class="card-price">' +
           (p.forSale ? '<span class="price-buy">' + S.money(p.price) + "</span>" : "") +
-          (p.forRent ? '<span class="price-rent">เช่า ' + S.money(p.rentPerDay) + "/วัน</span>" : "") + "</div>" +
+          (p.forRent ? '<span class="price-rent" data-rent-only>เช่า ' + S.money(p.rentPerDay) + "/วัน</span>" : "") + "</div>" +
         '<span class="card-stock ' + (avail <= 0 || low ? "low" : "") + '">' + (avail <= 0 ? "สินค้าหมด" : "มีสินค้าพร้อมส่ง · เหลือ " + avail + " ชิ้น") + "</span></div>" +
       '<div class="card-actions"><a class="me-btn me-btn-sm me-btn-ghost" href="product.html?id=' + p.id + '">รายละเอียด</a>' +
         (avail > 0 ? '<button class="me-btn me-btn-sm" data-quickadd="' + p.id + '" data-mode="' + (p.forSale ? "buy" : "rent") + '">' + (p.forSale ? "ใส่ตะกร้า" : "เช่าสินค้า") + "</button>" : '<button class="me-btn me-btn-sm" disabled>หมด</button>') +
