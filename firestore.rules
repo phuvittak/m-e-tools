@@ -97,7 +97,19 @@ service cloud.firestore {
 
     // admin_data: คีย์ที่ admin แก้ในหลังร้านแล้วซิงค์ขึ้น cloud
     // (settings, staff, shipping rates, ledger, suppliers, purchases)
-    // อ่าน + เขียน: เฉพาะแอดมิน — ลูกค้าไม่ควรเห็นข้อมูล back office
+
+    // settings + ship_rates: ลูกค้าหน้าร้านต้องอ่านได้ (ที่อยู่ร้าน, เวลา, ค่าจัดส่ง ฯลฯ)
+    // — admin เป็นคนเขียนเท่านั้น, deletePin ถูกตัดก่อน push (ดูใน store.js)
+    match /admin_data/me_settings {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /admin_data/me_ship_rates {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ที่เหลือ (staff/ledger/suppliers/purchases) — เฉพาะ admin
     match /admin_data/{key} {
       allow read, write: if isAdmin();
     }

@@ -147,6 +147,9 @@
     mountLineFab();
     mountWebChat();
     loadShopFeatures();
+    // โหลด settings + ship_rates จาก cloud — ทำให้หน้าร้านเห็นค่าล่าสุดที่แอดมินบันทึก
+    // โดยไม่ต้องล้าง localStorage หรือ login admin
+    if (S.cloudLoadPublicSettings) S.cloudLoadPublicSettings();
   }
 
   // Phase B+: โหลดสวิตช์ฟีเจอร์ของร้าน (rentEnabled ฯลฯ) — body class ควบคุม CSS

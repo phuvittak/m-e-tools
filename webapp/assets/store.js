@@ -260,14 +260,73 @@
 
   /* ---------- Cloud sync: admin data ↔ Firestore admin_data/{key} ---- */
   // เขียน — fire-and-forget ทุกครั้งที่ admin save ข้อมูล
+  // settings ตัด deletePin ออกก่อน push (ไม่ให้ลูกค้าเห็นได้เพราะ settings public read)
   function cloudPushAdminData(key, val) {
+    var toSave = val;
+    if (key === KEY.settings && val && typeof val === "object") {
+      toSave = Object.assign({}, val);
+      delete toSave.deletePin;
+    }
     loadFirebaseAuthAndDb("admin").then(function (m) {
       var fs = m.fsMod;
       fs.setDoc(fs.doc(m.db, "admin_data", key), {
-        value: val,
+        value: toSave,
         updatedAt: fs.serverTimestamp(),
       }).catch(function (err) { console.warn("[cloud push]", key, err && err.message); });
     }).catch(function () {});
+  }
+
+  // โหลด settings + ship_rates จาก cloud (public read) — ใช้ในหน้าลูกค้า/หน้าร้าน
+  // ไม่ต้องมี auth, ไม่ touch admin_data อันอื่น
+  // ผสานกับค่า local — preserve deletePin ที่อาจมีอยู่ใน localStorage (ไม่ทับด้วย undefined)
+  function cloudLoadPublicSettings() {
+    var cfg = parseFbConfig(firebaseCfg());
+    if (!cfg || !cfg.projectId) return Promise.resolve(false);
+    var urls = [
+      "https://firestore.googleapis.com/v1/projects/" + cfg.projectId + "/databases/default/documents/admin_data/" + KEY.settings,
+      "https://firestore.googleapis.com/v1/projects/" + cfg.projectId + "/databases/default/documents/admin_data/" + KEY.ship,
+    ];
+    return Promise.all(urls.map(function (u) {
+      return fetch(u).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+    })).then(function (results) {
+      results.forEach(function (doc, i) {
+        if (!doc || !doc.fields) return;
+        var key = i === 0 ? KEY.settings : KEY.ship;
+        var valField = doc.fields.value;
+        var val = valField ? unwrapFs(valField) : null;
+        if (val !== null) {
+          if (key === KEY.settings) {
+            // merge เพื่อเก็บ deletePin ที่ local อาจมี
+            var existing = read(KEY.settings, {});
+            var merged = Object.assign({}, val);
+            if (existing.deletePin) merged.deletePin = existing.deletePin;
+            write(key, merged, { skipCloud: true });
+          } else {
+            write(key, val, { skipCloud: true });
+          }
+        }
+      });
+      dispatch();
+      return true;
+    });
+  }
+
+  // unwrap Firestore REST typed value (subset, สำหรับ object/array/primitive)
+  function unwrapFs(v) {
+    if (!v || typeof v !== "object") return null;
+    if ("stringValue" in v) return v.stringValue;
+    if ("integerValue" in v) return Number(v.integerValue);
+    if ("doubleValue" in v) return Number(v.doubleValue);
+    if ("booleanValue" in v) return v.booleanValue;
+    if ("timestampValue" in v) return v.timestampValue;
+    if ("nullValue" in v) return null;
+    if ("mapValue" in v) {
+      var out = {}, f = v.mapValue.fields || {};
+      for (var k in f) out[k] = unwrapFs(f[k]);
+      return out;
+    }
+    if ("arrayValue" in v) return (v.arrayValue.values || []).map(unwrapFs);
+    return null;
   }
   // โหลด — อ่าน Firestore แล้วเขียน localStorage (ใช้ตอนเปิดหน้า admin)
   // skipCloud=true เพื่อไม่ให้ write() วน push กลับขึ้น cloud อีกรอบ
@@ -1043,6 +1102,7 @@
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
     registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loginGoogleCloud: loginGoogleCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
     cloudLoadAdminData: cloudLoadAdminData, cloudPushAdminData: cloudPushAdminData,
+    cloudLoadPublicSettings: cloudLoadPublicSettings,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
     session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS,
     logout: logout, requirePerm: requirePerm, checkPin: checkPin,
