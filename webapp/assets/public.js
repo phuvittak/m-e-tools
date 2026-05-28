@@ -111,10 +111,28 @@
   function redirectAfterAuth() { var r = U.qp("next"); return r ? decodeURIComponent(r) : "index.html"; }
 
   function socialLogin(provider) {
+    // Google → ใช้ Firebase Auth ตรง ๆ ไม่ต้องตั้ง Client ID เพิ่ม (Firebase Console เปิด provider พอ)
+    // Facebook → ยังใช้ flow เก่าก่อน
+    if (provider === "google") {
+      S.loginGoogleCloud().then(function () {
+        U.toast("เข้าสู่ระบบด้วย Google สำเร็จ", "ok");
+        setTimeout(function () { location.href = redirectAfterAuth(); }, 500);
+      }).catch(function (err) {
+        var code = err && err.code ? err.code : "";
+        if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
+        if (code === "auth/operation-not-allowed") { U.toast("Google sign-in ยังไม่ได้เปิดใน Firebase Console", "err"); return; }
+        if (code === "auth/popup-blocked") { U.toast("เบราว์เซอร์บล็อกป๊อปอัพ — กรุณาอนุญาตและลองใหม่", "err"); return; }
+        // อาจไม่ได้ตั้ง Firebase Config — fallback ของเก่า
+        var st = S.getSettings();
+        if (st.googleClientId) { googleSignIn(st.googleClientId); return; }
+        U.toast("เข้าสู่ระบบด้วย Google ไม่สำเร็จ: " + (err.message || err), "err");
+      });
+      return;
+    }
     var st = S.getSettings();
-    var id = provider === "google" ? st.googleClientId : st.facebookAppId;
-    if (!id) { U.toast("ผู้ดูแลร้านยังไม่ได้เชื่อมต่อ " + (provider === "google" ? "Google" : "Facebook") + " — ตั้งค่า Client ID ได้ในระบบหลังร้าน", "err"); return; }
-    if (provider === "google") googleSignIn(id); else facebookSignIn(id);
+    var id = st.facebookAppId;
+    if (!id) { U.toast("ผู้ดูแลร้านยังไม่ได้เชื่อมต่อ Facebook — ตั้งค่า App ID ได้ในระบบหลังร้าน", "err"); return; }
+    facebookSignIn(id);
   }
   function loadScript(src, cb) {
     if (document.querySelector('script[src="' + src + '"]')) { cb(); return; }

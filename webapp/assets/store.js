@@ -881,6 +881,36 @@
       });
     });
   }
+
+  // เข้าระบบ/สมัครด้วย Google ผ่าน Firebase Auth (popup) — รวม register + login ในรอบเดียว
+  // ต้อง enable Google provider ใน Firebase Console → Authentication ก่อน
+  function loginGoogleCloud() {
+    return loadFirebaseAuthAndDb().then(function (m) {
+      var provider = new m.authMod.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      return m.authMod.signInWithPopup(m.auth, provider).then(function (cred) {
+        var uid = cred.user.uid;
+        var email = (cred.user.email || "").toLowerCase();
+        var name = cred.user.displayName || email.split("@")[0];
+        var phone = cred.user.phoneNumber || "";
+        // สร้าง/อัปเดต users/{uid} doc — merge เพื่อไม่ทับถ้าเคยตั้งไว้แล้ว
+        return m.fsMod.setDoc(m.fsMod.doc(m.db, "users", uid), {
+          uid: uid, email: email, name: name, phone: phone,
+          provider: "google",
+          updatedAt: m.fsMod.serverTimestamp(),
+        }, { merge: true }).then(function () {
+          // sync local user list
+          var users = getUsers();
+          if (!users.some(function (x) { return x.email === email; })) {
+            users.push({ uid: uid, name: name, email: email, phone: phone, createdAt: Date.now(), social: "google", cloud: true });
+            write(KEY.users, users);
+          }
+          setSession({ uid: uid, email: email, name: name, role: "customer" });
+          return { ok: true, uid: uid, role: "customer" };
+        });
+      });
+    });
+  }
   // gate an admin page by a permission key (employees) — owner always allowed
   function requirePerm(key, redirect) {
     if (!isStaff()) { window.location.href = redirect || "../login.html"; return false; }
@@ -961,7 +991,7 @@
     getShipRates: getShipRates, getShippingFee: getShippingFee, setShipRate: setShipRate,
     getSettings: getSettings, saveSettings: saveSettings, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
-    registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
+    registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loginGoogleCloud: loginGoogleCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
     session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS,
     logout: logout, requirePerm: requirePerm, checkPin: checkPin,
