@@ -402,17 +402,26 @@
       var text = (replyInput.value || "").trim();
       if (!text) return;
       replySend.disabled = true;
-      // ส่งผ่าน Vercel function: push เข้า LINE + เขียน Firestore + ตั้ง human mode ในขั้นเดียว
-      fetch("/api/admin-reply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: state.activeUid, text: text }),
+      // แนบ Firebase ID token เพื่อให้ API ตรวจ admin uid
+      var getToken = state.getIdToken ? state.getIdToken() : Promise.resolve("");
+      getToken.then(function (token) {
+        return fetch("/api/admin-reply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+          body: JSON.stringify({ userId: state.activeUid, text: text }),
+        });
       })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
         .then(function (r) {
           replySend.disabled = false;
           if (!r.ok) {
-            if (window.U && U.toast) U.toast("ส่งไม่สำเร็จ: " + (r.body.error || ""), "err");
+            if (r.body.error === "not-admin") {
+              if (window.U && U.toast) U.toast("ยังไม่ใช่ admin — เพิ่ม admins/" + (r.body.uid || state.adminUid) + " ใน Firebase Console", "err");
+            } else if (r.body.error === "missing-auth" || r.body.error === "invalid-token" || r.body.error === "expired-token") {
+              if (window.U && U.toast) U.toast("Auth หมดอายุ — รีเฟรชหน้าเว็บ", "err");
+            } else {
+              if (window.U && U.toast) U.toast("ส่งไม่สำเร็จ: " + (r.body.error || ""), "err");
+            }
             return;
           }
           replyInput.value = "";
@@ -436,14 +445,19 @@
     }
 
     function resumeBotFor(uid) {
-      fetch("/api/admin-resume-bot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: uid }),
+      var getToken = state.getIdToken ? state.getIdToken() : Promise.resolve("");
+      getToken.then(function (token) {
+        return fetch("/api/admin-resume-bot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+          body: JSON.stringify({ userId: uid }),
+        });
       })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
         .then(function (r) {
           if (r.ok) { if (window.U && U.toast) U.toast("เปิดบอทแล้ว — ลูกค้าย้ายไปช่องบอทตอบ", "ok"); }
-          else { if (window.U && U.toast) U.toast("เปิดบอทไม่สำเร็จ", "err"); }
+          else if (r.body.error === "not-admin") { if (window.U && U.toast) U.toast("ยังไม่ใช่ admin — เพิ่ม admins/" + state.adminUid + " ใน Firebase Console", "err"); }
+          else { if (window.U && U.toast) U.toast("เปิดบอทไม่สำเร็จ: " + (r.body.error || ""), "err"); }
         })
         .catch(function (e) {
           if (window.U && U.toast) U.toast("เครือข่ายผิดพลาด: " + (e.message || e), "err");
@@ -466,8 +480,23 @@
         try { app = appMod.getApp("botinbox"); }
         catch (e) { app = appMod.initializeApp(cfg, "botinbox"); }
         var authInst = authMod.getAuth(app);
-        return authMod.signInAnonymously(authInst).then(function () {
+        return authMod.signInAnonymously(authInst).then(function (cred) {
           var db = fsMod.getFirestore(app, "default");
+          state.adminUid = cred.user.uid;
+          state.getIdToken = function () { return cred.user.getIdToken(); };
+          // โชว์ admin uid เพื่อให้เจ้าของไปเพิ่ม admins/{uid} ใน Firebase Console
+          var uidBox = document.querySelector("[data-admin-uid]");
+          if (uidBox) {
+            uidBox.style.display = "block";
+            uidBox.querySelector("[data-uid-val]").textContent = cred.user.uid;
+            var copyBtn = uidBox.querySelector("[data-uid-copy]");
+            if (copyBtn) copyBtn.onclick = function () {
+              navigator.clipboard.writeText(cred.user.uid).then(function () {
+                copyBtn.textContent = "คัดลอกแล้ว ✓";
+                setTimeout(function () { copyBtn.textContent = "คัดลอก"; }, 1500);
+              });
+            };
+          }
           // เก็บ helpers ที่ sendReply / promptRename ใช้ — ไม่ต้องโหลด SDK ซ้ำ
           state.fs = {
             db: db,

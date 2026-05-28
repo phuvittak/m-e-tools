@@ -12,6 +12,22 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // helper: ตรวจว่า uid ของผู้เรียกเป็นแอดมิน
+    // แอดมินคือ doc ที่อยู่ใน /admins/{uid} — ตั้งครั้งแรกผ่าน Firebase Console:
+    //   เปิด /admin/bot-inbox.html ครั้งแรก จะ sign-in anonymous → ดู uid ใน DevTools (state.fs)
+    //   หรือดูใน Firebase Console → Authentication → Users
+    //   แล้วสร้าง doc admins/{uid} (ค่าใดก็ได้ เช่น { addedAt: now })
+    function isAdmin() {
+      return request.auth != null
+          && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // รายการแอดมิน — ใครก็อ่านไม่ได้ ยกเว้นแอดมินด้วยกัน
+    match /admins/{uid} {
+      allow read: if isAdmin();
+      allow write: if isAdmin(); // bootstrap doc แรกต้องสร้างผ่าน Console
+    }
+
     // แชทลูกค้า: เอกสารบทสนทนา + ข้อความ
     match /chats/{convId} {
       allow read, write: if request.auth != null;
@@ -32,11 +48,11 @@ service cloud.firestore {
     // create: บอท Vercel เขียนแบบ paired (text + reply) ไม่มี auth
     //          แอดมินตอบจากหน้า bot-inbox เขียนแบบ flat (text + role:"admin") มี auth
     //          เว็บลูกค้าเขียนแบบ flat (text + role:"user") มี auth (Phase A4-A5)
-    // read:   ต้อง auth — แอดมินอ่านได้ทั้งหมด ลูกค้าควรเห็นเฉพาะของตัวเอง
-    //         (rules ตอนนี้ยังกว้าง จะ tighten ใน Phase D หลังมี Firebase Auth)
+    // read:   แอดมินอ่านได้ทั้งหมด, ลูกค้าฝั่งเว็บเห็นเฉพาะของ uid ตัวเอง
     // update/delete: ห้าม
     match /bot_messages/{msgId} {
-      allow read: if request.auth != null;
+      allow read: if isAdmin()
+                || (request.auth != null && resource.data.userId == request.auth.uid);
       allow create: if request.resource.data.userId is string
                  && request.resource.data.userId.size() > 0
                  && request.resource.data.userId.size() < 100
@@ -53,19 +69,20 @@ service cloud.firestore {
     }
 
     // โปรไฟล์ลูกค้า (ชื่อเล่นที่แอดมินตั้ง) — แยกจาก ID ใน bot_messages
-    // อ่าน: ผู้ที่ผ่าน anonymous auth (ใช้ในหลังร้าน + ลูกค้าฝั่งเว็บเห็นชื่อตัวเอง)
-    // เขียน: ตอนนี้เปิดกว้าง — Phase D จะ tighten ด้วย custom claims/admin role
+    // อ่าน: แอดมินอ่านทั้งหมด, ลูกค้าอ่านของตัวเอง
+    // เขียน: แอดมินเท่านั้น (ตั้งชื่อเล่นเป็นเรื่องหลังร้าน)
     match /customer_profiles/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isAdmin()
+                || (request.auth != null && request.auth.uid == userId);
+      allow write: if isAdmin();
     }
 
     // ตั้งค่าคำตอบของบอท (Phase B) — เจ้าของแก้จากหน้า bot-replies.html
     // อ่าน: เปิดสาธารณะ — line-webhook อ่านโดยไม่มี auth (เหมือน products/catalog)
-    // เขียน: ต้อง auth — Phase D จะ tighten ด้วย admin custom claim
+    // เขียน: เฉพาะแอดมิน
     match /bot_config/{cfgId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
 
     // โปรไฟล์ลูกค้า (Phase D) — ผูกกับ Firebase Auth UID
@@ -75,16 +92,28 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // session ของ LINE bot — เก็บโหมด (ai/human) ของลูกค้าแต่ละคน
+    // เขียน: เปิดกว้าง — LINE webhook + /api/admin-reply เขียนผ่าน REST ไม่มี auth
+    //         (security debt: ควรใช้ Firebase Admin SDK + service account ใน webhook/API)
+    // อ่าน: แอดมิน + ลูกค้าฝั่งเว็บอ่านของ uid ตัวเอง (เผื่อในอนาคต)
+    match /bot_sessions/{userId} {
+      allow read: if isAdmin()
+                || (request.auth != null && request.auth.uid == userId);
+      allow write: if true;
+    }
+
     // คำสั่งซื้อ (Phase E) — ลูกค้าสร้าง, แอดมินอ่าน/อัปเดตสถานะ
-    // อ่าน: ต้อง auth (ยังกว้าง — Phase D tighten จะใส่ admin claim)
+    // อ่าน: แอดมินอ่านทั้งหมด, ลูกค้าอ่านของตัวเอง
     // สร้าง: ต้องเป็นเจ้าของ userId
-    // อัปเดต: ต้อง auth (admin เปลี่ยนสถานะ — Phase D tighten)
+    // อัปเดต: แอดมินเท่านั้น (ลูกค้ายกเลิกผ่าน setOrderStatus ก็ผ่าน admin path)
     // ลบ: ห้าม
     match /orders/{orderId} {
-      allow read: if request.auth != null;
+      allow read: if isAdmin()
+                || (request.auth != null && resource.data.userId == request.auth.uid);
       allow create: if request.auth != null
                  && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null;
+      allow update: if isAdmin()
+                 || (request.auth != null && resource.data.userId == request.auth.uid);
       allow delete: if false;
     }
 

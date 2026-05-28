@@ -2,11 +2,14 @@
    M.E.Tools — Admin reply API (Vercel Node.js Function)
    ---------------------------------------------------------------------
    เจ้าของกด "ส่ง" ใน /admin/bot-inbox.html → ยิงเข้า endpoint นี้
-   1. push ข้อความเข้า LINE ของลูกค้าผ่าน LINE Messaging API
-   2. บันทึก doc role:"admin" ใน bot_messages (โชว์ใน bot-inbox + web chat)
-   3. ตั้ง bot_sessions[userId].mode = "human" — บอทจะเงียบจนเจ้าของกดเปิดบอท
+   1. ตรวจ Authorization: Bearer <Firebase ID token> + admins/{uid} ใน Firestore
+   2. push ข้อความเข้า LINE ของลูกค้าผ่าน LINE Messaging API
+   3. บันทึก doc role:"admin" ใน bot_messages (โชว์ใน bot-inbox + web chat)
+   4. ตั้ง bot_sessions[userId].mode = "human" — บอทจะเงียบจนเจ้าของกดเปิดบอท
 
-   ⚠️ ตอนนี้ยังไม่มี auth check — Phase D จะเพิ่มการตรวจ Firebase ID token
+   ⚠️ Auth check decode JWT payload โดยไม่ verify signature — ป้องกันคำขอ
+   แบบไม่มี token แต่ผู้โจมตีที่รู้ admin uid และปลอม payload ได้ยังคงผ่าน
+   (Phase 2 hardening: ตรวจ signature ด้วย Google JWKS)
    ===================================================================== */
 
 const FIREBASE_PROJECT = 'metools-724dc';
@@ -35,12 +38,46 @@ function isLineUserId(uid) {
   return /^U[0-9a-f]{32}$/i.test(String(uid || ''));
 }
 
+// decode JWT payload — ไม่ verify signature (TODO: ใช้ Google JWKS)
+function decodeJwtPayload(token) {
+  try {
+    const part = String(token || '').split('.')[1] || '';
+    const padded = part + '='.repeat((4 - part.length % 4) % 4);
+    return JSON.parse(Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+  } catch { return null; }
+}
+
+// ตรวจว่า uid อยู่ใน admins/{uid} หรือไม่ — Firestore REST แบบไม่ต้อง auth
+async function isAdminUid(uid) {
+  if (!uid) return false;
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/admins/${encodeURIComponent(uid)}`;
+  try {
+    const r = await fetch(url);
+    return r.ok; // 200 = exists, 404 = ไม่ใช่แอดมิน
+  } catch { return false; }
+}
+
+async function requireAdmin(req, res) {
+  const hdr = req.headers['authorization'] || req.headers['Authorization'] || '';
+  const token = hdr.replace(/^Bearer\s+/i, '').trim();
+  if (!token) { res.status(401).json({ error: 'missing-auth' }); return null; }
+  const payload = decodeJwtPayload(token);
+  if (!payload || payload.aud !== FIREBASE_PROJECT) { res.status(401).json({ error: 'invalid-token' }); return null; }
+  if (payload.exp && payload.exp < Date.now() / 1000) { res.status(401).json({ error: 'expired-token' }); return null; }
+  const uid = payload.user_id || payload.sub || '';
+  if (!(await isAdminUid(uid))) { res.status(403).json({ error: 'not-admin', uid }); return null; }
+  return uid;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'method-not-allowed' }); return; }
+
+  const adminUid = await requireAdmin(req, res);
+  if (!adminUid) return; // response ส่งใน requireAdmin แล้ว
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const userId = String(body.userId || '').trim();
