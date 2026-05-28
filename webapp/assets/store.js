@@ -815,7 +815,11 @@
   // โหลด Firebase modular SDK lazily — เปลือก iife ของไฟล์นี้ใช้ dynamic import ได้
   // สมัคร: createUserWithEmailAndPassword + setDoc users/{uid} (profile)
   // เข้าระบบ: signInWithEmailAndPassword → load users/{uid} → setSession ด้วย uid
-  function loadFirebaseAuthAndDb() {
+  // appName: "customer" (default) สำหรับลูกค้า, "admin" สำหรับหลังร้าน
+  // — แยกกันเพื่อให้ admin/customer ไม่ใช้ uid เดียวกัน
+  // — แต่ admin pages ทั้งหมดควรใช้ "admin" เพื่อให้ uid ตรงกันข้ามหน้า
+  function loadFirebaseAuthAndDb(appName) {
+    var name = appName || "customer";
     var cfg = parseFbConfig(firebaseCfg());
     if (!cfg) return Promise.reject(new Error("ยังไม่ได้ตั้ง Firebase Config"));
     var base = "https://www.gstatic.com/firebasejs/10.12.2/";
@@ -826,8 +830,8 @@
     ]).then(function (mods) {
       var appMod = mods[0], authMod = mods[1], fsMod = mods[2];
       var app;
-      try { app = appMod.getApp("customer"); }
-      catch (e) { app = appMod.initializeApp(cfg, "customer"); }
+      try { app = appMod.getApp(name); }
+      catch (e) { app = appMod.initializeApp(cfg, name); }
       return {
         app: app,
         auth: authMod.getAuth(app),

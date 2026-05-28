@@ -194,8 +194,9 @@
           import(base + 'firebase-auth.js'),
         ]);
         var app;
-        try { app = appMod.getApp('richmenu'); }
-        catch (e) { app = appMod.initializeApp(cfg, 'richmenu'); }
+        // ใช้ app name "admin" ให้ uid ตรงกับ bot-inbox / bot-replies
+        try { app = appMod.getApp('admin'); }
+        catch (e) { app = appMod.initializeApp(cfg, 'admin'); }
         var auth = authMod.getAuth(app);
         var cred = await authMod.signInAnonymously(auth);
         var idToken = await cred.user.getIdToken();

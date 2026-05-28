@@ -477,8 +477,9 @@
       ]).then(function (mods) {
         var appMod = mods[0], authMod = mods[1], fsMod = mods[2];
         var app;
-        try { app = appMod.getApp("botinbox"); }
-        catch (e) { app = appMod.initializeApp(cfg, "botinbox"); }
+        // ใช้ชื่อ "admin" เดียวกันทุก admin page → uid คงที่ข้ามหน้า
+        try { app = appMod.getApp("admin"); }
+        catch (e) { app = appMod.initializeApp(cfg, "admin"); }
         var authInst = authMod.getAuth(app);
         return authMod.signInAnonymously(authInst).then(function (cred) {
           var db = fsMod.getFirestore(app, "default");
@@ -853,8 +854,8 @@
       ]).then(function (mods) {
         var appMod = mods[0], authMod = mods[1], fsMod = mods[2];
         var app;
-        try { app = appMod.getApp("botreplies"); }
-        catch (e) { app = appMod.initializeApp(cfg, "botreplies"); }
+        try { app = appMod.getApp("admin"); }
+        catch (e) { app = appMod.initializeApp(cfg, "admin"); }
         var authInst = authMod.getAuth(app);
         return authMod.signInAnonymously(authInst).then(function () {
           var db = fsMod.getFirestore(app, "default");
@@ -1008,7 +1009,7 @@
 
     setAlert("กำลังโหลด…");
     if (!S.loadFirebaseAuthAndDb) { setAlert("ยังไม่ได้ตั้ง Firebase", "err"); return; }
-    S.loadFirebaseAuthAndDb().then(function (m) {
+    S.loadFirebaseAuthAndDb("admin").then(function (m) {
       var fs = m.fsMod;
       // โหลด orders + customer_profiles
       fs.onSnapshot(fs.collection(m.db, "orders"), function (snap) {
@@ -1248,7 +1249,7 @@
 
     function subscribeCloudOrders() {
       if (!S.loadFirebaseAuthAndDb) return;
-      S.loadFirebaseAuthAndDb().then(function (m) {
+      S.loadFirebaseAuthAndDb("admin").then(function (m) {
         var fs = m.fsMod;
         var col = fs.collection(m.db, "orders");
         fs.onSnapshot(col, function (snap) {
