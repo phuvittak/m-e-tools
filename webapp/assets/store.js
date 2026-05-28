@@ -245,8 +245,54 @@
       return fallback;
     }
   }
-  function write(key, val) {
+  // คีย์ที่ admin แก้แล้วควรซิงค์ขึ้น cloud — เห็นเหมือนกันทุกอุปกรณ์
+  // ไม่รวม: products (มีรูป base64 ใหญ่ — ใช้ปุ่ม sync แยก), orders (ซิงค์ผ่าน Phase E),
+  //          users (Firebase Auth Phase D), cart/session/seeded (per-device)
+  var ADMIN_CLOUD_KEYS = [
+    KEY.settings, KEY.staff, KEY.ship, KEY.ledger, KEY.suppliers, KEY.purchases
+  ];
+  function write(key, val, opts) {
     localStorage.setItem(key, JSON.stringify(val));
+    if (!opts || !opts.skipCloud) {
+      if (ADMIN_CLOUD_KEYS.indexOf(key) >= 0) cloudPushAdminData(key, val);
+    }
+  }
+
+  /* ---------- Cloud sync: admin data ↔ Firestore admin_data/{key} ---- */
+  // เขียน — fire-and-forget ทุกครั้งที่ admin save ข้อมูล
+  function cloudPushAdminData(key, val) {
+    loadFirebaseAuthAndDb("admin").then(function (m) {
+      var fs = m.fsMod;
+      fs.setDoc(fs.doc(m.db, "admin_data", key), {
+        value: val,
+        updatedAt: fs.serverTimestamp(),
+      }).catch(function (err) { console.warn("[cloud push]", key, err && err.message); });
+    }).catch(function () {});
+  }
+  // โหลด — อ่าน Firestore แล้วเขียน localStorage (ใช้ตอนเปิดหน้า admin)
+  // skipCloud=true เพื่อไม่ให้ write() วน push กลับขึ้น cloud อีกรอบ
+  // returns Promise → callers re-render after data arrives
+  function cloudLoadAdminData() {
+    return loadFirebaseAuthAndDb("admin").then(function (m) {
+      var fs = m.fsMod;
+      var promises = ADMIN_CLOUD_KEYS.map(function (key) {
+        return fs.getDoc(fs.doc(m.db, "admin_data", key)).then(function (snap) {
+          if (snap && snap.exists && snap.exists()) {
+            var data = snap.data();
+            if (data && data.value !== undefined) {
+              write(key, data.value, { skipCloud: true });
+            }
+          }
+        }).catch(function (err) { console.warn("[cloud load]", key, err && err.message); });
+      });
+      return Promise.all(promises).then(function () {
+        dispatch(); // re-render หน้าที่ฟัง onChange
+        return true;
+      });
+    }).catch(function (err) {
+      console.warn("[cloud load init]", err && err.message);
+      return false;
+    });
   }
 
   // add warranty / motor / shipping-size defaults to a seed product
@@ -996,6 +1042,7 @@
     getSettings: getSettings, saveSettings: saveSettings, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
     registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loginGoogleCloud: loginGoogleCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
+    cloudLoadAdminData: cloudLoadAdminData, cloudPushAdminData: cloudPushAdminData,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
     session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS,
     logout: logout, requirePerm: requirePerm, checkPin: checkPin,

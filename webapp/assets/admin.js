@@ -16,6 +16,9 @@
   } else if (!S.requirePerm(permFor[view] || "dashboard", "../login.html")) return;
 
   mountShell(view);
+  // ดึงข้อมูล admin จาก cloud ก่อนเริ่ม (settings/staff/ledger/etc.) — ทำเงียบ ๆ
+  // ถ้า cloud ใหม่กว่า localStorage จะอัปเดต local แล้ว dispatch ให้ทุกหน้า re-render
+  if (S.cloudLoadAdminData) S.cloudLoadAdminData();
   ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers }[view] || function () {})();
 
   /* ---------- shell / sidebar ---------- */

@@ -95,6 +95,13 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // admin_data: คีย์ที่ admin แก้ในหลังร้านแล้วซิงค์ขึ้น cloud
+    // (settings, staff, shipping rates, ledger, suppliers, purchases)
+    // อ่าน + เขียน: เฉพาะแอดมิน — ลูกค้าไม่ควรเห็นข้อมูล back office
+    match /admin_data/{key} {
+      allow read, write: if isAdmin();
+    }
+
     // โปรไฟล์ลูกค้า (Phase D) — ผูกกับ Firebase Auth UID
     // อ่าน/เขียน: เฉพาะเจ้าของ uid ตัวเองเท่านั้น
     match /users/{userId} {
