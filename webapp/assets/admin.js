@@ -496,6 +496,25 @@
                 setTimeout(function () { copyBtn.textContent = "คัดลอก"; }, 1500);
               });
             };
+            // ปุ่ม "เพิ่มฉันเป็น admin" — เขียน doc admins/{uid} ตรงจาก browser (bootstrap)
+            var claimBtn = uidBox.querySelector("[data-uid-claim]");
+            var claimStatus = uidBox.querySelector("[data-uid-claim-status]");
+            if (claimBtn) claimBtn.onclick = function () {
+              claimBtn.disabled = true;
+              claimStatus.textContent = "กำลังเพิ่ม…";
+              fsMod.setDoc(fsMod.doc(db, "admins", cred.user.uid), {
+                addedAt: fsMod.serverTimestamp(),
+                via: "self-bootstrap"
+              }).then(function () {
+                claimStatus.textContent = "✓ เพิ่มแล้ว — รีเฟรชหน้านี้ (Ctrl+Shift+R)";
+                claimStatus.style.color = "#1b5e20";
+                if (window.U && U.toast) U.toast("เพิ่มเป็น admin แล้ว — รีเฟรชเพื่อให้ทุกอย่างทำงาน", "ok");
+              }).catch(function (err) {
+                claimStatus.textContent = "ผิดพลาด: " + (err.message || err);
+                claimStatus.style.color = "#a00";
+                claimBtn.disabled = false;
+              });
+            };
           }
           // เก็บ helpers ที่ sendReply / promptRename ใช้ — ไม่ต้องโหลด SDK ซ้ำ
           state.fs = {

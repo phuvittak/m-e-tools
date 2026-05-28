@@ -82,8 +82,10 @@
       <div data-admin-uid style="display:none; background:var(--bg-2); padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:12px; color:var(--fg-2); font-family:var(--font-mono, monospace)">
         Admin uid: <b data-uid-val></b>
         <button data-uid-copy type="button" style="margin-left:8px; padding:2px 8px; font-size:11px; border:1px solid var(--border-3); border-radius:4px; background:#fff; cursor:pointer">คัดลอก</button>
+        <button data-uid-claim type="button" style="margin-left:6px; padding:2px 10px; font-size:11px; border:1px solid #FFB81C; border-radius:4px; background:#FFB81C; color:#000; cursor:pointer; font-weight:600">⚡ เพิ่มฉันเป็น admin</button>
+        <span data-uid-claim-status style="margin-left:8px; font-size:11px; color:var(--fg-2)"></span>
         <span data-uid-help style="display:block; margin-top:4px; color:var(--fg-2); font-family:var(--font-body); font-size:11px">
-          ถ้า rules ใหม่ปฏิเสธการอ่าน → สร้าง doc <code>admins/{uid}</code> ใน Firebase Console แล้วรีเฟรช
+          ถ้าโดน permission-denied → กด "⚡ เพิ่มฉันเป็น admin" 1 ครั้ง แล้วรีเฟรชหน้านี้ใหม่
         </span>
       </div>
 

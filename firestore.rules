@@ -22,10 +22,16 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    // รายการแอดมิน — ใครก็อ่านไม่ได้ ยกเว้นแอดมินด้วยกัน
+    // รายการแอดมิน
+    // - อ่าน: เฉพาะ admin ด้วยกัน
+    // - สร้าง: เปิดให้ user เพิ่มตัวเองได้ (uid == auth.uid) — bootstrap ผ่านปุ่มใน bot-inbox
+    //   ⚠️ security tradeoff: ใครก็ขึ้นเป็น admin ได้ ตราบใดที่เข้าเว็บได้
+    //   หลัง bootstrap แล้ว แนะนำให้แก้บรรทัด allow create เป็น `if isAdmin()` แทน
+    // - อัปเดต/ลบ: เฉพาะ admin
     match /admins/{uid} {
       allow read: if isAdmin();
-      allow write: if isAdmin(); // bootstrap doc แรกต้องสร้างผ่าน Console
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update, delete: if isAdmin();
     }
 
     // แชทลูกค้า: เอกสารบทสนทนา + ข้อความ
