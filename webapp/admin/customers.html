@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>สรุปลูกค้า — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css">
+  <style>
+    .cus-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:12px; margin-bottom:18px }
+    .cus-kpi { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:14px 16px }
+    .cus-kpi .lbl { font-size:11px; color:var(--fg-2); text-transform:uppercase; letter-spacing:.5px; font-weight:600 }
+    .cus-kpi .val { font-size:26px; font-weight:700; color:var(--fg); margin-top:4px; font-family:var(--font-display, inherit) }
+    .cus-kpi .sub { font-size:12px; color:var(--fg-2); margin-top:2px }
+
+    .cus-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px }
+    @media (max-width:900px) { .cus-grid { grid-template-columns:1fr } }
+
+    .cus-panel { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:16px 18px }
+    .cus-panel h2 { margin:0 0 12px; font-size:15px; font-family:var(--font-display, inherit) }
+    .cus-panel .sub { font-size:12px; color:var(--fg-2); margin-bottom:10px }
+
+    .cus-rank { width:100%; border-collapse:collapse; font-family:var(--font-body); font-size:13px }
+    .cus-rank th { text-align:left; padding:6px 8px; border-bottom:2px solid var(--border-3); font-weight:700; color:var(--fg-2); font-size:11px; text-transform:uppercase; letter-spacing:.04em }
+    .cus-rank td { padding:8px; border-bottom:1px solid var(--border-3) }
+    .cus-rank td.num { text-align:right; font-family:var(--font-mono, monospace) }
+    .cus-rank tr:last-child td { border-bottom:none }
+
+    .cus-cat-bar { display:flex; flex-direction:column; gap:8px }
+    .cus-cat-row { display:flex; align-items:center; gap:10px }
+    .cus-cat-row .label { width:120px; font-size:13px; flex-shrink:0 }
+    .cus-cat-row .meter { flex:1; height:18px; background:#f0f0f0; border-radius:4px; overflow:hidden; position:relative }
+    .cus-cat-row .fill { height:100%; background:var(--accent, #FFB81C); transition:width .3s }
+    .cus-cat-row .val { width:80px; text-align:right; font-size:12px; font-family:var(--font-mono, monospace) }
+
+    .cus-search { margin-bottom:14px }
+    .cus-search input { width:100%; padding:10px 14px; border:1px solid var(--border-3); border-radius:8px; font-family:var(--font-body); font-size:14px; outline:none; background:#fff }
+
+    .cus-empty { padding:24px; text-align:center; color:var(--fg-2); font-family:var(--font-body); font-size:13px }
+  </style>
+</head>
+<body data-admin="customers">
+  <div class="admin" data-shell>
+    <main class="main">
+      <div class="topbar">
+        <div><h1>สรุปลูกค้า</h1><div class="sub">ใครอยากได้อะไร / ยอดซื้อต่อคน — นับจากออเดอร์ที่ยืนยันแล้ว (ไม่นับยกเลิก)</div></div>
+      </div>
+
+      <div class="alert" data-alert style="display:none"></div>
+
+      <div class="cus-kpis">
+        <div class="cus-kpi"><div class="lbl">ลูกค้าทั้งหมด</div><div class="val" data-kpi-customers>—</div><div class="sub">มีออเดอร์ยืนยันอย่างน้อย 1</div></div>
+        <div class="cus-kpi"><div class="lbl">รายได้รวม</div><div class="val" data-kpi-revenue>—</div><div class="sub">บาท (ไม่รวมที่ยกเลิก)</div></div>
+        <div class="cus-kpi"><div class="lbl">ออเดอร์ทั้งหมด</div><div class="val" data-kpi-orders>—</div><div class="sub">ที่ยืนยันแล้ว</div></div>
+        <div class="cus-kpi"><div class="lbl">เฉลี่ยต่อลูกค้า</div><div class="val" data-kpi-avg>—</div><div class="sub">บาท/คน</div></div>
+      </div>
+
+      <div class="cus-grid">
+        <div class="cus-panel">
+          <h2>ขายดีตามหมวด</h2>
+          <div class="sub">จำนวนชิ้นที่ลูกค้าซื้อในแต่ละหมวด (รวมทุกออเดอร์ที่ยืนยันแล้ว)</div>
+          <div class="cus-cat-bar" data-by-category>
+            <div class="cus-empty">กำลังโหลด…</div>
+          </div>
+        </div>
+        <div class="cus-panel">
+          <h2>ขายดีตามแบรนด์</h2>
+          <div class="sub">จำนวนชิ้นที่ลูกค้าซื้อในแต่ละแบรนด์</div>
+          <div class="cus-cat-bar" data-by-brand>
+            <div class="cus-empty">กำลังโหลด…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cus-panel">
+        <h2>ลูกค้า / สมาชิก (จัดอันดับตามยอดซื้อ)</h2>
+        <div class="cus-search">
+          <input data-search type="search" placeholder="🔎 ค้นหาว่าใครซื้อสินค้าอะไร เช่น สว่าน">
+        </div>
+        <table class="cus-rank" data-rank>
+          <thead>
+            <tr><th>อันดับ</th><th>ชื่อ</th><th>อีเมล</th><th>โทร</th><th class="num">คำสั่งซื้อ</th><th class="num">ยอดรวม</th></tr>
+          </thead>
+          <tbody><tr><td colspan="6" class="cus-empty">กำลังโหลด…</td></tr></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+  <script src="../assets/thai-geo.js"></script>
+  <script src="../assets/store.js"></script>
+  <script src="../assets/ui.js"></script>
+  <script src="../assets/admin.js"></script>
+</body>
+</html>

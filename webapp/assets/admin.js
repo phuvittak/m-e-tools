@@ -11,12 +11,12 @@
   if (view === "staff" || view === "botreplies") {
     if (!S.requirePerm(null, "../login.html")) return;
     if (!S.isOwner()) { window.location.href = "dashboard.html"; return; }
-  } else if (view === "chat" || view === "botinbox") {
+  } else if (view === "chat" || view === "botinbox" || view === "customers") {
     if (!S.requirePerm(null, "../login.html")) return; // any staff
   } else if (!S.requirePerm(permFor[view] || "dashboard", "../login.html")) return;
 
   mountShell(view);
-  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies }[view] || function () {})();
+  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers }[view] || function () {})();
 
   /* ---------- shell / sidebar ---------- */
   function mountShell(active) {
@@ -31,6 +31,7 @@
       chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
       botinbox: '<path d="M12 2C6.48 2 2 6.04 2 11c0 2.5 1.16 4.74 3 6.33V22l3.83-2.1c1.01.23 2.07.35 3.17.35 5.52 0 10-4.04 10-9s-4.48-9-10-9z"/><circle cx="8.5" cy="11" r="1.2" fill="currentColor"/><circle cx="12" cy="11" r="1.2" fill="currentColor"/><circle cx="15.5" cy="11" r="1.2" fill="currentColor"/>',
       botreplies: '<path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M7 8h10M7 12h7" stroke-linecap="round"/>',
+      customers: '<path d="M17 21v-2a4 4 0 0 0-3-3.87"/><path d="M4 21v-2a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v2"/><circle cx="9" cy="7" r="4"/><circle cx="17" cy="6" r="3"/>',
     };
     var nav = [
       ["dashboard.html", "dashboard", "แดชบอร์ด", "dashboard"],
@@ -41,6 +42,7 @@
     ].filter(function (n) { return S.hasPerm(n[3]); });
     // แชทลูกค้าหน้าเว็บถูกถอดออก — ลูกค้าทักผ่าน LINE OA ตรง ดูทุกบทสนทนาในหน้า "แชทบอท LINE"
     nav.push(["bot-inbox.html", "botinbox", "แชทบอท LINE", "botinbox"]);
+    nav.push(["customers.html", "customers", "สรุปลูกค้า", "customers"]);
     if (S.isOwner()) nav.push(["bot-replies.html", "botreplies", "คำตอบของบอท", "botreplies"]);
     if (S.isOwner()) nav.push(["staff.html", "staff", "จัดการทีมงาน", "staff"]);
 
@@ -910,6 +912,158 @@
     saveBtn.addEventListener("click", save);
 
     load();
+  }
+
+  /* ===================== CUSTOMERS SUMMARY (Phase E completion) ===================== */
+  // หน้า "ใครอยากได้อะไร / ยอดซื้อต่อคน"
+  // อ่าน Firestore orders (ทั้งหมด) → จัด group by userId → คำนวณยอดรวม, จัดอันดับ
+  // นับเฉพาะออเดอร์ที่ "ยืนยันแล้ว" (status != cancelled) เพื่อไม่ให้ออเดอร์ที่ยกเลิกมาทำให้สับสน
+  function initCustomers() {
+    var alertBox = document.querySelector("[data-alert]");
+    var byCatBox = document.querySelector("[data-by-category]");
+    var byBrandBox = document.querySelector("[data-by-brand]");
+    var rankTbody = document.querySelector("[data-rank] tbody");
+    var searchInput = document.querySelector("[data-search]");
+    var state = { orders: [], profiles: {}, search: "" };
+
+    if (searchInput) searchInput.addEventListener("input", function () {
+      state.search = (searchInput.value || "").trim().toLowerCase();
+      renderRank();
+    });
+
+    function setAlert(msg, kind) {
+      if (!msg) { alertBox.style.display = "none"; return; }
+      alertBox.textContent = msg; alertBox.style.display = "block";
+      alertBox.style.background = kind === "err" ? "#fee" : "#efe";
+    }
+
+    setAlert("กำลังโหลด…");
+    if (!S.loadFirebaseAuthAndDb) { setAlert("ยังไม่ได้ตั้ง Firebase", "err"); return; }
+    S.loadFirebaseAuthAndDb().then(function (m) {
+      var fs = m.fsMod;
+      // โหลด orders + customer_profiles
+      fs.onSnapshot(fs.collection(m.db, "orders"), function (snap) {
+        state.orders = snap.docs
+          .map(function (d) { return d.data() || {}; })
+          .filter(function (o) { return o.status !== "cancelled"; }); // ตามที่ user สั่ง — ยกเลิกแล้วลบออกอัตโนมัติจากสรุป
+        renderAll();
+      }, function (err) { setAlert("โหลดออเดอร์ไม่สำเร็จ: " + err.message, "err"); });
+
+      fs.onSnapshot(fs.collection(m.db, "customer_profiles"), function (snap) {
+        var map = {};
+        snap.docs.forEach(function (d) { map[d.id] = d.data() || {}; });
+        state.profiles = map;
+        renderAll();
+      }, function () {});
+    }).catch(function (err) { setAlert("เชื่อม Firebase ไม่สำเร็จ: " + err.message, "err"); });
+
+    function renderAll() {
+      setAlert("");
+      renderKPIs();
+      renderByCategory();
+      renderByBrand();
+      renderRank();
+    }
+
+    function renderKPIs() {
+      var byUser = {};
+      var revenue = 0;
+      state.orders.forEach(function (o) {
+        var uid = o.userId || o.userEmail || (o.customer && o.customer.email) || "unknown";
+        byUser[uid] = true;
+        revenue += (o.revenue || o.subtotal || 0);
+      });
+      var customerCount = Object.keys(byUser).length;
+      document.querySelector("[data-kpi-customers]").textContent = customerCount;
+      document.querySelector("[data-kpi-revenue]").textContent = S.money(revenue);
+      document.querySelector("[data-kpi-orders]").textContent = state.orders.length;
+      document.querySelector("[data-kpi-avg]").textContent = customerCount ? S.money(Math.round(revenue / customerCount)) : "—";
+    }
+
+    function aggregateBy(keyFn) {
+      var totals = {};
+      state.orders.forEach(function (o) {
+        (o.items || []).forEach(function (it) {
+          var key = keyFn(it);
+          if (!key) return;
+          totals[key] = (totals[key] || 0) + (it.qty || 0);
+        });
+      });
+      return Object.keys(totals).map(function (k) { return { key: k, qty: totals[k] }; })
+        .sort(function (a, b) { return b.qty - a.qty; });
+    }
+
+    function renderMeter(box, rows, labelMap) {
+      if (!rows.length) { box.innerHTML = '<div class="cus-empty">ยังไม่มีข้อมูล</div>'; return; }
+      var max = rows[0].qty || 1;
+      box.innerHTML = rows.slice(0, 10).map(function (r) {
+        var pct = Math.round((r.qty / max) * 100);
+        var label = (labelMap && labelMap[r.key]) || r.key;
+        return '<div class="cus-cat-row">' +
+          '<div class="label">' + esc(label) + '</div>' +
+          '<div class="meter"><div class="fill" style="width:' + pct + '%"></div></div>' +
+          '<div class="val">' + r.qty + ' ชิ้น</div>' +
+        '</div>';
+      }).join("");
+    }
+
+    function renderByCategory() {
+      // item มี productId แต่ไม่มี category — ต้องดูจาก products
+      // category อาจไม่ถูก embed ใน item — ใช้ category จาก products ที่ admin ดู (local)
+      // backup: เดาจากชื่อสินค้า
+      var prodCat = {};
+      S.getProducts().forEach(function (p) { prodCat[p.id] = p.category || ""; });
+      var labelMap = {};
+      (S.CATEGORIES || []).forEach(function (c) { labelMap[c.key] = c.label; });
+      var rows = aggregateBy(function (it) { return prodCat[it.productId] || ""; });
+      renderMeter(byCatBox, rows, labelMap);
+    }
+
+    function renderByBrand() {
+      var prodBrand = {};
+      S.getProducts().forEach(function (p) { prodBrand[p.id] = p.brand || ""; });
+      var rows = aggregateBy(function (it) { return prodBrand[it.productId] || ""; });
+      renderMeter(byBrandBox, rows);
+    }
+
+    function renderRank() {
+      var byUser = {};
+      state.orders.forEach(function (o) {
+        var uid = o.userId || o.userEmail || (o.customer && o.customer.email) || "unknown";
+        if (!byUser[uid]) byUser[uid] = { uid: uid, name: "", email: "", phone: "", total: 0, count: 0, items: [] };
+        var rec = byUser[uid];
+        rec.total += (o.revenue || o.subtotal || 0);
+        rec.count += 1;
+        if (!rec.name && o.customer && o.customer.name) rec.name = o.customer.name;
+        if (!rec.email) rec.email = o.userEmail || (o.customer && o.customer.email) || "";
+        if (!rec.phone && o.customer && o.customer.phone) rec.phone = o.customer.phone;
+        (o.items || []).forEach(function (it) { rec.items.push(it.name || ""); });
+        // override ด้วย nickname จาก customer_profiles ถ้ามี
+        if (state.profiles[uid] && state.profiles[uid].nickname) rec.name = state.profiles[uid].nickname;
+      });
+      var ranked = Object.values(byUser).sort(function (a, b) { return b.total - a.total; });
+      // filter ด้วย search (ดูชื่อ, อีเมล, รายการสินค้า)
+      if (state.search) {
+        ranked = ranked.filter(function (r) {
+          var h = (r.name + " " + r.email + " " + r.phone + " " + r.items.join(" ")).toLowerCase();
+          return h.indexOf(state.search) >= 0;
+        });
+      }
+      if (!ranked.length) {
+        rankTbody.innerHTML = '<tr><td colspan="6" class="cus-empty">' + (state.search ? "ไม่พบลูกค้า" : "ยังไม่มีลูกค้า") + '</td></tr>';
+        return;
+      }
+      rankTbody.innerHTML = ranked.map(function (r, i) {
+        return '<tr>' +
+          '<td>#' + (i + 1) + '</td>' +
+          '<td>' + esc(r.name || "—") + '</td>' +
+          '<td>' + esc(r.email || "—") + '</td>' +
+          '<td>' + esc(r.phone || "—") + '</td>' +
+          '<td class="num">' + r.count + '</td>' +
+          '<td class="num">' + S.money(r.total) + '</td>' +
+        '</tr>';
+      }).join("");
+    }
   }
 
   function openProductModal(p) {
