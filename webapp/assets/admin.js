@@ -553,6 +553,7 @@
               else if (f.at) atStr = String(f.at);
               return {
                 userId: f.userId || "",
+                role: f.role || "",
                 text: f.text || "",
                 reply: f.reply || "",
                 source: f.source || "line",
