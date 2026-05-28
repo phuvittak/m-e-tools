@@ -988,7 +988,7 @@
 
   /* ===================== ORDERS ===================== */
   function initOrders() {
-    var state = { status: "", type: "", q: "" };
+    var state = { status: "", type: "", q: "", cloudOrders: [] };
     var ss = document.querySelector("[data-statusfilter]");
     var ts = document.querySelector("[data-typefilter]");
     var cs = document.querySelector("[data-customer]");
@@ -997,11 +997,50 @@
     cs.addEventListener("input", function () { state.q = cs.value.trim().toLowerCase(); render(); });
     document.querySelector("[data-shipcfg]").addEventListener("click", openShipEditor);
 
+    // Phase E: subscribe orders/{id} จาก Firestore — order ของลูกค้าที่ login Firebase Auth
+    subscribeCloudOrders();
+
+    function subscribeCloudOrders() {
+      if (!S.loadFirebaseAuthAndDb) return;
+      S.loadFirebaseAuthAndDb().then(function (m) {
+        var fs = m.fsMod;
+        var col = fs.collection(m.db, "orders");
+        fs.onSnapshot(col, function (snap) {
+          state.cloudOrders = snap.docs.map(function (d) {
+            var data = d.data() || {};
+            // ทำ at เป็น number (ms) ให้ตรงกับ local order
+            if (data.createdAtTs && data.createdAtTs.toDate) data.createdAt = data.createdAtTs.toDate().getTime();
+            data._cloud = true;
+            return data;
+          });
+          render();
+        }, function (err) { console.warn("[orders listener]", err && err.message); });
+      }).catch(function (err) { console.warn("[orders init firestore]", err && err.message); });
+    }
+
+    function mergedOrders() {
+      // merge local + cloud — cloud ชนะถ้า id ตรงกัน (cloud คือ source of truth สำหรับ order ที่ลูกค้าสร้าง)
+      // local ยังครองสำหรับ order ที่ไม่มี userId (สร้างก่อน Phase E)
+      var byId = {};
+      S.getOrders().forEach(function (o) { byId[o.id] = o; });
+      state.cloudOrders.forEach(function (o) {
+        // เก็บ staffMessage ของ local ถ้า cloud ยังไม่มี (รักษาข้อมูลที่ admin ใส่ไว้ใน local เดิม)
+        var local = byId[o.id];
+        if (local && !o.staffMessage && local.staffMessage) o.staffMessage = local.staffMessage;
+        byId[o.id] = o;
+      });
+      return Object.values(byId).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    }
+
     function render() {
-      var orders = S.getOrders().filter(function (o) {
+      var orders = mergedOrders().filter(function (o) {
         if (state.status && o.status !== state.status) return false;
         if (state.type && o.type !== state.type) return false;
-        if (state.q) { var h = (o.customer.name + " " + o.customer.phone + " " + o.id).toLowerCase(); if (h.indexOf(state.q) < 0) return false; }
+        if (state.q) {
+          var c = o.customer || {};
+          var h = ((c.name || "") + " " + (c.phone || "") + " " + (o.id || "") + " " + (o.userEmail || "")).toLowerCase();
+          if (h.indexOf(state.q) < 0) return false;
+        }
         return true;
       });
       var rev = 0, prof = 0;

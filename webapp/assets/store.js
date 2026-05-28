@@ -497,7 +497,28 @@
 
     write(KEY.orders, orders);
     clearCart();
+    // Phase E: sync ขึ้น Firestore — fire-and-forget เพื่อไม่บล็อก UI
+    // ใช้เฉพาะลูกค้าที่ login ผ่าน Firebase Auth (มี uid) — ถ้าไม่มีก็เก็บแค่ localStorage
+    if (sess && sess.uid) syncOrdersToCloud(created, sess);
     return created;
+  }
+
+  // เขียน orders/{id} ใน Firestore — owner admin/orders.html จะ subscribe แล้วเห็นแบบเรียลไทม์
+  function syncOrdersToCloud(orders, sess) {
+    if (!orders || !orders.length) return;
+    loadFirebaseAuthAndDb().then(function (m) {
+      var fs = m.fsMod;
+      orders.forEach(function (o) {
+        var payload = Object.assign({}, o, {
+          userId: sess.uid,
+          userEmail: sess.email || "",
+          createdAtTs: fs.serverTimestamp(),
+          updatedAtTs: fs.serverTimestamp(),
+        });
+        fs.setDoc(fs.doc(m.db, "orders", o.id), payload)
+          .catch(function (err) { console.error("[order sync]", o.id, err && err.message); });
+      });
+    }).catch(function (err) { console.warn("[order sync init]", err && err.message); });
   }
 
   function setOrderStatus(orderId, status, extra) {
@@ -528,9 +549,28 @@
       }
       o.received = status === "received" || status === "returned";
       o.status = status;
+      // sync ขึ้น cloud — admin คนอื่นเห็นเปลี่ยนทันที + ลูกค้าใน orders.html เห็นด้วย
+      syncOrderStatusToCloud(o);
       break;
     }
     write(KEY.orders, orders);
+  }
+
+  function syncOrderStatusToCloud(o) {
+    if (!o || !o.userId) return; // order ที่ไม่มี userId = local-only (ก่อน Phase E)
+    loadFirebaseAuthAndDb().then(function (m) {
+      var fs = m.fsMod;
+      fs.setDoc(fs.doc(m.db, "orders", o.id), {
+        status: o.status,
+        received: !!o.received,
+        refunded: !!o.refunded,
+        cancelReason: o.cancelReason || "",
+        staffMessage: o.staffMessage || "",
+        staffMessageAt: o.staffMessageAt || null,
+        updatedAtTs: fs.serverTimestamp(),
+      }, { merge: true })
+        .catch(function (err) { console.error("[order status sync]", o.id, err && err.message); });
+    }).catch(function () {});
   }
   // owner/staff message to the customer about an order (e.g. delivery ETA)
   function saveOrderMessage(orderId, msg) {
