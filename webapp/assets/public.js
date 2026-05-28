@@ -28,11 +28,35 @@
     var form = document.querySelector("[data-login]");
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      var r = S.loginUser(form.querySelector("[data-email]").value, form.querySelector("[data-pass]").value);
-      if (r.ok) {
+      var email = form.querySelector("[data-email]").value;
+      var pass = form.querySelector("[data-pass]").value;
+      // 1) staff/owner ใน localStorage ก่อน (ต้อง local เสมอ เพื่อความปลอดภัย)
+      var local = S.loginUser(email, pass);
+      if (local.ok && (local.role === "owner" || local.role === "employee")) {
         U.toast("เข้าสู่ระบบสำเร็จ", "ok");
-        setTimeout(function () { window.location.href = r.role === "employee" || r.role === "owner" ? "admin/dashboard.html" : redirectAfterAuth(); }, 400);
-      } else U.toast(r.error || "เข้าสู่ระบบไม่สำเร็จ", "err");
+        setTimeout(function () { window.location.href = "admin/dashboard.html"; }, 400);
+        return;
+      }
+      // 2) ลูกค้า — ลอง Firebase Auth (cross-device) ก่อน
+      S.loginUserCloud(email, pass).then(function (r) {
+        U.toast("เข้าสู่ระบบสำเร็จ", "ok");
+        setTimeout(function () { window.location.href = redirectAfterAuth(); }, 400);
+      }).catch(function (err) {
+        // 3) fallback localStorage ลูกค้าเก่า (สมัครก่อน Phase D)
+        if (local.ok) {
+          U.toast("เข้าสู่ระบบสำเร็จ (โหมดออฟไลน์)", "ok");
+          setTimeout(function () { window.location.href = redirectAfterAuth(); }, 400);
+          return;
+        }
+        // แปลง Firebase error code เป็นภาษาไทย
+        var code = err && err.code ? err.code : "";
+        var msg = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+        if (code === "auth/user-not-found") msg = "ไม่พบบัญชีอีเมลนี้ — กรุณาสมัครก่อน";
+        else if (code === "auth/wrong-password" || code === "auth/invalid-credential") msg = "รหัสผ่านไม่ถูกต้อง";
+        else if (code === "auth/too-many-requests") msg = "ลองเข้าระบบบ่อยเกินไป รอสักครู่แล้วลองใหม่";
+        else if (code === "auth/network-request-failed") msg = "เครือข่ายมีปัญหา ลองใหม่";
+        U.toast(msg, "err");
+      });
     });
   }
   function initRegister() {
@@ -61,9 +85,27 @@
       if (!phoneVerified) { U.toast("กรุณายืนยันเบอร์โทรด้วย OTP ก่อน", "err"); return; }
       var pass = form.querySelector("[data-pass]").value, pass2 = form.querySelector("[data-pass2]").value;
       if (pass !== pass2) { U.toast("รหัสผ่านไม่ตรงกัน", "err"); return; }
-      var r = S.registerUser({ name: form.querySelector("[data-name]").value.trim(), email: form.querySelector("[data-email]").value, phone: phoneI.value.trim(), password: pass });
-      if (r.ok) { U.toast("สมัครสมาชิกสำเร็จ ยินดีต้อนรับ!", "ok"); setTimeout(function () { window.location.href = redirectAfterAuth(); }, 500); }
-      else U.toast(r.error || "สมัครไม่สำเร็จ", "err");
+      if (pass.length < 6) { U.toast("รหัสผ่านต้องยาวอย่างน้อย 6 ตัว", "err"); return; }
+      var payload = {
+        name: form.querySelector("[data-name]").value.trim(),
+        email: form.querySelector("[data-email]").value,
+        phone: phoneI.value.trim(),
+        password: pass
+      };
+      // ลอง Firebase Auth ก่อน (cross-device); ถ้าไม่ได้ค่อย fall back localStorage
+      S.registerUserCloud(payload).then(function (r) {
+        U.toast("สมัครสมาชิกสำเร็จ ยินดีต้อนรับ!", "ok");
+        setTimeout(function () { window.location.href = redirectAfterAuth(); }, 500);
+      }).catch(function (err) {
+        var code = err && err.code ? err.code : "";
+        if (code === "auth/email-already-in-use") { U.toast("อีเมลนี้สมัครแล้ว — ลองเข้าสู่ระบบแทน", "err"); return; }
+        if (code === "auth/invalid-email") { U.toast("รูปแบบอีเมลไม่ถูกต้อง", "err"); return; }
+        if (code === "auth/weak-password") { U.toast("รหัสผ่านอ่อนเกินไป (≥ 6 ตัวอักษร)", "err"); return; }
+        // อาจเป็น Firebase Config ยังไม่ได้ตั้ง → fallback localStorage แบบเดิม
+        var local = S.registerUser(payload);
+        if (local.ok) { U.toast("สมัครสมาชิกสำเร็จ (โหมดออฟไลน์)", "ok"); setTimeout(function () { window.location.href = redirectAfterAuth(); }, 500); }
+        else U.toast(local.error || err.message || "สมัครไม่สำเร็จ", "err");
+      });
     });
   }
   function redirectAfterAuth() { var r = U.qp("next"); return r ? decodeURIComponent(r) : "index.html"; }

@@ -770,6 +770,77 @@
     if (u) { setSession({ email: u.email, name: u.name, role: "customer" }); return { ok: true, role: "customer" }; }
     return { ok: false, error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
   }
+
+  /* ---------- Phase D: Firebase Auth สำหรับลูกค้า (cross-device) ---------- */
+  // โหลด Firebase modular SDK lazily — เปลือก iife ของไฟล์นี้ใช้ dynamic import ได้
+  // สมัคร: createUserWithEmailAndPassword + setDoc users/{uid} (profile)
+  // เข้าระบบ: signInWithEmailAndPassword → load users/{uid} → setSession ด้วย uid
+  function loadFirebaseAuthAndDb() {
+    var cfg = parseFbConfig(firebaseCfg());
+    if (!cfg) return Promise.reject(new Error("ยังไม่ได้ตั้ง Firebase Config"));
+    var base = "https://www.gstatic.com/firebasejs/10.12.2/";
+    return Promise.all([
+      import(base + "firebase-app.js"),
+      import(base + "firebase-auth.js"),
+      import(base + "firebase-firestore.js"),
+    ]).then(function (mods) {
+      var appMod = mods[0], authMod = mods[1], fsMod = mods[2];
+      var app;
+      try { app = appMod.getApp("customer"); }
+      catch (e) { app = appMod.initializeApp(cfg, "customer"); }
+      return {
+        app: app,
+        auth: authMod.getAuth(app),
+        db: fsMod.getFirestore(app, "default"),
+        authMod: authMod,
+        fsMod: fsMod,
+      };
+    });
+  }
+
+  // สมัครลูกค้า: เขียนทั้ง Firebase Auth + Firestore users/{uid} + localStorage (legacy)
+  function registerUserCloud(u) {
+    var email = (u.email || "").trim().toLowerCase();
+    if (!u.name || !email || !u.password) return Promise.reject(new Error("กรุณากรอกชื่อ อีเมล และรหัสผ่าน"));
+    return loadFirebaseAuthAndDb().then(function (m) {
+      return m.authMod.createUserWithEmailAndPassword(m.auth, email, u.password).then(function (cred) {
+        var uid = cred.user.uid;
+        return m.fsMod.setDoc(m.fsMod.doc(m.db, "users", uid), {
+          uid: uid,
+          email: email,
+          name: u.name,
+          phone: u.phone || "",
+          createdAt: m.fsMod.serverTimestamp(),
+        }).then(function () {
+          // อัปเดต localStorage เผื่อ offline / fallback (ไม่เก็บ password ใน plain ที่ cloud)
+          var users = getUsers();
+          if (!users.some(function (x) { return x.email === email; })) {
+            users.push({ uid: uid, name: u.name, email: email, phone: u.phone || "", createdAt: Date.now(), cloud: true });
+            write(KEY.users, users);
+          }
+          setSession({ uid: uid, email: email, name: u.name, role: "customer" });
+          return { ok: true, uid: uid, role: "customer" };
+        });
+      });
+    });
+  }
+
+  // เข้าระบบลูกค้าผ่าน Firebase Auth (cross-device) — โหลด profile กลับมาตั้ง session
+  function loginUserCloud(email, password) {
+    email = (email || "").trim().toLowerCase();
+    if (!email || !password) return Promise.reject(new Error("กรุณากรอกอีเมลและรหัสผ่าน"));
+    return loadFirebaseAuthAndDb().then(function (m) {
+      return m.authMod.signInWithEmailAndPassword(m.auth, email, password).then(function (cred) {
+        var uid = cred.user.uid;
+        return m.fsMod.getDoc(m.fsMod.doc(m.db, "users", uid)).then(function (snap) {
+          var data = (snap && snap.exists && snap.exists()) ? (snap.data() || {}) : {};
+          var name = data.name || cred.user.displayName || email.split("@")[0];
+          setSession({ uid: uid, email: email, name: name, role: "customer" });
+          return { ok: true, uid: uid, role: "customer" };
+        });
+      });
+    });
+  }
   // gate an admin page by a permission key (employees) — owner always allowed
   function requirePerm(key, redirect) {
     if (!isStaff()) { window.location.href = redirect || "../login.html"; return false; }
@@ -850,6 +921,7 @@
     getShipRates: getShipRates, getShippingFee: getShippingFee, setShipRate: setShipRate,
     getSettings: getSettings, saveSettings: saveSettings, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
+    registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
     session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS,
     logout: logout, requirePerm: requirePerm, checkPin: checkPin,
