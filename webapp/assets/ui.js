@@ -75,7 +75,7 @@
       '<span class="me-header-loc">ท่ารั้ว · เชียงใหม่</span></a>' +
       '<nav class="me-header-nav">' +
       navLink("index.html", "หน้าแรก", active === "home") +
-      navLink("shop.html", "สินค้า / เช่า-ซื้อ", active === "shop") +
+      navLink("shop.html", 'สินค้า<span data-rent-only> / เช่า-ซื้อ</span>', active === "shop") +
       navLink("orders.html", "ติดตามคำสั่งซื้อ", active === "orders") +
       "</nav>" +
       '<div class="me-header-right">' + accountArea() +
@@ -126,7 +126,7 @@
           '<div class="me-socials">' + socialBtn(st.facebook, "Facebook", FB) + socialBtn(st.instagram, "Instagram", IG) + socialBtn(st.tiktok, "TikTok", TT) + "</div>" +
         "</div>" +
         '<div class="me-footer-col"><div class="me-footer-h">เมนู</div>' +
-          '<a href="index.html">หน้าแรก</a><a href="shop.html">สินค้า / เช่า-ซื้อ</a>' +
+          '<a href="index.html">หน้าแรก</a><a href="shop.html">สินค้า<span data-rent-only> / เช่า-ซื้อ</span></a>' +
           '<a href="cart.html">ตะกร้า</a><a href="orders.html">ติดตามคำสั่งซื้อ</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">ช่วยเหลือ</div>' +
           '<a href="index.html#faq">คำถามที่พบบ่อย</a><a href="#" data-open-chat>ติดต่อร้าน (แชท)</a>' +
@@ -146,6 +146,37 @@
     S.onChange(renderChrome);
     mountLineFab();
     mountWebChat();
+    loadShopFeatures();
+  }
+
+  // Phase B+: โหลดสวิตช์ฟีเจอร์ของร้าน (rentEnabled ฯลฯ) — body class ควบคุม CSS
+  // bot_config/replies เป็น public read — ดึงตรงด้วย Firestore REST ไม่ต้อง auth
+  function loadShopFeatures() {
+    // ใช้ค่าใน localStorage ก่อน (เร็ว) แล้ว refresh จาก cloud
+    try {
+      var cached = localStorage.getItem("me_shopFeatures");
+      if (cached) applyFeatures(JSON.parse(cached));
+    } catch (e) {}
+    var cfg = window.parseFbConfig ? window.parseFbConfig((S.firebaseCfg && S.firebaseCfg()) || "") : null;
+    if (!cfg || !cfg.projectId) return;
+    var url = "https://firestore.googleapis.com/v1/projects/" + cfg.projectId + "/databases/default/documents/bot_config/replies";
+    fetch(url)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (doc) {
+        if (!doc || !doc.fields) return;
+        var v = doc.fields.rentEnabled;
+        var rent = (v && typeof v.booleanValue === "boolean") ? v.booleanValue : true;
+        var feats = { rentEnabled: rent };
+        try { localStorage.setItem("me_shopFeatures", JSON.stringify(feats)); } catch (e) {}
+        applyFeatures(feats);
+      })
+      .catch(function () {});
+  }
+  function applyFeatures(feats) {
+    if (!feats) return;
+    var body = document.body;
+    if (feats.rentEnabled === false) body.classList.add("no-rent");
+    else body.classList.remove("no-rent");
   }
 
   /* ---------- Phase A4-A5: web chat widget → Firestore bot_messages ---------- */

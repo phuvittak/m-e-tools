@@ -104,7 +104,7 @@ async function getBotConfig() {
   try {
     const res = await fetch(url);
     if (!res.ok) {
-      _botCfgCache = { greeting: '', fallback: '', rules: [] };
+      _botCfgCache = { rentEnabled: true, greeting: '', fallback: '', rules: [] };
       _botCfgFetchedAt = Date.now();
       return _botCfgCache;
     }
@@ -112,6 +112,7 @@ async function getBotConfig() {
     const fields = {};
     for (const k in doc.fields || {}) fields[k] = unwrapFsValue(doc.fields[k]);
     _botCfgCache = {
+      rentEnabled: typeof fields.rentEnabled === 'boolean' ? fields.rentEnabled : true,
       greeting: String(fields.greeting || ''),
       fallback: String(fields.fallback || ''),
       rules: Array.isArray(fields.rules) ? fields.rules.map((r) => ({
@@ -123,7 +124,7 @@ async function getBotConfig() {
     return _botCfgCache;
   } catch (err) {
     console.error('[bot_config] fetch threw', err?.message);
-    return _botCfgCache || { greeting: '', fallback: '', rules: [] };
+    return _botCfgCache || { rentEnabled: true, greeting: '', fallback: '', rules: [] };
   }
 }
 
@@ -390,15 +391,18 @@ function flexContactMenu() {
 
 // ข้อความต้อนรับเริ่มต้น (plain text + emoji) — เลียนสไตล์ DeWalt Thailand OA
 // เจ้าของแก้ได้ใน /admin/bot-replies.html (override ผ่าน bot_config.greeting)
-function defaultWelcomeText() {
-  return [
+// rentEnabled: ถ้าร้านไม่มีบริการเช่า ระบบจะตัดบรรทัด "เช่า" ออก
+function defaultWelcomeText(opts = {}) {
+  const lines = [
     `🛠️ สวัสดีครับ ${SHOP.shortName}`,
     `ยินดีต้อนรับ — แจ้งข้อมูลที่ต้องการสอบถามได้โดย`,
     ``,
     `🔧 อะไหล่ — แจ้งชื่อรุ่นสินค้าและอะไหล่ที่ต้องการ`,
     `⚙️ การใช้งาน — แจ้งปัญหาที่เกิดขึ้น`,
     `📦 สินค้า — แจ้งชื่อรุ่นสินค้าที่สนใจ`,
-    `💰 เช่า — เครื่องมือเช่ารายวัน`,
+  ];
+  if (opts.rentEnabled !== false) lines.push(`💰 เช่า — เครื่องมือเช่ารายวัน`);
+  lines.push(
     ``,
     `ทางแอดมินจะตอบกลับเร็วที่สุดภายใน 24 ชม.`,
     ``,
@@ -407,8 +411,9 @@ function defaultWelcomeText() {
     `${SHOP.hoursSun}`,
     ``,
     `📞 หากไม่มีการตอบกลับภายใน 24 ชม.`,
-    `ติดต่อได้ที่ ${SHOP.phone}`,
-  ].join('\n');
+    `ติดต่อได้ที่ ${SHOP.phone}`
+  );
+  return lines.join('\n');
 }
 
 function flexWelcome() {
@@ -460,6 +465,19 @@ const QUICK_MAIN = [
   { type: 'message', label: '🔋 แบต', text: 'แบต' },
   { type: 'message', label: '📞 ติดต่อ', text: 'ติดต่อ' },
 ];
+
+// quick reply ที่ตอบสนอง rentEnabled — แทรกปุ่ม "เช่า" ถ้าร้านเปิดบริการเช่า
+function quickMainFor(cfg) {
+  if (cfg && cfg.rentEnabled === false) return QUICK_MAIN;
+  return [
+    { type: 'message', label: '🛠️ สว่าน', text: 'สว่าน' },
+    { type: 'message', label: '🪚 เลื่อย', text: 'เลื่อย' },
+    { type: 'message', label: '⚡ เจียร', text: 'เครื่องเจียร' },
+    { type: 'message', label: '🔋 แบต', text: 'แบต' },
+    { type: 'message', label: '💰 เช่า', text: 'เช่า' },
+    { type: 'message', label: '📞 ติดต่อ', text: 'ติดต่อ' },
+  ];
+}
 
 const QUICK_BRANDS = [
   { type: 'message', label: 'DEWALT', text: 'DEWALT' },
@@ -697,9 +715,17 @@ async function handleMessage(userId, text, token) {
   // 1.5) โหลด config ที่เจ้าของตั้งไว้จาก Firestore (cache 5 นาที)
   const botCfg = await getBotConfig();
 
+  // 1.55) ถ้าร้านปิดบริการเช่า + ลูกค้าทักเรื่องเช่า → บอกตรง ๆ ก่อน AI จะตอบมั่ว
+  if (botCfg.rentEnabled === false && /(เช่า|rent|เช็า)/i.test(String(text || ''))) {
+    return withQuickReply(
+      `ขออภัยครับ ตอนนี้ร้านยังไม่มีบริการเช่าเครื่องมือนะครับ 🙏\nมีแต่จำหน่ายขาดทั้งหมด — ดูเครื่องมือได้ที่ ${SHOP.website}/shop.html`,
+      quickMainFor(botCfg)
+    );
+  }
+
   // 1.6) ทักทาย — ใช้ greeting ที่เจ้าของตั้ง ถ้ามี
   if (/^(สวัสดี|หวัดดี|สวัด|hello|hi|hey|hej)/i.test(String(text || '').trim())) {
-    if (botCfg.greeting) return withQuickReply(botCfg.greeting, QUICK_MAIN);
+    if (botCfg.greeting) return withQuickReply(botCfg.greeting, quickMainFor(botCfg));
   }
 
   // 1.7) คีย์เวิร์ดที่เจ้าของกำหนดเอง — มาก่อน smartReply (กฎที่ owner แก้ได้ ชนะ hardcode)
@@ -715,10 +741,10 @@ async function handleMessage(userId, text, token) {
   if (ai) return ai;
 
   // 4) Fallback — ใช้ของเจ้าของถ้ามี ไม่งั้น default
-  if (botCfg.fallback) return withQuickReply(botCfg.fallback, QUICK_MAIN);
+  if (botCfg.fallback) return withQuickReply(botCfg.fallback, quickMainFor(botCfg));
   return withQuickReply(
     `ขอบคุณสำหรับข้อความครับ 🙏\nสนใจดูเครื่องมือหมวดไหนเป็นพิเศษครับ?`,
-    QUICK_MAIN
+    quickMainFor(botCfg)
   );
 }
 
@@ -928,10 +954,8 @@ export default async function handler(req, res) {
         // ใช้ greeting ที่เจ้าของตั้งใน /admin/bot-replies.html ก่อน (style DeWalt OA)
         // ถ้าไม่มี ใช้ default plain text (ไม่ใช่ Flex) — สะอาดและอ่านง่ายเหมือนของ DeWalt
         const cfg = await getBotConfig();
-        const welcome = cfg.greeting
-          ? withQuickReply(cfg.greeting, QUICK_MAIN)
-          : withQuickReply(defaultWelcomeText(), QUICK_MAIN);
-        await replyToLine(event.replyToken, welcome, token);
+        const text = cfg.greeting || defaultWelcomeText({ rentEnabled: cfg.rentEnabled });
+        await replyToLine(event.replyToken, withQuickReply(text, quickMainFor(cfg)), token);
         return;
       }
       if (event.type === 'message' && event.message?.type === 'text') {

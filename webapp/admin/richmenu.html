@@ -54,66 +54,77 @@
     var ctx = canvas.getContext('2d');
     var W = 2500, H = 1686;
 
-    // 6 ปุ่ม 2×3 grid
-    var BUTTONS = [
-      { icon: '🛠️', title: 'ดูเครื่องมือ', sub: 'ทุกหมวด' },
-      { icon: '🎯', title: 'โปรโมชั่น',   sub: 'ส่วนลดวันนี้' },
-      { icon: '📅', title: 'เช่ารายวัน',  sub: 'รายวัน/รายสัปดาห์' },
-      { icon: '📍', title: 'ที่อยู่ร้าน',  sub: 'แผนที่ + เวลาเปิด' },
-      { icon: '📞', title: 'โทรหาเรา',    sub: '081-3706466' },
-      { icon: '💬', title: 'ติดต่อเจ้าของ', sub: 'คุยตรงกับร้าน' },
-    ];
-
-    // พื้นหลังดำสนิท
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, W, H);
-
-    // โลโก้แบนด์ด้านบน (แถบเหลือง 80px)
-    ctx.fillStyle = '#FFB81C';
-    ctx.fillRect(0, 0, W, 80);
-    ctx.fillStyle = '#000';
-    ctx.font = 'bold 56px "Helvetica Neue", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('M.E.TOOLS · ท่ารั้ว · เชียงใหม่', W/2, 40);
-
-    // วาด 6 ปุ่ม
-    var startY = 80;
-    var cellW = W / 3;
-    var cellH = (H - startY) / 2;
-    var pad = 24;
-
-    BUTTONS.forEach(function (b, i) {
-      var col = i % 3, row = Math.floor(i / 3);
-      var x = col * cellW + pad;
-      var y = startY + row * cellH + pad;
-      var w = cellW - pad * 2;
-      var h = cellH - pad * 2;
-
-      // กล่องสีเทาเข้ม (เกือบดำ) มี border เหลือง
-      ctx.fillStyle = '#1a1a1a';
-      ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = '#FFB81C';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(x, y, w, h);
-
-      // icon (emoji ใหญ่)
-      ctx.font = '180px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    // อ่าน rentEnabled จาก bot_config — async, ค่อย redraw หลังโหลด
+    // default true (สามารถสลับเป็น false หลัง fetch)
+    var rentEnabled = true;
+    function makeButtons() {
+      return [
+        { icon: '🛠️', title: 'ดูเครื่องมือ', sub: 'ทุกหมวด' },
+        { icon: '🎯', title: 'โปรโมชั่น',   sub: 'ส่วนลดวันนี้' },
+        rentEnabled
+          ? { icon: '📅', title: 'เช่ารายวัน',  sub: 'รายวัน/รายสัปดาห์' }
+          : { icon: '🔧', title: 'บริการซ่อม', sub: 'รับซ่อมเครื่องมือ' },
+        { icon: '📍', title: 'ที่อยู่ร้าน',  sub: 'แผนที่ + เวลาเปิด' },
+        { icon: '📞', title: 'โทรหาเรา',    sub: '081-3706466' },
+        { icon: '💬', title: 'ติดต่อเจ้าของ', sub: 'คุยตรงกับร้าน' },
+      ];
+    }
+    function drawCanvas() {
+      var BUTTONS = makeButtons();
+      // พื้นหลังดำสนิท
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, W, H);
+      // โลโก้แบนด์ด้านบน (แถบเหลือง 80px)
+      ctx.fillStyle = '#FFB81C';
+      ctx.fillRect(0, 0, W, 80);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 56px "Helvetica Neue", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#FFB81C';
-      ctx.fillText(b.icon, x + w/2, y + h/2 - 80);
+      ctx.fillText('M.E.TOOLS · ท่ารั้ว · เชียงใหม่', W/2, 40);
+      // วาด 6 ปุ่ม
+      var startY = 80;
+      var cellW = W / 3;
+      var cellH = (H - startY) / 2;
+      var pad = 24;
+      BUTTONS.forEach(function (b, i) {
+        var col = i % 3, row = Math.floor(i / 3);
+        var x = col * cellW + pad;
+        var y = startY + row * cellH + pad;
+        var w = cellW - pad * 2;
+        var h = cellH - pad * 2;
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#FFB81C';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(x, y, w, h);
+        ctx.font = '180px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#FFB81C';
+        ctx.fillText(b.icon, x + w/2, y + h/2 - 80);
+        ctx.font = 'bold 72px "Helvetica Neue", sans-serif';
+        ctx.fillStyle = '#FFB81C';
+        ctx.fillText(b.title, x + w/2, y + h/2 + 80);
+        ctx.font = '40px "Helvetica Neue", sans-serif';
+        ctx.fillStyle = '#888';
+        ctx.fillText(b.sub, x + w/2, y + h/2 + 150);
+      });
+    }
+    drawCanvas();
 
-      // ชื่อปุ่ม
-      ctx.font = 'bold 72px "Helvetica Neue", sans-serif';
-      ctx.fillStyle = '#FFB81C';
-      ctx.fillText(b.title, x + w/2, y + h/2 + 80);
-
-      // sub label
-      ctx.font = '40px "Helvetica Neue", sans-serif';
-      ctx.fillStyle = '#888';
-      ctx.fillText(b.sub, x + w/2, y + h/2 + 150);
-    });
+    // โหลด rentEnabled จาก bot_config (public read) — redraw ถ้าค่าต่างจาก default
+    fetch('https://firestore.googleapis.com/v1/projects/metools-724dc/databases/default/documents/bot_config/replies')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (doc) {
+        if (!doc || !doc.fields) return;
+        var v = doc.fields.rentEnabled;
+        if (v && typeof v.booleanValue === 'boolean' && v.booleanValue === false) {
+          rentEnabled = false;
+          drawCanvas();
+        }
+      })
+      .catch(function () {});
 
     function downloadPng() {
       var link = document.createElement('a');
@@ -130,7 +141,7 @@
       var actions = [
         { type: 'message', text: 'ดูสินค้า' },
         { type: 'message', text: 'โปร' },
-        { type: 'message', text: 'เช่า' },
+        rentEnabled ? { type: 'message', text: 'เช่า' } : { type: 'message', text: 'ซ่อม' },
         { type: 'message', text: 'ที่อยู่' },
         { type: 'uri', uri: 'tel:0813706466' },
         { type: 'message', text: 'ติดต่อเจ้าของ' },

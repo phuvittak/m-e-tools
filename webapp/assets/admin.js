@@ -794,6 +794,7 @@
 
     function defaultConfig() {
       return {
+        rentEnabled: true,
         greeting: [
           "🛠️ สวัสดีครับ M.E.Tools ท่ารั้ว",
           "ยินดีต้อนรับ — แจ้งข้อมูลที่ต้องการสอบถามได้โดย",
@@ -852,8 +853,9 @@
         setAlert("");
         if (snap && snap.exists && snap.exists()) {
           var data = snap.data() || {};
-          // เก่าอาจไม่มี rules array
+          // เก่าอาจไม่มี rules array / rentEnabled — default true เพื่อ backward compat
           state.config = {
+            rentEnabled: typeof data.rentEnabled === "boolean" ? data.rentEnabled : true,
             greeting: data.greeting || "",
             fallback: data.fallback || "",
             rules: Array.isArray(data.rules) ? data.rules.map(function (r) {
@@ -872,6 +874,8 @@
     }
 
     function render() {
+      var rentCb = document.querySelector("[data-feat-rent]");
+      if (rentCb) rentCb.checked = !!state.config.rentEnabled;
       greetingEl.value = state.config.greeting || "";
       fallbackEl.value = state.config.fallback || "";
       var rules = state.config.rules || [];
@@ -906,6 +910,8 @@
     }
 
     function collectFromDom() {
+      var rentCb = document.querySelector("[data-feat-rent]");
+      state.config.rentEnabled = rentCb ? !!rentCb.checked : true;
       state.config.greeting = greetingEl.value.trim();
       state.config.fallback = fallbackEl.value.trim();
       var rules = [];
@@ -930,6 +936,7 @@
       var ref = fs.doc(fs.db, "bot_config", "replies");
       var sess = S.session() || {};
       fs.setDoc(ref, {
+        rentEnabled: state.config.rentEnabled,
         greeting: state.config.greeting,
         fallback: state.config.fallback,
         rules: state.config.rules,

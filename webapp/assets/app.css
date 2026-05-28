@@ -367,6 +367,14 @@ textarea { resize: vertical; min-height: 80px; }
 .chip.buy { background: var(--dw-yellow); color: var(--ink); }
 .chip.rent { background: var(--workboot-blue); color: #fff; }
 
+/* ---------- shop feature toggles (rent on/off) ---------- */
+/* body.no-rent → ซ่อนทุกอย่างเกี่ยวกับเช่าทันที (Phase B+) */
+body.no-rent .tile-badge.rent,
+body.no-rent .tile-badge.both,
+body.no-rent [data-rent-only],
+body.no-rent .chip.rent { display: none !important; }
+body.no-rent .tile-rent { display: none !important; }
+
 /* ---------- toast ---------- */
 /* ---------- chat widget ---------- */
 .me-chat { position: fixed; bottom: 22px; left: 22px; z-index: 190; }
