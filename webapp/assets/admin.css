@@ -191,10 +191,42 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
 @media (max-width: 900px) {
   .admin { grid-template-columns: 1fr; }
   .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
-  .side-nav { flex-direction: row; flex-wrap: wrap; }
+  .side-nav { flex-direction: row; flex-wrap: wrap; overflow-y: visible; min-height: 0; }
   .side-foot { border-top: none; padding-top: 0; flex-direction: row; align-items: center; }
   .kpis { grid-template-columns: repeat(2,1fr); }
   .grid-2 { grid-template-columns: 1fr; }
+  .main { padding: 20px 18px 50px; }
 }
-@media (max-width: 520px) { .kpis { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .main { padding: 16px 14px 40px; }
+  .topbar h1 { font-size: 26px; }
+  .topbar .sub { font-size: 13px; }
+  table.data { font-size: 12px; }
+  table.data th, table.data td { padding: 8px 6px; }
+  .search-admin input { min-width: 0; flex: 1 1 100%; }
+  /* bot-inbox split — บนมือถือ list ก่อน, thread ตามล่าง (เลื่อนลงดู) */
+  .botinbox-split { grid-template-columns: 1fr !important; }
+  .conv-list { max-height: 40vh; }
+  .thread { max-height: 60vh; }
+  .botinbox-kpis { grid-template-columns: repeat(2,1fr) !important; }
+  .botinbox-kpi .val { font-size: 22px; }
+  .reply-bar { flex-wrap: wrap; }
+  .reply-bar textarea { min-height: 52px; font-size: 13px; }
+  .reply-bar button { width: 100%; padding: 10px; }
+  /* bot-replies editor */
+  .br-section { padding: 14px 16px; }
+  .br-rule-head { flex-wrap: wrap; }
+  /* admin table — เลื่อนแนวนอนได้ */
+  .main > * { max-width: 100%; }
+  [data-ordtable], [data-invtable] { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+@media (max-width: 520px) {
+  .kpis { grid-template-columns: 1fr; }
+  .botinbox-kpis { grid-template-columns: 1fr !important; }
+  .conv-row .who { font-size: 12px; }
+  .conv-row .meta { flex-wrap: wrap; gap: 4px; }
+  .conv-actions button { font-size: 10px; padding: 2px 8px; }
+  .thread-name { font-size: 13px; }
+  .thread-id { display: none; } /* บนจอเล็กซ่อน ID เต็ม เหลือแต่ชื่อ */
+}
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation: none !important; transition: none !important; } }

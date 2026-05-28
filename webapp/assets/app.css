@@ -518,5 +518,13 @@ textarea { resize: vertical; min-height: 80px; }
   .cards { grid-template-columns: 1fr; }
   .me-cats-grid { grid-template-columns: 1fr; }
   .pd-prices { gap: 16px; }
+  /* chat widget + LINE FAB ขยับสั้นลง + ปุ่มเล็กลงเพื่อไม่บัง content */
+  .me-chat-fab { font-size: 12px; padding: 10px 14px; }
+  .me-chat { bottom: 14px; left: 14px; }
+  .me-chat.me-chat-right { right: 14px; }
+  .me-chat-panel { width: 92vw; max-width: 360px; }
+  .me-chat-body { height: 260px; }
+  /* auth forms */
+  .auth-card { padding: 22px 18px; margin: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation: none !important; transition: none !important; } }
