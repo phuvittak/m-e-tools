@@ -271,7 +271,7 @@
       status("เข้าสู่ระบบ…");
       firebase.auth().signInAnonymously().then(function (cred) {
         status("เตรียมข้อมูล…");
-        var items = S.getProducts().map(function (p) {
+        var items = S.getProducts().filter(function (p) { return !p.hidden; }).map(function (p) {
           var clean = {};
           for (var k in p) if (Object.prototype.hasOwnProperty.call(p, k) && k !== "images" && k !== "image") clean[k] = p[k];
           clean.available = S.available(p);

@@ -188,7 +188,7 @@
 
     var box = document.querySelector("[data-cats]");
     if (box) {
-      var products = S.getProducts();
+      var products = S.getProducts().filter(function (p) { return !p.hidden; });
       box.innerHTML = S.CATEGORIES.map(function (c) {
         var n = products.filter(function (p) { return p.category === c.key; }).length;
         return (
@@ -201,7 +201,7 @@
     }
     var feat = document.querySelector("[data-featured]");
     if (feat) {
-      feat.innerHTML = S.getProducts().slice(0, 6).map(cardHtml).join("");
+      feat.innerHTML = S.getProducts().filter(function (p) { return !p.hidden; }).slice(0, 6).map(cardHtml).join("");
       wireCards(feat);
     }
     // FAQ accordion (editable in back office)
@@ -233,7 +233,7 @@
   function initShop() {
     var state = { q: U.qp("q") || "", cats: U.qp("cat") ? [U.qp("cat")] : [], brands: U.qp("brand") ? [U.qp("brand")] : [], mode: U.qp("mode") || "all", sort: "default", priceMin: 0, priceMax: 0, inStock: false };
 
-    var products = S.getProducts();
+    var products = S.getProducts().filter(function (p) { return !p.hidden; });
     var fbox = document.querySelector("[data-filters]");
     var allBrands = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
     var catCounts = {};
@@ -325,7 +325,7 @@
     var id = U.qp("id");
     var p = S.getProduct(id);
     var root = document.querySelector("[data-product]");
-    if (!p) { root.innerHTML = '<div class="empty"><h3>ไม่พบสินค้านี้</h3><a class="me-btn" href="shop.html">กลับไปหน้าสินค้า</a></div>'; return; }
+    if (!p || p.hidden) { root.innerHTML = '<div class="empty"><h3>ไม่พบสินค้านี้</h3><a class="me-btn" href="shop.html">กลับไปหน้าสินค้า</a></div>'; return; }
 
     document.title = p.name + " — M.E.Tools";
     var avail = S.available(p);
