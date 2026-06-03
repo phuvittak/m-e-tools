@@ -127,6 +127,7 @@ img { max-width: 100%; display: block; }
 .me-cat:hover { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 0 var(--ink); background: var(--dw-yellow-pale); }
 .me-cat-ic { color: var(--ink); }
 .me-cat-ic svg { stroke: var(--ink); }
+.me-cat-img { width: 40px; height: 40px; object-fit: contain; display: block; }
 .me-cat-name { font-family: var(--font-display-th); font-style: italic; font-weight: 800; font-size: 19px; text-transform: uppercase; }
 .me-cat-count { font-family: var(--font-mono); font-size: 12px; color: var(--fg-3); }
 

@@ -14,19 +14,18 @@
     }
     .catalog-hero h1 { margin:0 0 6px; font-size:clamp(20px,4vw,28px) }
     .catalog-hero p { margin:0; color:rgba(255,255,255,.65); font-size:14px }
-    .catalog-frame-wrap {
-      flex:1; position:relative; background:#222;
-      min-height:calc(100vh - 140px)
+    .catalog-body { flex:1; padding:28px 24px 40px }
+    .catalog-brand { margin-bottom:34px }
+    .catalog-brand-head {
+      display:flex; align-items:baseline; gap:12px;
+      border-bottom:3px solid var(--ink,#0b0b0b); padding-bottom:8px; margin-bottom:18px
     }
-    .catalog-frame-wrap iframe {
-      position:absolute; inset:0; width:100%; height:100%;
-      border:none; display:block
+    .catalog-brand-head h2 {
+      margin:0; font-size:clamp(18px,3vw,24px); font-family:var(--font-display,inherit);
+      text-transform:uppercase; letter-spacing:.02em
     }
-    .catalog-loading {
-      position:absolute; inset:0; display:flex; align-items:center;
-      justify-content:center; color:#fff; font-size:15px; gap:10px;
-      pointer-events:none
-    }
+    .catalog-brand-count { color:var(--fg-2,#666); font-size:13px; font-weight:600 }
+    .catalog-empty { text-align:center; padding:60px 20px; color:var(--fg-2,#666); font-size:15px }
     .catalog-nav {
       background:var(--ink,#0b0b0b); padding:12px 20px;
       display:flex; justify-content:center; gap:16px; flex-wrap:wrap
@@ -44,36 +43,22 @@
   <div class="catalog-wrap">
     <div class="catalog-hero">
       <h1>📖 แคตตาล็อกสินค้า M.E.Tools</h1>
-      <p>ดูสินค้าทั้งหมดแบบ Flipbook — ครบทุกรุ่น ทุกแบรนด์</p>
+      <p>เครื่องมือช่างครบทุกรุ่น ทุกแบรนด์ — อัปเดตอัตโนมัติจากสต็อกร้าน</p>
     </div>
 
-    <div class="catalog-frame-wrap" id="catalogFrame">
-      <div class="catalog-loading" id="catalogLoading">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-        กำลังโหลดแคตตาล็อก…
+    <main class="catalog-body wrap">
+      <div data-catalog>
+        <div class="catalog-empty">กำลังโหลดแคตตาล็อก…</div>
       </div>
-      <iframe
-        id="catalogIframe"
-        src="https://anyflip.com/qjteo/lhvk/"
-        allowfullscreen
-        allow="fullscreen"
-        title="แคตตาล็อกสินค้า M.E.Tools"
-        onload="document.getElementById('catalogLoading').style.display='none'"
-      ></iframe>
-    </div>
+    </main>
 
     <nav class="catalog-nav">
-      <a href="shop.html">🛒 ดูสินค้าพร้อมราคา</a>
+      <a href="shop.html">🛒 ดูสินค้าพร้อมราคา + ตัวกรอง</a>
       <a href="index.html">🏠 หน้าแรก</a>
-      <a href="https://anyflip.com/qjteo/lhvk/" target="_blank" rel="noopener">↗ เปิดเต็มหน้าจอ</a>
     </nav>
   </div>
 
   <div data-footer></div>
-
-  <style>
-    @keyframes spin { to { transform:rotate(360deg) } }
-  </style>
 
   <script src="assets/thai-geo.js"></script>
   <script src="assets/store.js"></script>

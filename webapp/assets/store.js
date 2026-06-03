@@ -213,6 +213,16 @@
       { name: "STANLEY", tag: "อุปกรณ์มือ", primary: false },
       { name: "INGCO", tag: "ครบเครื่อง", primary: false },
     ],
+    // tool categories (editable in admin → settings). icon = preset key, image = uploaded data URL (overrides icon)
+    categories: [
+      { key: "drill", label: "สว่าน / ไขควง", icon: "drill", image: "" },
+      { key: "saw", label: "เลื่อย", icon: "saw", image: "" },
+      { key: "grinder", label: "เครื่องเจียร", icon: "grinder", image: "" },
+      { key: "battery", label: "แบต / ที่ชาร์จ", icon: "battery", image: "" },
+      { key: "measure", label: "เครื่องมือวัด", icon: "measure", image: "" },
+      { key: "hand", label: "เครื่องมือช่างมือ", icon: "wrench", image: "" },
+      { key: "power", label: "เครื่องมือไฟฟ้าอื่นๆ", icon: "compressor", image: "" },
+    ],
     // hero promo banner (below hero). enabled=false → hidden
     promo: { enabled: false, title: "", text: "", image: "" },
     // flash sale (below brands). endTime = epoch ms; items reference products
@@ -447,8 +457,22 @@
     { key: "hand", label: "เครื่องมือช่างมือ" },
     { key: "power", label: "เครื่องมือไฟฟ้าอื่นๆ" },
   ];
+  function defaultCatIcon(key) {
+    return { drill: "drill", saw: "saw", grinder: "grinder", battery: "battery", measure: "measure", hand: "wrench", power: "compressor" }[key] || "tool";
+  }
+  // editable categories from settings; falls back to hardcoded defaults
+  function getCategories() {
+    var st = getSettings();
+    if (st && st.categories && st.categories.length) {
+      return st.categories.map(function (c) {
+        return { key: c.key, label: c.label, icon: c.icon || defaultCatIcon(c.key), image: c.image || "" };
+      });
+    }
+    return CATEGORIES.map(function (c) { return { key: c.key, label: c.label, icon: defaultCatIcon(c.key), image: "" }; });
+  }
   function categoryLabel(key) {
-    for (var i = 0; i < CATEGORIES.length; i++) if (CATEGORIES[i].key === key) return CATEGORIES[i].label;
+    var cats = getCategories();
+    for (var i = 0; i < cats.length; i++) if (cats[i].key === key) return cats[i].label;
     return key;
   }
   function typeLabel(type) { return type === "rent" ? "เช่าสินค้า" : "ซื้อสินค้า"; }
@@ -1085,7 +1109,7 @@
 
   global.MEStore = {
     KEY: KEY,
-    CATEGORIES: CATEGORIES, categoryLabel: categoryLabel,
+    CATEGORIES: CATEGORIES, categoryLabel: categoryLabel, getCategories: getCategories,
     typeLabel: typeLabel, statusLabel: statusLabel, fulfillmentLabel: fulfillmentLabel,
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
     getProducts: getProducts, getProduct: getProduct, available: available,

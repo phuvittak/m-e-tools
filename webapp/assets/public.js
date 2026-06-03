@@ -8,7 +8,7 @@
 
   U.mountChrome(page === "home" ? "home" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : "");
 
-  var routes = { home: initHome, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister };
+  var routes = { home: initHome, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog };
   if (routes[page]) routes[page]();
 
   /* ===================== AUTH ===================== */
@@ -189,12 +189,15 @@
     var box = document.querySelector("[data-cats]");
     if (box) {
       var products = S.getProducts().filter(function (p) { return !p.hidden; });
-      box.innerHTML = S.CATEGORIES.map(function (c) {
+      box.innerHTML = S.getCategories().map(function (c) {
         var n = products.filter(function (p) { return p.category === c.key; }).length;
+        var visual = c.image
+          ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
+          : '<span class="me-cat-ic">' + U.iconSvg(c.icon || iconForCat(c.key), 40) + "</span>";
         return (
           '<a class="me-cat" href="shop.html?cat=' + c.key + '">' +
-          '<span class="me-cat-ic">' + U.iconSvg(iconForCat(c.key), 40) + "</span>" +
-          '<span class="me-cat-name">' + c.label + "</span>" +
+          visual +
+          '<span class="me-cat-name">' + esc(c.label) + "</span>" +
           '<span class="me-cat-count">' + n + " รายการ</span></a>"
         );
       }).join("");
@@ -235,7 +238,10 @@
 
     var products = S.getProducts().filter(function (p) { return !p.hidden; });
     var fbox = document.querySelector("[data-filters]");
-    var allBrands = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
+    var productBrands = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
+    var brandOrder = (S.getSettings().brands || []).map(function (b) { return b.name; });
+    var allBrands = brandOrder.filter(function (b) { return productBrands.indexOf(b) >= 0; })
+      .concat(productBrands.filter(function (b) { return brandOrder.indexOf(b) < 0; }));
     var catCounts = {};
     products.forEach(function (p) { catCounts[p.category] = (catCounts[p.category] || 0) + 1; });
 
@@ -249,9 +255,9 @@
       '<div class="filter-group">' +
       '<label class="check"><input type="checkbox" data-f="instock"> เฉพาะมีสต็อก</label></div>' +
       '<div class="filter-group"><span class="lbl">ประเภทสินค้า</span>' +
-      S.CATEGORIES.map(function (c) {
+      S.getCategories().map(function (c) {
         var n = catCounts[c.key] || 0;
-        return '<label class="check"><input type="checkbox" data-f="cat" value="' + c.key + '"' + (state.cats.indexOf(c.key) >= 0 ? " checked" : "") + '> ' + c.label + ' <span class="filter-count">(' + n + ')</span></label>';
+        return '<label class="check"><input type="checkbox" data-f="cat" value="' + c.key + '"' + (state.cats.indexOf(c.key) >= 0 ? " checked" : "") + '> ' + esc(c.label) + ' <span class="filter-count">(' + n + ')</span></label>';
       }).join("") + "</div>" +
       '<div class="filter-group"><span class="lbl">แบรนด์</span>' +
       allBrands.map(function (b) { return '<label class="check"><input type="checkbox" data-f="brand" value="' + b + '"' + (state.brands.indexOf(b) >= 0 ? " checked" : "") + '> ' + b + '</label>'; }).join("") + "</div>" +
@@ -726,6 +732,28 @@
   }
 
   /* ===================== shared bits ===================== */
+  /* ===================== CATALOG ===================== */
+  function initCatalog() {
+    var box = document.querySelector("[data-catalog]");
+    if (!box) return;
+    var products = S.getProducts().filter(function (p) { return !p.hidden; });
+    if (!products.length) { box.innerHTML = '<div class="catalog-empty">ยังไม่มีสินค้าในแคตตาล็อก</div>'; return; }
+    var brandOrder = (S.getSettings().brands || []).map(function (b) { return b.name; });
+    var present = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
+    var brands = brandOrder.filter(function (b) { return present.indexOf(b) >= 0; })
+      .concat(present.filter(function (b) { return brandOrder.indexOf(b) < 0; }));
+    box.innerHTML = brands.map(function (b) {
+      var items = products.filter(function (p) { return p.brand === b; });
+      if (!items.length) return "";
+      return '<section class="catalog-brand">' +
+        '<div class="catalog-brand-head"><h2>' + esc(b) + "</h2>" +
+        '<span class="catalog-brand-count">' + items.length + " รายการ</span></div>" +
+        '<div class="cards">' + items.map(cardHtml).join("") + "</div>" +
+        "</section>";
+    }).join("");
+    wireCards(box);
+  }
+
   function cardHtml(p) {
     var avail = S.available(p);
     var low = avail > 0 && avail <= 3;
