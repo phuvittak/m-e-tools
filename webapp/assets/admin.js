@@ -19,7 +19,7 @@
   // ดึงข้อมูล admin จาก cloud ก่อนเริ่ม (settings/staff/ledger/etc.) — ทำเงียบ ๆ
   // ถ้า cloud ใหม่กว่า localStorage จะอัปเดต local แล้ว dispatch ให้ทุกหน้า re-render
   if (S.cloudLoadAdminData) S.cloudLoadAdminData();
-  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers }[view] || function () {})();
+  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, import: function(){} }[view] || function () {})();
 
   /* ---------- shell / sidebar ---------- */
   function mountShell(active) {
@@ -47,6 +47,7 @@
     nav.push(["bot-inbox.html", "botinbox", "แชทบอท LINE", "botinbox"]);
     nav.push(["customers.html", "customers", "สรุปลูกค้า", "customers"]);
     if (S.isOwner()) nav.push(["bot-replies.html", "botreplies", "คำตอบของบอท", "botreplies"]);
+    if (S.isOwner()) nav.push(["import.html", "import", "นำเข้าสินค้า (AI)", "inventory"]);
     if (S.isOwner()) nav.push(["staff.html", "staff", "จัดการทีมงาน", "staff"]);
 
     var roleTag = sess.role === "owner" ? "แอดมิน" : "พนักงาน";

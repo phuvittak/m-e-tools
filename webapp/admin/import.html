@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>นำเข้าสินค้า — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css">
+  <style>
+    .imp-card { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:20px; margin-bottom:16px }
+    .imp-card h2 { margin:0 0 6px; font-size:16px }
+    .imp-card .sub { font-size:13px; color:var(--fg-2); margin-bottom:14px; line-height:1.5 }
+    .imp-row { display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap }
+    .imp-row input[type=url], .imp-row input[type=text] { flex:1; min-width:0; padding:10px 12px; border:1px solid var(--border-3); border-radius:8px; font-family:var(--font-body); font-size:14px }
+    .imp-row input:focus { outline:none; border-color:var(--accent,#FFB81C); box-shadow:0 0 0 3px rgba(255,184,28,.2) }
+    .imp-btn { padding:10px 20px; font-family:var(--font-body); font-weight:700; font-size:14px; border-radius:8px; border:1px solid var(--ink,#0b0b0b); cursor:pointer; background:var(--accent,#FFB81C); color:var(--ink,#0b0b0b) }
+    .imp-btn:disabled { opacity:.5; cursor:not-allowed }
+    .imp-btn-ghost { background:#fff }
+    textarea.imp-paste { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--border-3); border-radius:8px; font-family:var(--font-body); font-size:13px; resize:vertical; min-height:100px }
+    .imp-results { display:flex; flex-direction:column; gap:14px; margin-top:8px }
+    .imp-product { background:#fff; border:1px solid var(--border-3); border-radius:10px; padding:16px }
+    .imp-product-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px }
+    .imp-product-head strong { font-size:15px; flex:1 }
+    .imp-product-head .badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:6px; background:var(--bg-2); border:1px solid var(--border-3) }
+    .imp-fields { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+    .imp-fields .full { grid-column:1/-1 }
+    .imp-field { display:flex; flex-direction:column; gap:4px }
+    .imp-field label { font-size:11px; font-weight:700; color:var(--fg-2); text-transform:uppercase; letter-spacing:.05em }
+    .imp-field input, .imp-field select, .imp-field textarea { padding:8px 10px; border:1px solid var(--border-3); border-radius:6px; font-family:var(--font-body); font-size:13px; background:#fff }
+    .imp-field textarea { min-height:60px; resize:vertical }
+    .imp-field input:focus, .imp-field select:focus, .imp-field textarea:focus { outline:none; border-color:var(--accent,#FFB81C) }
+    .imp-product-footer { display:flex; gap:8px; margin-top:14px; padding-top:12px; border-top:1px solid var(--border-3) }
+    .imp-status { font-size:12px; color:var(--fg-2); margin-top:4px; min-height:18px }
+    .imp-empty { text-align:center; padding:40px; color:var(--fg-2); font-size:14px }
+    .imp-log { background:var(--bg-2); border:1px solid var(--border-3); border-radius:8px; padding:12px; font-size:12px; font-family:monospace; max-height:120px; overflow-y:auto; margin-top:8px; color:var(--fg-2) }
+    .imp-sources { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px }
+    .imp-src { padding:6px 12px; font-size:12px; font-weight:600; border:1px solid var(--border-3); border-radius:6px; background:#fff; cursor:pointer; text-decoration:none; color:var(--fg) }
+    .imp-src:hover { background:var(--bg-2) }
+    .divider { border:none; border-top:1px solid var(--border-3); margin:20px 0 }
+  </style>
+</head>
+<body data-admin="import">
+  <div class="admin" data-shell>
+    <main class="main">
+      <div class="topbar">
+        <div><h1>นำเข้าสินค้า (AI)</h1><div class="sub">วาง URL หน้าสินค้าจากเว็บอ้างอิง หรือวางข้อความดิบ — AI แยกข้อมูลให้อัตโนมัติแล้วเพิ่มเข้าคลัง</div></div>
+      </div>
+
+      <div class="alert" data-alert style="display:none"></div>
+
+      <div class="imp-card">
+        <h2>📎 นำเข้าจาก URL</h2>
+        <div class="sub">วาง URL หน้าสินค้าจากเว็บใดก็ได้ — ระบบจะ fetch HTML แล้วให้ AI แยกข้อมูลสินค้าให้</div>
+        <div class="sub" style="color:#a07000">เว็บอ้างอิงแนะนำ (คลิกเพื่อเปิด):</div>
+        <div class="imp-sources">
+          <a class="imp-src" href="https://shop.ktw.co.th/ktw/th/THB/" target="_blank" rel="noopener">🔧 shop.ktw.co.th</a>
+          <a class="imp-src" href="https://itoolmart.com/" target="_blank" rel="noopener">🛠️ itoolmart.com</a>
+          <a class="imp-src" href="https://www.dewalt.co.th/products/" target="_blank" rel="noopener">⚡ dewalt.co.th</a>
+        </div>
+        <div class="imp-row">
+          <input type="url" id="urlInput" placeholder="https://shop.ktw.co.th/ktw/th/THB/สว่านไร้สาย-dewalt/...">
+          <button class="imp-btn" id="fetchBtn">🔍 ดึงข้อมูล</button>
+        </div>
+
+        <hr class="divider">
+
+        <h2>📋 หรือวางข้อความดิบ</h2>
+        <div class="sub">Copy ข้อมูลสินค้า (ชื่อ สเปค ราคา ฯลฯ) แล้ววางในช่องนี้แทน URL</div>
+        <textarea class="imp-paste" id="pasteInput" placeholder="วางข้อมูลสินค้าตรงนี้…&#10;เช่น ชื่อรุ่น: DEWALT DCD991P2, Brushless, 20V, 3 สปีด, การรับประกัน 3 ปี ราคา 8,900 บาท"></textarea>
+        <div style="margin-top:8px">
+          <button class="imp-btn" id="parseBtn">✨ AI แยกข้อมูล</button>
+        </div>
+
+        <div class="imp-log" id="impLog" style="display:none"></div>
+      </div>
+
+      <div id="resultsWrap" style="display:none">
+        <div class="imp-card">
+          <h2 id="resultsTitle">ผลการดึงข้อมูล</h2>
+          <div class="sub">ตรวจสอบและแก้ไขข้อมูลก่อนบันทึก — AI อาจแปลผิดบางส่วน</div>
+          <div class="imp-results" id="resultsList"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../assets/thai-geo.js"></script>
+  <script src="../assets/store.js"></script>
+  <script src="../assets/ui.js"></script>
+  <script src="../assets/admin.js"></script>
+  <script>
+  (function () {
+    var S = window.MEStore;
+    var logEl = document.getElementById("impLog");
+    var resultsWrap = document.getElementById("resultsWrap");
+    var resultsList = document.getElementById("resultsList");
+    var resultsTitle = document.getElementById("resultsTitle");
+    var alertBox = document.querySelector("[data-alert]");
+
+    function log(msg) {
+      logEl.style.display = "block";
+      logEl.innerHTML += msg + "\n";
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setAlert(msg, kind) {
+      if (!msg) { alertBox.style.display = "none"; return; }
+      alertBox.textContent = msg;
+      alertBox.style.display = "block";
+      alertBox.style.background = kind === "err" ? "#fee" : "#efe";
+    }
+
+    var CATS = [
+      { key:"drill", label:"สว่าน / ไขควง" },
+      { key:"saw", label:"เลื่อย" },
+      { key:"grinder", label:"เครื่องเจียร" },
+      { key:"battery", label:"แบตเตอรี่ / ที่ชาร์จ" },
+      { key:"measure", label:"เครื่องมือวัด" },
+      { key:"hand", label:"เครื่องมือช่างมือ" },
+      { key:"power", label:"เครื่องมือไฟฟ้าอื่นๆ" },
+    ];
+
+    function esc(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+
+    function renderProduct(p, idx) {
+      var catOpts = CATS.map(function(c) {
+        return '<option value="' + c.key + '"' + (p.category === c.key ? " selected" : "") + ">" + c.label + "</option>";
+      }).join("");
+
+      var specsText = Array.isArray(p.specs) ? p.specs.join("\n") : "";
+
+      var el = document.createElement("div");
+      el.className = "imp-product";
+      el.dataset.idx = idx;
+      el.innerHTML =
+        '<div class="imp-product-head">' +
+          '<strong>' + esc(p.name || "—") + '</strong>' +
+          '<span class="badge">' + esc(p.brand || "?") + '</span>' +
+        '</div>' +
+        '<div class="imp-fields">' +
+          '<div class="imp-field full"><label>ชื่อสินค้า</label><input data-field="name" value="' + esc(p.name) + '"></div>' +
+          '<div class="imp-field"><label>แบรนด์</label><input data-field="brand" value="' + esc(p.brand) + '"></div>' +
+          '<div class="imp-field"><label>รหัส SKU</label><input data-field="sku" value="' + esc(p.sku) + '"></div>' +
+          '<div class="imp-field"><label>หมวดหมู่</label><select data-field="category">' + catOpts + '</select></div>' +
+          '<div class="imp-field"><label>ระบบมอเตอร์</label><input data-field="motorType" value="' + esc(p.motorType) + '"></div>' +
+          '<div class="imp-field"><label>การรับประกัน (ปี)</label><input data-field="warrantyYears" type="number" min="0" value="' + (p.warrantyYears||0) + '"></div>' +
+          '<div class="imp-field"><label>ราคาขาย (บาท)</label><input data-field="price" type="number" min="0" value="' + (p.price||0) + '"></div>' +
+          '<div class="imp-field"><label>ค่าเช่า/วัน (บาท)</label><input data-field="rentPerDay" type="number" min="0" value="' + (p.rentPerDay||0) + '"></div>' +
+          '<div class="imp-field"><label>ขนาดจัดส่ง</label><input data-field="shipSize" value="' + esc(p.shipSize) + '"></div>' +
+          '<div class="imp-field full"><label>รายละเอียด</label><textarea data-field="desc">' + esc(p.desc) + '</textarea></div>' +
+          '<div class="imp-field full"><label>สเปค (1 รายการต่อ 1 บรรทัด)</label><textarea data-field="specs" rows="4">' + esc(specsText) + '</textarea></div>' +
+        '</div>' +
+        '<div class="imp-product-footer">' +
+          '<button class="imp-btn" data-save-product>💾 บันทึกสินค้านี้</button>' +
+          '<button class="imp-btn imp-btn-ghost" data-skip-product>ข้าม</button>' +
+          '<span class="imp-status" data-save-status></span>' +
+        '</div>';
+
+      el.querySelector("[data-save-product]").addEventListener("click", function() {
+        var btn = el.querySelector("[data-save-product]");
+        var status = el.querySelector("[data-save-status]");
+        function fv(f) { var i = el.querySelector("[data-field=" + f + "]"); return i ? i.value.trim() : ""; }
+        var name = fv("name");
+        if (!name) { status.textContent = "❌ กรุณากรอกชื่อสินค้า"; return; }
+        var specsRaw = fv("specs");
+        var specs = specsRaw ? specsRaw.split("\n").map(function(s){return s.trim();}).filter(Boolean) : [];
+        var data = {
+          name: name,
+          brand: fv("brand") || "—",
+          sku: fv("sku") || S.genId("SKU"),
+          category: fv("category") || "power",
+          motorType: fv("motorType") || "—",
+          warrantyYears: +fv("warrantyYears") || 0,
+          price: +fv("price") || 0,
+          rentPerDay: +fv("rentPerDay") || 0,
+          shipSize: fv("shipSize"),
+          desc: fv("desc"),
+          specs: specs,
+          stock: 0, rented: 0, cost: 0,
+          forSale: true, forRent: false,
+          icon: "tool", location: "ยังไม่ระบุ",
+          images: [], image: "",
+        };
+        try {
+          S.saveProduct(data);
+          status.textContent = "✅ บันทึกแล้ว";
+          btn.disabled = true;
+          el.style.opacity = "0.55";
+        } catch(e) {
+          status.textContent = "❌ " + (e.message || "บันทึกไม่สำเร็จ");
+        }
+      });
+
+      el.querySelector("[data-skip-product]").addEventListener("click", function() {
+        el.remove();
+        if (!resultsList.children.length) {
+          resultsWrap.style.display = "none";
+          setAlert("ข้ามทั้งหมดแล้ว", "ok");
+        }
+      });
+
+      return el;
+    }
+
+    function showResults(products, sourceLabel) {
+      resultsList.innerHTML = "";
+      if (!products || !products.length) {
+        resultsWrap.style.display = "none";
+        setAlert("ไม่พบข้อมูลสินค้าในแหล่งนี้ — ลองเว็บอื่นหรือวางข้อความดิบแทน", "err");
+        return;
+      }
+      resultsTitle.textContent = "พบ " + products.length + " รายการ" + (sourceLabel ? " จาก " + sourceLabel : "");
+      products.forEach(function(p, i) { resultsList.appendChild(renderProduct(p, i)); });
+      resultsWrap.style.display = "block";
+      resultsWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+      setAlert("");
+    }
+
+    async function doFetch(url, text) {
+      logEl.innerHTML = "";
+      log("⏳ กำลังส่งข้อมูลให้ AI วิเคราะห์…");
+      var body = url ? { url: url } : { text: text };
+      var label = url ? url.replace(/^https?:\/\//, "").split("/")[0] : "ข้อความที่วางมา";
+      try {
+        var r = await fetch("/api/import-products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        var data = await r.json();
+        if (!data.ok) {
+          log("❌ Error: " + (data.message || data.error));
+          setAlert("ดึงข้อมูลไม่สำเร็จ: " + (data.message || data.error), "err");
+          return;
+        }
+        log("✅ AI พบ " + (data.products||[]).length + " รายการ");
+        showResults(data.products, label);
+      } catch(e) {
+        log("❌ " + (e.message || e));
+        setAlert("เกิดข้อผิดพลาด: " + (e.message || e), "err");
+      }
+    }
+
+    document.getElementById("fetchBtn").addEventListener("click", async function() {
+      var url = document.getElementById("urlInput").value.trim();
+      if (!url) { setAlert("กรุณากรอก URL ก่อน", "err"); return; }
+      if (!url.startsWith("http")) { setAlert("URL ต้องขึ้นต้นด้วย https://", "err"); return; }
+      this.disabled = true; this.textContent = "⏳ กำลังดึง…";
+      await doFetch(url, "");
+      this.disabled = false; this.textContent = "🔍 ดึงข้อมูล";
+    });
+
+    document.getElementById("parseBtn").addEventListener("click", async function() {
+      var text = document.getElementById("pasteInput").value.trim();
+      if (!text) { setAlert("กรุณาวางข้อมูลสินค้าก่อน", "err"); return; }
+      this.disabled = true; this.textContent = "⏳ AI กำลังวิเคราะห์…";
+      await doFetch("", text);
+      this.disabled = false; this.textContent = "✨ AI แยกข้อมูล";
+    });
+  })();
+  </script>
+</body>
+</html>

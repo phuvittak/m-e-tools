@@ -28,7 +28,11 @@ function unwrapFsValue(v) {
   return null;
 }
 
+let _cfgCache = null, _cfgAt = 0;
+const CFG_TTL = 5 * 60 * 1000;
+
 async function getBotConfig() {
+  if (_cfgCache && Date.now() - _cfgAt < CFG_TTL) return _cfgCache;
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_config/web_replies`;
   try {
     const r = await fetch(url);
@@ -36,7 +40,7 @@ async function getBotConfig() {
     const doc = await r.json();
     const fields = {};
     for (const k in doc.fields || {}) fields[k] = unwrapFsValue(doc.fields[k]);
-    return {
+    _cfgCache = {
       rentEnabled: typeof fields.rentEnabled === 'boolean' ? fields.rentEnabled : true,
       greeting: String(fields.greeting || ''),
       fallback: String(fields.fallback || ''),
@@ -45,7 +49,9 @@ async function getBotConfig() {
         answer: String(r?.answer || ''),
       })).filter((r) => r.keywords.length && r.answer) : [],
     };
-  } catch { return { rentEnabled: true, greeting: '', fallback: '', rules: [] }; }
+    _cfgAt = Date.now();
+    return _cfgCache;
+  } catch { return _cfgCache || { rentEnabled: true, greeting: '', fallback: '', rules: [] }; }
 }
 
 async function getSession(userId) {

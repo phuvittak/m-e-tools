@@ -231,23 +231,40 @@
 
   /* ===================== SHOP ===================== */
   function initShop() {
-    var state = { q: U.qp("q") || "", cats: U.qp("cat") ? [U.qp("cat")] : [], brands: U.qp("brand") ? [U.qp("brand")] : [], mode: U.qp("mode") || "all", sort: "default" };
+    var state = { q: U.qp("q") || "", cats: U.qp("cat") ? [U.qp("cat")] : [], brands: U.qp("brand") ? [U.qp("brand")] : [], mode: U.qp("mode") || "all", sort: "default", priceMin: 0, priceMax: 0, inStock: false };
 
+    var products = S.getProducts();
     var fbox = document.querySelector("[data-filters]");
-    var brands = uniq(S.getProducts().map(function (p) { return p.brand; }));
+    var allBrands = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
+    var catCounts = {};
+    products.forEach(function (p) { catCounts[p.category] = (catCounts[p.category] || 0) + 1; });
+
     fbox.innerHTML =
       "<h3>ตัวกรอง</h3>" +
+      '<div class="filter-group"><span class="lbl">ช่วงราคา (บาท)</span>' +
+      '<div class="price-range-row">' +
+      '<input type="number" min="0" step="100" placeholder="ต่ำสุด" data-pmin class="price-inp"> –' +
+      '<input type="number" min="0" step="100" placeholder="สูงสุด" data-pmax class="price-inp">' +
+      '</div></div>' +
+      '<div class="filter-group">' +
+      '<label class="check"><input type="checkbox" data-f="instock"> เฉพาะมีสต็อก</label></div>' +
       '<div class="filter-group"><span class="lbl">ประเภทสินค้า</span>' +
       S.CATEGORIES.map(function (c) {
-        return '<label class="check"><input type="checkbox" data-f="cat" value="' + c.key + '"' + (state.cats.indexOf(c.key) >= 0 ? " checked" : "") + "> " + c.label + "</label>";
+        var n = catCounts[c.key] || 0;
+        return '<label class="check"><input type="checkbox" data-f="cat" value="' + c.key + '"' + (state.cats.indexOf(c.key) >= 0 ? " checked" : "") + '> ' + c.label + ' <span class="filter-count">(' + n + ')</span></label>';
       }).join("") + "</div>" +
       '<div class="filter-group"><span class="lbl">แบรนด์</span>' +
-      brands.map(function (b) { return '<label class="check"><input type="checkbox" data-f="brand" value="' + b + '"' + (state.brands.indexOf(b) >= 0 ? " checked" : "") + "> " + b + "</label>"; }).join("") + "</div>" +
+      allBrands.map(function (b) { return '<label class="check"><input type="checkbox" data-f="brand" value="' + b + '"' + (state.brands.indexOf(b) >= 0 ? " checked" : "") + '> ' + b + '</label>'; }).join("") + "</div>" +
       '<div class="filter-group"><span class="lbl">รูปแบบ</span>' +
       '<label class="check"><input type="radio" name="mode" data-f="mode" value="all" checked> ทั้งหมด</label>' +
       '<label class="check"><input type="radio" name="mode" data-f="mode" value="buy"> ซื้อสินค้า</label>' +
       '<label class="check" data-rent-only><input type="radio" name="mode" data-f="mode" value="rent"> เช่าสินค้า</label></div>' +
       '<button class="me-btn me-btn-ghost me-btn-sm" data-clear>ล้างตัวกรอง</button>';
+
+    var pminEl = fbox.querySelector("[data-pmin]");
+    var pmaxEl = fbox.querySelector("[data-pmax]");
+    pminEl.addEventListener("input", function () { state.priceMin = parseInt(pminEl.value, 10) || 0; render(); });
+    pmaxEl.addEventListener("input", function () { state.priceMax = parseInt(pmaxEl.value, 10) || 0; render(); });
 
     var sinput = document.querySelector("[data-q]");
     if (sinput) { sinput.value = state.q; sinput.addEventListener("input", function () { state.q = sinput.value.trim(); render(); }); }
@@ -259,11 +276,14 @@
       if (f === "cat") state.cats = checkedValues(fbox, "cat");
       else if (f === "brand") state.brands = checkedValues(fbox, "brand");
       else if (f === "mode") state.mode = e.target.value;
+      else if (f === "instock") state.inStock = e.target.checked;
       render();
     });
     fbox.querySelector("[data-clear]").addEventListener("click", function () {
-      state.q = ""; state.cats = []; state.brands = []; state.mode = "all"; state.sort = "default";
+      state.q = ""; state.cats = []; state.brands = []; state.mode = "all"; state.sort = "default"; state.priceMin = 0; state.priceMax = 0; state.inStock = false;
       if (sinput) sinput.value = "";
+      if (pminEl) pminEl.value = "";
+      if (pmaxEl) pmaxEl.value = "";
       fbox.querySelectorAll("input[type=checkbox]").forEach(function (c) { c.checked = false; });
       var allRadio = fbox.querySelector("input[value=all]"); if (allRadio) allRadio.checked = true;
       if (sortSel) sortSel.value = "default";
@@ -277,10 +297,16 @@
         if (state.brands.length && state.brands.indexOf(p.brand) < 0) return false;
         if (state.mode === "buy" && !p.forSale) return false;
         if (state.mode === "rent" && !p.forRent) return false;
+        if (state.inStock && S.available(p) <= 0) return false;
+        if (state.priceMin || state.priceMax) {
+          var effPrice = state.mode === "rent" ? (p.rentPerDay || p.price || 0) : (p.price || p.rentPerDay || 0);
+          if (state.priceMin && effPrice < state.priceMin) return false;
+          if (state.priceMax && effPrice > state.priceMax) return false;
+        }
         return true;
       });
-      if (state.sort === "price-asc") list.sort(function (a, b) { return a.price - b.price; });
-      else if (state.sort === "price-desc") list.sort(function (a, b) { return b.price - a.price; });
+      if (state.sort === "price-asc") list.sort(function (a, b) { return (a.price || a.rentPerDay || 0) - (b.price || b.rentPerDay || 0); });
+      else if (state.sort === "price-desc") list.sort(function (a, b) { return (b.price || b.rentPerDay || 0) - (a.price || a.rentPerDay || 0); });
       else if (state.sort === "name") list.sort(function (a, b) { return a.name.localeCompare(b.name, "th"); });
 
       var grid = document.querySelector("[data-cards]");
