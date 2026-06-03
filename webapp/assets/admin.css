@@ -156,6 +156,7 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
 .row-edit { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-3); flex-wrap: wrap; }
 .row-edit:last-child { border-bottom: none; }
 .row-edit input, .row-edit select { font-family: var(--font-body); font-size: 14px; padding: 8px 10px; border: 2px solid var(--ink); }
+.row-edit.is-hidden, .faq-edit.is-hidden { opacity: .55; }
 .perm-grid { display: flex; gap: 16px 22px; flex-wrap: wrap; padding: 4px 0; }
 .perm-grid .f-check { font-size: 14px; }
 

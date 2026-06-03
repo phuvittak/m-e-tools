@@ -1664,49 +1664,56 @@
     root.querySelector("[data-qrclear]").addEventListener("click", function () { pendingQR = ""; drawQR(); });
 
     // FAQ editor
-    var faq = (st.faq || []).map(function (f) { return { q: f.q, a: f.a }; });
+    var faq = (st.faq || []).map(function (f) { return { q: f.q, a: f.a, hidden: !!f.hidden }; });
     var faqList = root.querySelector("[data-faqlist]");
     function syncFaq() {
       faqList.querySelectorAll("[data-fq]").forEach(function (i) { faq[+i.dataset.fq].q = i.value; });
       faqList.querySelectorAll("[data-fa]").forEach(function (t) { faq[+t.dataset.fa].a = t.value; });
+      faqList.querySelectorAll("[data-fh]").forEach(function (i) { faq[+i.dataset.fh].hidden = i.checked; });
     }
     function renderFaq() {
       faqList.innerHTML = faq.map(function (f, i) {
-        return '<div class="faq-edit"><div style="display:flex;flex-direction:column;gap:8px;flex:1">' +
+        return '<div class="faq-edit' + (f.hidden ? " is-hidden" : "") + '"><div style="display:flex;flex-direction:column;gap:8px;flex:1">' +
           '<input data-fq="' + i + '" value="' + esc(f.q) + '" placeholder="คำถาม">' +
           '<textarea data-fa="' + i + '" rows="2" placeholder="คำตอบ">' + esc(f.a) + "</textarea></div>" +
-          '<button class="btn btn-sm btn-danger" data-fdel="' + i + '">ลบ</button></div>';
+          '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">' +
+          '<label class="f-check" style="white-space:nowrap"><input type="checkbox" data-fh="' + i + '"' + (f.hidden ? " checked" : "") + "> ซ่อน</label>" +
+          '<button class="btn btn-sm btn-danger" data-fdel="' + i + '">ลบ</button></div></div>';
       }).join("");
       faqList.querySelectorAll("[data-fq]").forEach(function (i) { i.onchange = function () { faq[+i.dataset.fq].q = i.value; }; });
       faqList.querySelectorAll("[data-fa]").forEach(function (t) { t.onchange = function () { faq[+t.dataset.fa].a = t.value; }; });
+      faqList.querySelectorAll("[data-fh]").forEach(function (i) { i.onchange = function () { syncFaq(); renderFaq(); }; });
       faqList.querySelectorAll("[data-fdel]").forEach(function (b) { b.onclick = function () { syncFaq(); faq.splice(+b.dataset.fdel, 1); renderFaq(); }; });
     }
     renderFaq();
-    root.querySelector("[data-faqadd]").addEventListener("click", function () { syncFaq(); faq.push({ q: "", a: "" }); renderFaq(); });
+    root.querySelector("[data-faqadd]").addEventListener("click", function () { syncFaq(); faq.push({ q: "", a: "", hidden: false }); renderFaq(); });
 
     // ----- Brands editor -----
-    var brands = (st.brands || []).map(function (b) { return { name: b.name, tag: b.tag, primary: !!b.primary }; });
+    var brands = (st.brands || []).map(function (b) { return { name: b.name, tag: b.tag, primary: !!b.primary, hidden: !!b.hidden }; });
     var brandList = root.querySelector("[data-brandlist]");
     function syncBrands() {
       if (!brandList) return;
       brandList.querySelectorAll("[data-bn]").forEach(function (i) { brands[+i.dataset.bn].name = i.value; });
       brandList.querySelectorAll("[data-bt]").forEach(function (i) { brands[+i.dataset.bt].tag = i.value; });
       brandList.querySelectorAll("[data-bp]").forEach(function (i) { brands[+i.dataset.bp].primary = i.checked; });
+      brandList.querySelectorAll("[data-bh]").forEach(function (i) { brands[+i.dataset.bh].hidden = i.checked; });
     }
     var _dragSrcIdx = null;
     function renderBrands() {
       if (!brandList) return;
       brandList.innerHTML = brands.map(function (b, i) {
-        return '<div class="row-edit" draggable="true" data-brow="' + i + '" style="cursor:grab">' +
+        return '<div class="row-edit' + (b.hidden ? " is-hidden" : "") + '" draggable="true" data-brow="' + i + '" style="cursor:grab">' +
           '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 6px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
           '<input data-bn="' + i + '" value="' + esc(b.name) + '" placeholder="ชื่อแบรนด์" style="flex:1">' +
           '<input data-bt="' + i + '" value="' + esc(b.tag || "") + '" placeholder="คำอธิบายสั้น" style="flex:1.4">' +
           '<label class="f-check"><input type="checkbox" data-bp="' + i + '"' + (b.primary ? " checked" : "") + "> เด่น</label>" +
+          '<label class="f-check"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อน</label>" +
           '<button class="btn btn-sm btn-danger" data-bdel="' + i + '">ลบ</button></div>';
       }).join("");
       brandList.querySelectorAll("[data-bdel]").forEach(function (b) {
         b.onclick = function () { syncBrands(); brands.splice(+b.dataset.bdel, 1); renderBrands(); };
       });
+      brandList.querySelectorAll("[data-bh]").forEach(function (i) { i.onchange = function () { syncBrands(); renderBrands(); }; });
       // drag-and-drop reorder
       brandList.querySelectorAll("[data-brow]").forEach(function (row) {
         row.addEventListener("dragstart", function (e) {
@@ -1730,7 +1737,7 @@
         });
       });
     }
-    if (brandList) { renderBrands(); root.querySelector("[data-brand-add]").addEventListener("click", function () { syncBrands(); brands.push({ name: "", tag: "", primary: false }); renderBrands(); }); }
+    if (brandList) { renderBrands(); root.querySelector("[data-brand-add]").addEventListener("click", function () { syncBrands(); brands.push({ name: "", tag: "", primary: false, hidden: false }); renderBrands(); }); }
 
     // ----- categories editor (rename / icon / image / reorder) -----
     var CAT_ICONS = ["drill", "driver", "saw", "grinder", "rotary", "battery", "charger", "measure", "wrench", "laser", "compressor", "box", "tool"];
@@ -1745,12 +1752,13 @@
       if (!catList) return;
       catList.querySelectorAll("[data-cn]").forEach(function (i) { cats[+i.dataset.cn].label = i.value; });
       catList.querySelectorAll("[data-ci]").forEach(function (i) { var c = cats[+i.dataset.ci]; if (!c.image) c.icon = i.value; });
+      catList.querySelectorAll("[data-ch]").forEach(function (i) { cats[+i.dataset.ch].hidden = i.checked; });
     }
     var _catDragIdx = null;
     function renderCats() {
       if (!catList) return;
       catList.innerHTML = cats.map(function (c, i) {
-        return '<div class="row-edit" draggable="true" data-crow="' + i + '" style="cursor:grab;align-items:center">' +
+        return '<div class="row-edit' + (c.hidden ? " is-hidden" : "") + '" draggable="true" data-crow="' + i + '" style="cursor:grab;align-items:center">' +
           '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 4px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
           '<span style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:var(--bg-1,#f5f5f5);border-radius:6px">' + catPreview(c) + "</span>" +
           '<input data-cn="' + i + '" value="' + esc(c.label) + '" placeholder="ชื่อหมวด" style="flex:1;min-width:110px">' +
@@ -1758,11 +1766,13 @@
             CAT_ICONS.map(function (ic) { return '<option value="' + ic + '"' + ((c.icon || "tool") === ic ? " selected" : "") + ">" + ic + "</option>"; }).join("") + "</select>" +
           '<label class="btn btn-sm" style="cursor:pointer;white-space:nowrap">⬆ รูป<input type="file" accept="image/*" data-cimg="' + i + '" style="display:none"></label>' +
           (c.image ? '<button type="button" class="btn btn-sm" data-cimgclr="' + i + '">ลบรูป</button>' : "") +
+          '<label class="f-check" style="white-space:nowrap"><input type="checkbox" data-ch="' + i + '"' + (c.hidden ? " checked" : "") + "> ซ่อน</label>" +
           '<button type="button" class="btn btn-sm btn-danger" data-cdel="' + i + '">ลบ</button></div>';
       }).join("");
       catList.querySelectorAll("[data-cdel]").forEach(function (b) { b.onclick = function () { syncCats(); cats.splice(+b.dataset.cdel, 1); renderCats(); }; });
       catList.querySelectorAll("[data-cimgclr]").forEach(function (b) { b.onclick = function () { syncCats(); cats[+b.dataset.cimgclr].image = ""; renderCats(); }; });
       catList.querySelectorAll("[data-ci]").forEach(function (sel) { sel.addEventListener("change", function () { syncCats(); renderCats(); }); });
+      catList.querySelectorAll("[data-ch]").forEach(function (chk) { chk.addEventListener("change", function () { syncCats(); renderCats(); }); });
       catList.querySelectorAll("[data-cimg]").forEach(function (inp) {
         inp.addEventListener("change", function (e) {
           var f = e.target.files && e.target.files[0]; if (!f) return;
@@ -1786,7 +1796,7 @@
         });
       });
     }
-    if (catList) { renderCats(); var catAddBtn = root.querySelector("[data-cat-add]"); if (catAddBtn) catAddBtn.addEventListener("click", function () { syncCats(); cats.push({ key: "c" + Date.now().toString(36), label: "", icon: "tool", image: "" }); renderCats(); }); }
+    if (catList) { renderCats(); var catAddBtn = root.querySelector("[data-cat-add]"); if (catAddBtn) catAddBtn.addEventListener("click", function () { syncCats(); cats.push({ key: "c" + Date.now().toString(36), label: "", icon: "tool", image: "", hidden: false }); renderCats(); }); }
 
     // ----- Promo banner -----
     var promo = Object.assign({ enabled: false, title: "", text: "", image: "" }, st.promo || {});
@@ -1838,7 +1848,7 @@
       var patch = {};
       simpleKeys.forEach(function (k) { var el = root.querySelector('[data-set="' + k + '"]'); patch[k] = el ? el.value : st[k]; });
       patch.phone = phones.map(function (p) { return p.trim(); }).filter(Boolean).join(", ");
-      patch.categories = cats.filter(function (c) { return (c.label || "").trim(); }).map(function (c) { return { key: c.key, label: c.label.trim(), icon: c.icon || "tool", image: c.image || "" }; });
+      patch.categories = cats.filter(function (c) { return (c.label || "").trim(); }).map(function (c) { return { key: c.key, label: c.label.trim(), icon: c.icon || "tool", image: c.image || "", hidden: !!c.hidden }; });
       if (openSunEl) patch.openSun = openSunEl.checked;
       patch.specialDays = sdays.filter(function (d) { return d.date; });
       patch.heroPhrases = phrasesEl.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);

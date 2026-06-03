@@ -465,10 +465,10 @@
     var st = getSettings();
     if (st && st.categories && st.categories.length) {
       return st.categories.map(function (c) {
-        return { key: c.key, label: c.label, icon: c.icon || defaultCatIcon(c.key), image: c.image || "" };
+        return { key: c.key, label: c.label, icon: c.icon || defaultCatIcon(c.key), image: c.image || "", hidden: !!c.hidden };
       });
     }
-    return CATEGORIES.map(function (c) { return { key: c.key, label: c.label, icon: defaultCatIcon(c.key), image: "" }; });
+    return CATEGORIES.map(function (c) { return { key: c.key, label: c.label, icon: defaultCatIcon(c.key), image: "", hidden: false }; });
   }
   function categoryLabel(key) {
     var cats = getCategories();

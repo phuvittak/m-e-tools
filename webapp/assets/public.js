@@ -189,7 +189,7 @@
     var box = document.querySelector("[data-cats]");
     if (box) {
       var products = S.getProducts().filter(function (p) { return !p.hidden; });
-      box.innerHTML = S.getCategories().map(function (c) {
+      box.innerHTML = S.getCategories().filter(function (c) { return !c.hidden; }).map(function (c) {
         var n = products.filter(function (p) { return p.category === c.key; }).length;
         var visual = c.image
           ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
@@ -210,7 +210,7 @@
     // FAQ accordion (editable in back office)
     var faqBox = document.querySelector("[data-faq]");
     if (faqBox) {
-      faqBox.innerHTML = (st.faq || []).map(function (f, i) {
+      faqBox.innerHTML = (st.faq || []).filter(function (f) { return !f.hidden; }).map(function (f, i) {
         return '<div class="faq-item"><button type="button" class="faq-q" data-faq-q="' + i + '"><span>' + esc(f.q) + '</span><span class="faq-ic">+</span></button>' +
           '<div class="faq-a">' + esc(f.a) + "</div></div>";
       }).join("");
@@ -239,9 +239,12 @@
     var products = S.getProducts().filter(function (p) { return !p.hidden; });
     var fbox = document.querySelector("[data-filters]");
     var productBrands = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
-    var brandOrder = (S.getSettings().brands || []).map(function (b) { return b.name; });
+    var settingBrands = S.getSettings().brands || [];
+    var hiddenBrands = settingBrands.filter(function (b) { return b.hidden; }).map(function (b) { return b.name; });
+    var brandOrder = settingBrands.map(function (b) { return b.name; });
     var allBrands = brandOrder.filter(function (b) { return productBrands.indexOf(b) >= 0; })
-      .concat(productBrands.filter(function (b) { return brandOrder.indexOf(b) < 0; }));
+      .concat(productBrands.filter(function (b) { return brandOrder.indexOf(b) < 0; }))
+      .filter(function (b) { return hiddenBrands.indexOf(b) < 0; });
     var catCounts = {};
     products.forEach(function (p) { catCounts[p.category] = (catCounts[p.category] || 0) + 1; });
 
@@ -255,7 +258,7 @@
       '<div class="filter-group">' +
       '<label class="check"><input type="checkbox" data-f="instock"> เฉพาะมีสต็อก</label></div>' +
       '<div class="filter-group"><span class="lbl">ประเภทสินค้า</span>' +
-      S.getCategories().map(function (c) {
+      S.getCategories().filter(function (c) { return !c.hidden; }).map(function (c) {
         var n = catCounts[c.key] || 0;
         return '<label class="check"><input type="checkbox" data-f="cat" value="' + c.key + '"' + (state.cats.indexOf(c.key) >= 0 ? " checked" : "") + '> ' + esc(c.label) + ' <span class="filter-count">(' + n + ')</span></label>';
       }).join("") + "</div>" +
@@ -825,7 +828,7 @@
   }
   function renderBrands(brands) {
     var box = document.querySelector("[data-brands]"); if (!box) return;
-    box.innerHTML = (brands || []).map(function (b) {
+    box.innerHTML = (brands || []).filter(function (b) { return !b.hidden; }).map(function (b) {
       return '<a class="me-brand-card' + (b.primary ? " is-primary" : "") + '" href="shop.html?brand=' + encodeURIComponent(b.name) + '">' +
         '<div class="me-brand-name">' + esc(b.name) + '</div><div class="me-brand-tag">' + esc(b.tag || "") + "</div>" +
         (b.primary ? '<div class="me-brand-stamp">ศูนย์แท้</div>' : "") + "</a>";
