@@ -736,25 +736,189 @@
 
   /* ===================== shared bits ===================== */
   /* ===================== CATALOG ===================== */
+  /* ---------- catalog: real in-house flipbook ---------- */
+  function catCoverHtml(st) {
+    var company = (st && st.company) || "M.E.Tools";
+    return '<div class="cat-page cat-cover">' +
+      '<div class="cat-cover-mark">M.E.TOOLS</div>' +
+      "<h2>แคตตาล็อกสินค้า</h2>" +
+      "<p>" + esc(company) + "</p>" +
+      "<p>เครื่องมือช่างคุณภาพ · ท่ารั้ว เชียงใหม่</p>" +
+      '<div class="cat-cover-hint">แตะหน้า หรือใช้ปุ่ม ‹ › เพื่อเปิดดู</div>' +
+      "</div>";
+  }
+  function catPageHtml(p, brand) {
+    var imgs = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
+    var main = imgs[0] || "";
+    var photo = main
+      ? '<div class="cat-card-photo" style="background-image:url(' + JSON.stringify(main) + ')"></div>'
+      : '<div class="cat-card-photo cat-card-photo-ph">' + U.iconSvg(p.icon || "tool", 64) + "</div>";
+    var inbox = imgs.slice(1, 6);
+    var inboxHtml = inbox.length
+      ? '<div class="cat-inbox-label">สินค้าภายในกล่อง</div><div class="cat-inbox">' +
+        inbox.map(function (im) { return '<span style="background-image:url(' + JSON.stringify(im) + ')"></span>'; }).join("") + "</div>"
+      : "";
+    var specs = (p.specs || []).filter(function (s) { return s && (s[0] || s[1]); }).slice(0, 7);
+    var specsHtml = specs.length
+      ? '<div class="cat-sec-label">รายละเอียดสินค้า</div><ul class="cat-specs">' +
+        specs.map(function (s) { return "<li>" + esc(s[0]) + (s[1] ? ": " + esc(s[1]) : "") + "</li>"; }).join("") + "</ul>"
+      : "";
+    var hl = (p.highlights || []).filter(Boolean).slice(0, 4);
+    var hlHtml = hl.length
+      ? '<div class="cat-sec-label">จุดเด่น</div><ul class="cat-highlights">' +
+        hl.map(function (h) { return "<li>" + esc(h) + "</li>"; }).join("") + "</ul>"
+      : "";
+    var rows = '<tr><th>รหัสสินค้า</th><td>' + esc(p.sku || "-") + "</td></tr>" +
+      "<tr><th>ราคา (SRP)</th><td>" + S.money(p.price || 0) + "</td></tr>";
+    if (p.priceCtrl) rows += '<tr><th>ราคาคุม</th><td class="ctrl">' + S.money(p.priceCtrl) + "</td></tr>";
+    if (p.qtyPerBox) rows += "<tr><th>จำนวน</th><td>" + esc(String(p.qtyPerBox)) + " ตัว</td></tr>";
+    return '<div class="cat-page">' +
+      '<div class="cat-brandbar">' + esc(brand || p.brand || "") + "</div>" +
+      '<div class="cat-page-body"><div class="cat-card">' +
+        '<div class="cat-card-head">' + esc(p.name || "") + "</div>" +
+        '<div class="cat-card-main">' + photo +
+          '<div class="cat-card-side">' + inboxHtml + specsHtml + "</div>" +
+        "</div>" +
+        hlHtml +
+        '<table class="cat-price">' + rows + "</table>" +
+      "</div></div>" +
+    "</div>";
+  }
   function initCatalog() {
-    var box = document.querySelector("[data-catalog]");
+    var box = document.querySelector("[data-book]");
     if (!box) return;
+    var st = S.getSettings();
     var products = S.getProducts().filter(function (p) { return !p.hidden; });
-    if (!products.length) { box.innerHTML = '<div class="catalog-empty">ยังไม่มีสินค้าในแคตตาล็อก</div>'; return; }
-    var brandOrder = (S.getSettings().brands || []).map(function (b) { return b.name; });
+
+    var brandOrder = (st.brands || []).filter(function (b) { return !b.hidden; }).map(function (b) { return b.name; });
     var present = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
     var brands = brandOrder.filter(function (b) { return present.indexOf(b) >= 0; })
       .concat(present.filter(function (b) { return brandOrder.indexOf(b) < 0; }));
-    box.innerHTML = brands.map(function (b) {
-      var items = products.filter(function (p) { return p.brand === b; });
-      if (!items.length) return "";
-      return '<section class="catalog-brand">' +
-        '<div class="catalog-brand-head"><h2>' + esc(b) + "</h2>" +
-        '<span class="catalog-brand-count">' + items.length + " รายการ</span></div>" +
-        '<div class="cards">' + items.map(cardHtml).join("") + "</div>" +
-        "</section>";
-    }).join("");
-    wireCards(box);
+
+    var ordered = [];
+    brands.forEach(function (b) {
+      products.filter(function (p) { return p.brand === b; }).forEach(function (p) { ordered.push({ p: p, b: b }); });
+    });
+    products.filter(function (p) { return brands.indexOf(p.brand) < 0; })
+      .forEach(function (p) { ordered.push({ p: p, b: p.brand || "สินค้า" }); });
+
+    if (!ordered.length) { box.innerHTML = '<div class="catalog-empty">ยังไม่มีสินค้าในแคตตาล็อก</div>'; return; }
+
+    var BLANK = '<div class="cat-page cat-blank"></div>';
+    var pages = [catCoverHtml(st)];
+    ordered.forEach(function (it) { pages.push(catPageHtml(it.p, it.b)); });
+    if (pages.length % 2 !== 0) pages.push(BLANK);
+
+    box.innerHTML =
+      '<div class="book"><div class="book-spread" data-spread>' +
+        '<div class="book-page book-left"><div class="book-page-inner" data-pleft></div></div>' +
+        '<div class="book-page book-right"><div class="book-page-inner" data-pright></div></div>' +
+      "</div></div>" +
+      '<div class="book-nav"><button type="button" data-prev aria-label="ก่อนหน้า">‹</button>' +
+        '<span class="book-pageno" data-pageno></span>' +
+        '<button type="button" data-next aria-label="ถัดไป">›</button></div>';
+
+    var spread = box.querySelector("[data-spread]");
+    var pleft = box.querySelector("[data-pleft]");
+    var pright = box.querySelector("[data-pright]");
+    var prevBtn = box.querySelector("[data-prev]");
+    var nextBtn = box.querySelector("[data-next]");
+    var pageno = box.querySelector("[data-pageno]");
+    var pos = 0, animating = false;
+
+    function perSpread() { return window.matchMedia("(max-width:760px)").matches ? 1 : 2; }
+    function renderStatic() {
+      if (perSpread() === 1) { pright.innerHTML = pages[pos] || BLANK; pleft.innerHTML = ""; }
+      else { pleft.innerHTML = pages[pos] || BLANK; pright.innerHTML = pages[pos + 1] || BLANK; }
+    }
+    function updateNav() {
+      var step = perSpread() === 1 ? 1 : 2;
+      prevBtn.disabled = pos <= 0;
+      nextBtn.disabled = pos + step >= pages.length;
+      if (perSpread() === 1) pageno.textContent = "หน้า " + (pos + 1) + " / " + pages.length;
+      else pageno.textContent = "หน้า " + (pos + 1) + "–" + Math.min(pos + 2, pages.length) + " / " + pages.length;
+    }
+    function makeLeaf(frontHtml, backHtml, left, width, origin) {
+      var leaf = document.createElement("div");
+      leaf.className = "book-leaf";
+      leaf.style.left = left; leaf.style.width = width; leaf.style.transformOrigin = origin;
+      var f = document.createElement("div"); f.className = "book-leaf-face"; f.innerHTML = frontHtml;
+      var bk = document.createElement("div"); bk.className = "book-leaf-face book-leaf-back"; bk.innerHTML = backHtml;
+      leaf.appendChild(f); leaf.appendChild(bk);
+      return leaf;
+    }
+    function onFlipEnd(leaf, cb) {
+      var done = false;
+      function fin() { if (done) return; done = true; leaf.removeEventListener("transitionend", fin); cb(); }
+      leaf.addEventListener("transitionend", fin);
+      setTimeout(fin, 950);
+    }
+    function runFlip(leaf, fromDeg, toDeg, after) {
+      leaf.style.transform = "rotateY(" + fromDeg + "deg)";
+      spread.appendChild(leaf);
+      leaf.getBoundingClientRect();
+      requestAnimationFrame(function () { requestAnimationFrame(function () { leaf.style.transform = "rotateY(" + toDeg + "deg)"; }); });
+      onFlipEnd(leaf, function () { if (leaf.parentNode) leaf.parentNode.removeChild(leaf); after(); });
+    }
+    function flipNext() {
+      if (animating) return;
+      var single = perSpread() === 1, step = single ? 1 : 2;
+      if (pos + step >= pages.length) return;
+      animating = true;
+      var leaf;
+      if (single) {
+        leaf = makeLeaf(pages[pos] || BLANK, pages[pos + 1] || BLANK, "0", "100%", "left center");
+        pright.innerHTML = pages[pos + 1] || BLANK;
+      } else {
+        leaf = makeLeaf(pages[pos + 1] || BLANK, pages[pos + 2] || BLANK, "50%", "50%", "left center");
+        pright.innerHTML = pages[pos + 3] || BLANK;
+      }
+      runFlip(leaf, 0, -180, function () { pos += step; renderStatic(); updateNav(); animating = false; });
+    }
+    function flipPrev() {
+      if (animating) return;
+      var single = perSpread() === 1, step = single ? 1 : 2;
+      if (pos - step < 0) return;
+      animating = true;
+      var leaf;
+      if (single) {
+        leaf = makeLeaf(pages[pos - 1] || BLANK, pages[pos] || BLANK, "0", "100%", "left center");
+        runFlip(leaf, -180, 0, function () { pos -= step; renderStatic(); updateNav(); animating = false; });
+      } else {
+        leaf = makeLeaf(pages[pos] || BLANK, pages[pos - 1] || BLANK, "0", "50%", "right center");
+        pleft.innerHTML = pages[pos - 2] || BLANK;
+        pright.innerHTML = pages[pos - 1] || BLANK;
+        runFlip(leaf, 0, 180, function () { pos -= step; renderStatic(); updateNav(); animating = false; });
+      }
+    }
+
+    prevBtn.addEventListener("click", flipPrev);
+    nextBtn.addEventListener("click", flipNext);
+    spread.addEventListener("click", function (e) {
+      if (e.target.closest && e.target.closest("a")) return;
+      var r = spread.getBoundingClientRect();
+      if ((e.clientX - r.left) > r.width / 2) flipNext(); else flipPrev();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") flipNext();
+      else if (e.key === "ArrowLeft") flipPrev();
+    });
+    var tx = 0;
+    spread.addEventListener("touchstart", function (e) { tx = e.changedTouches[0].clientX; }, { passive: true });
+    spread.addEventListener("touchend", function (e) {
+      var dx = e.changedTouches[0].clientX - tx;
+      if (dx < -40) flipNext(); else if (dx > 40) flipPrev();
+    }, { passive: true });
+    var rt;
+    window.addEventListener("resize", function () {
+      clearTimeout(rt);
+      rt = setTimeout(function () {
+        if (perSpread() === 2 && pos % 2 === 1) pos -= 1;
+        renderStatic(); updateNav();
+      }, 150);
+    });
+
+    renderStatic(); updateNav();
   }
 
   function cardHtml(p) {

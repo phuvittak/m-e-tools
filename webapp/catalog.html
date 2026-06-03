@@ -7,34 +7,85 @@
   <meta name="description" content="ดูแคตตาล็อกเครื่องมือช่าง M.E.Tools ครบทุกรุ่น DEWALT MAKITA BOSCH ท่ารั้ว เชียงใหม่">
   <link rel="stylesheet" href="assets/app.css">
   <style>
-    .catalog-wrap { display:flex; flex-direction:column; min-height:100vh }
-    .catalog-hero {
-      background:var(--ink,#0b0b0b); color:#fff; padding:28px 24px 20px;
-      text-align:center
+    :root { --cat-paper:#ffffff; --cat-red:#d11f26; --cat-ink:#15171c; }
+    .catalog-wrap { display:flex; flex-direction:column; min-height:100vh; background:#23262c }
+    .catalog-hero { background:var(--ink,#0b0b0b); color:#fff; padding:16px 20px 12px; text-align:center }
+    .catalog-hero h1 { margin:0 0 3px; font-size:clamp(17px,3.2vw,23px) }
+    .catalog-hero p { margin:0; color:rgba(255,255,255,.6); font-size:13px }
+
+    /* ---- book stage ---- */
+    .book-stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px 10px 10px }
+    .catalog-empty { text-align:center; padding:60px 20px; color:#bbb; font-size:15px }
+    .book { position:relative; width:min(1060px,97vw) }
+    .book-spread {
+      position:relative; display:flex; width:100%; aspect-ratio:1.52/1;
+      perspective:2600px; box-shadow:0 26px 60px rgba(0,0,0,.5); border-radius:3px; background:var(--cat-paper)
     }
-    .catalog-hero h1 { margin:0 0 6px; font-size:clamp(20px,4vw,28px) }
-    .catalog-hero p { margin:0; color:rgba(255,255,255,.65); font-size:14px }
-    .catalog-body { flex:1; padding:28px 24px 40px }
-    .catalog-brand { margin-bottom:34px }
-    .catalog-brand-head {
-      display:flex; align-items:baseline; gap:12px;
-      border-bottom:3px solid var(--ink,#0b0b0b); padding-bottom:8px; margin-bottom:18px
-    }
-    .catalog-brand-head h2 {
-      margin:0; font-size:clamp(18px,3vw,24px); font-family:var(--font-display,inherit);
-      text-transform:uppercase; letter-spacing:.02em
-    }
-    .catalog-brand-count { color:var(--fg-2,#666); font-size:13px; font-weight:600 }
-    .catalog-empty { text-align:center; padding:60px 20px; color:var(--fg-2,#666); font-size:15px }
-    .catalog-nav {
-      background:var(--ink,#0b0b0b); padding:12px 20px;
-      display:flex; justify-content:center; gap:16px; flex-wrap:wrap
-    }
-    .catalog-nav a {
-      color:var(--dw-yellow,#FFB81C); font-weight:600; font-size:14px;
-      text-decoration:none
-    }
+    .book-page { position:relative; width:50%; height:100%; background:var(--cat-paper); overflow:hidden; cursor:pointer }
+    .book-page.book-left  { border-radius:3px 0 0 3px; box-shadow:inset -22px 0 30px -22px rgba(0,0,0,.45) }
+    .book-page.book-right { border-radius:0 3px 3px 0; box-shadow:inset  22px 0 30px -22px rgba(0,0,0,.45) }
+    .book-page-inner { position:absolute; inset:0 }
+
+    /* ---- flipping leaf ---- */
+    .book-leaf { position:absolute; top:0; height:100%; transform-style:preserve-3d;
+      transition:transform .72s cubic-bezier(.34,.08,.2,1); z-index:30; will-change:transform }
+    .book-leaf-face { position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden;
+      background:var(--cat-paper); overflow:hidden }
+    .book-leaf-back { transform:rotateY(180deg) }
+
+    /* ---- nav ---- */
+    .book-nav { display:flex; align-items:center; gap:18px }
+    .book-nav button { background:var(--dw-yellow,#FFB81C); color:#111; border:none; width:46px; height:46px;
+      border-radius:50%; font-size:24px; line-height:1; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,.3) }
+    .book-nav button:disabled { opacity:.32; cursor:default; box-shadow:none }
+    .book-pageno { color:rgba(255,255,255,.85); font-size:13px; min-width:120px; text-align:center; font-family:var(--font-mono,monospace) }
+
+    /* ---- catalog page content ---- */
+    .cat-page { position:absolute; inset:0; display:flex; flex-direction:column; background:var(--cat-paper); color:var(--cat-ink) }
+    .cat-blank { background:var(--cat-paper) }
+    .cat-brandbar { background:var(--cat-red); color:#fff; font-weight:800; letter-spacing:.07em; text-transform:uppercase;
+      padding:8px 14px; font-size:clamp(13px,1.5vw,18px); display:flex; align-items:center; flex:0 0 auto }
+    .cat-page-body { flex:1; min-height:0; padding:clamp(10px,1.6vw,18px); display:flex }
+    .cat-card { flex:1; min-height:0; display:flex; flex-direction:column; gap:clamp(6px,1vw,10px) }
+    .cat-card-head { background:var(--cat-red); color:#fff; font-weight:700; line-height:1.25; border-radius:3px;
+      padding:6px 10px; font-size:clamp(11px,1.3vw,15px) }
+    .cat-card-main { display:flex; gap:clamp(8px,1.4vw,14px); align-items:flex-start }
+    .cat-card-photo { flex:0 0 44%; aspect-ratio:1/1; background:#f4f4f4 center/contain no-repeat;
+      border:1px solid #ececec; border-radius:5px }
+    .cat-card-photo-ph { display:flex; align-items:center; justify-content:center; color:#c9c9c9 }
+    .cat-card-side { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px }
+    .cat-sec-label, .cat-inbox-label { color:var(--cat-red); font-weight:800; font-size:clamp(10px,1.15vw,13px); margin-top:2px }
+    .cat-inbox { display:flex; flex-wrap:wrap; gap:5px }
+    .cat-inbox span { width:clamp(28px,3.4vw,40px); height:clamp(28px,3.4vw,40px); background:#f4f4f4 center/contain no-repeat;
+      border:1px solid #ececec; border-radius:4px }
+    .cat-specs, .cat-highlights { margin:0; padding:0; list-style:none; font-size:clamp(10px,1.12vw,13px); line-height:1.5 }
+    .cat-specs li, .cat-highlights li { position:relative; padding-left:13px }
+    .cat-specs li::before, .cat-highlights li::before { content:"•"; position:absolute; left:1px; color:var(--cat-red); font-weight:700 }
+    .cat-price { width:100%; border-collapse:collapse; margin-top:auto; font-size:clamp(10px,1.12vw,13px) }
+    .cat-price th { background:var(--cat-ink); color:#fff; font-weight:600; padding:5px 8px; text-align:left; white-space:nowrap }
+    .cat-price td { border:1px solid #e4e4e4; padding:5px 8px; font-weight:700 }
+    .cat-price td.ctrl { color:var(--cat-red) }
+
+    /* ---- cover ---- */
+    .cat-cover { align-items:center; justify-content:center; text-align:center; gap:12px; padding:24px;
+      background:radial-gradient(120% 120% at 50% 0%, #2a2d33 0%, #111317 70%); color:#fff }
+    .cat-cover-mark { font-family:var(--font-display,inherit); font-weight:900; letter-spacing:.18em; color:var(--dw-yellow,#FFB81C);
+      font-size:clamp(15px,2.2vw,22px) }
+    .cat-cover h2 { margin:0; font-size:clamp(22px,3.4vw,40px); font-family:var(--font-display,inherit) }
+    .cat-cover p { margin:0; color:rgba(255,255,255,.7); font-size:clamp(12px,1.5vw,15px) }
+    .cat-cover-hint { margin-top:10px; color:rgba(255,255,255,.5); font-size:12px }
+
+    /* ---- bottom links ---- */
+    .catalog-nav { background:var(--ink,#0b0b0b); padding:12px 20px; display:flex; justify-content:center; gap:16px; flex-wrap:wrap }
+    .catalog-nav a { color:var(--dw-yellow,#FFB81C); font-weight:600; font-size:14px; text-decoration:none }
     .catalog-nav a:hover { text-decoration:underline }
+
+    /* ---- mobile: single page ---- */
+    @media (max-width:760px) {
+      .book-spread { aspect-ratio:.74/1 }
+      .book-page.book-left { display:none }
+      .book-page.book-right { width:100% }
+    }
   </style>
 </head>
 <body data-page="catalog">
@@ -43,14 +94,12 @@
   <div class="catalog-wrap">
     <div class="catalog-hero">
       <h1>📖 แคตตาล็อกสินค้า M.E.Tools</h1>
-      <p>เครื่องมือช่างครบทุกรุ่น ทุกแบรนด์ — อัปเดตอัตโนมัติจากสต็อกร้าน</p>
+      <p>เปิดดูแบบหนังสือ — ครบทุกรุ่น ทุกแบรนด์ · อัปเดตอัตโนมัติจากสต็อกร้าน</p>
     </div>
 
-    <main class="catalog-body wrap">
-      <div data-catalog>
-        <div class="catalog-empty">กำลังโหลดแคตตาล็อก…</div>
-      </div>
-    </main>
+    <div class="book-stage" data-book>
+      <div class="catalog-empty">กำลังโหลดแคตตาล็อก…</div>
+    </div>
 
     <nav class="catalog-nav">
       <a href="shop.html">🛒 ดูสินค้าพร้อมราคา + ตัวกรอง</a>

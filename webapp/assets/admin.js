@@ -1307,9 +1307,11 @@
       '<div class="field"><label>ระบบมอเตอร์</label><input data-f="motorType" value="' + esc(p.motorType || "") + '" placeholder="ไร้แปรงถ่าน / มีแปรงถ่าน / —"></div></div>' +
       '<div class="field"><label>ขนาด/น้ำหนักสำหรับจัดส่ง</label><input data-f="shipSize" value="' + esc(p.shipSize || "") + '" placeholder="เช่น 32 × 9 × 24 ซม. · ~2 กก."></div>' +
       '<div class="f2"><div class="field"><label>ต้นทุน/ชิ้น (บาท)</label><input data-f="cost" type="number" min="0" value="' + p.cost + '"></div>' +
-      '<div class="field"><label>ราคาขาย (บาท)</label><input data-f="price" type="number" min="0" value="' + p.price + '"></div></div>' +
+      '<div class="field"><label>ราคาขาย / SRP (บาท)</label><input data-f="price" type="number" min="0" value="' + p.price + '"></div></div>' +
       '<div class="f2"><div class="field"><label>ค่าเช่า/วัน (บาท)</label><input data-f="rentPerDay" type="number" min="0" value="' + p.rentPerDay + '"></div>' +
       '<div class="field"><label>จำนวนในสต็อก</label><input data-f="stock" type="number" min="0" value="' + p.stock + '"></div></div>' +
+      '<div class="f2"><div class="field"><label>ราคาคุม (บาท · โชว์ในแคตตาล็อก · 0 = ไม่โชว์)</label><input data-f="priceCtrl" type="number" min="0" value="' + (p.priceCtrl || 0) + '"></div>' +
+      '<div class="field"><label>จำนวน/กล่อง (โชว์ในแคตตาล็อก · 0 = ไม่โชว์)</label><input data-f="qtyPerBox" type="number" min="0" value="' + (p.qtyPerBox || 0) + '"></div></div>' +
       '<div class="f-check"><label><input type="checkbox" data-f="forSale"' + (p.forSale ? " checked" : "") + "> ขายขาด</label>" +
         '<label><input type="checkbox" data-f="forRent"' + (p.forRent ? " checked" : "") + '> ให้เช่า</label>' +
         '<label><input type="checkbox" data-f="hidden"' + (p.hidden ? " checked" : "") + '> <span style="color:#c00">ซ่อนจากร้านค้า</span></label></div>' +
@@ -1317,6 +1319,8 @@
         '<div data-specrows></div>' +
         '<button type="button" class="btn btn-ghost btn-sm" data-addspec style="margin-top:6px">+ เพิ่มสเปค</button>' +
       '</div>' +
+      '<div class="field"><label>จุดเด่น (พิมพ์ 1 ข้อ / 1 บรรทัด · โชว์ในแคตตาล็อก)</label>' +
+        '<textarea data-f="highlights" rows="3" placeholder="เช่น ใช้งานง่าย ปรับแรงบิดได้ · น้ำหนักเบา จับถนัดมือ (1 ข้อต่อบรรทัด)">' + esc((p.highlights || []).join("\n")) + '</textarea></div>' +
       '<div class="field"><label>รายละเอียด</label>' +
       '<div style="display:flex;gap:8px;align-items:flex-start">' +
         '<textarea data-f="desc" rows="4" style="flex:1">' + esc(p.desc) + '</textarea>' +
@@ -1342,6 +1346,8 @@
         stock: +val("stock") || 0, forSale: chk("forSale"), forRent: chk("forRent"), hidden: chk("hidden"),
         desc: val("desc").trim(), specs: savedSpecs, rented: p.rented || 0,
         warrantyYears: +val("warrantyYears") || 0, motorType: val("motorType").trim() || "—", shipSize: val("shipSize").trim(),
+        priceCtrl: +val("priceCtrl") || 0, qtyPerBox: +val("qtyPerBox") || 0,
+        highlights: val("highlights").split("\n").map(function (s) { return s.trim(); }).filter(Boolean),
       };
       if (owner) { data.images = pendingImages.slice(); data.image = pendingImages[0] || ""; }
       else { data.images = p.images || []; data.image = p.image || ""; }
