@@ -378,6 +378,9 @@ body.no-rent .tile-badge.both,
 body.no-rent [data-rent-only],
 body.no-rent .chip.rent { display: none !important; }
 body.no-rent .tile-rent { display: none !important; }
+body.no-rent .mode-toggle { grid-template-columns: 1fr !important; }
+body.no-rent .mode-toggle [data-mode="rent"] { display: none !important; }
+body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 
 /* ---------- toast ---------- */
 /* ---------- chat widget ---------- */
@@ -484,6 +487,7 @@ body.no-rent .tile-rent { display: none !important; }
 .me-footer-row svg { stroke: var(--dw-yellow); flex: 0 0 auto; margin-top: 2px; }
 .me-footer-row a { color: var(--concrete-200); text-decoration: none; }
 .me-footer-row a:hover { color: var(--dw-yellow); background: transparent; }
+.me-phone-lbl { font-size: 11px; font-weight: 700; color: var(--dw-yellow); text-transform: uppercase; letter-spacing: .04em; line-height: 1.6; white-space: nowrap; }
 .me-socials { display: flex; gap: 10px; margin-top: 16px; }
 .me-soc { width: 40px; height: 40px; display: grid; place-items: center; background: var(--ink-soft); border: 2px solid var(--concrete-700); color: var(--paper); text-decoration: none; transition: all 140ms cubic-bezier(.2,.8,.2,1); }
 .me-soc:hover { background: var(--dw-yellow); color: var(--ink); border-color: var(--dw-yellow); transform: translateY(-2px); }

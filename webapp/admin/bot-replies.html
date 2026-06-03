@@ -45,13 +45,14 @@
 
       <div class="alert" data-alert style="display:none"></div>
 
-      <div class="br-section">
-        <h2>บริการของร้าน</h2>
-        <div class="sub">ปิดบริการที่ไม่มี — ระบบจะซ่อนทุกที่ที่กล่าวถึงบริการนั้น (ทั้งบอท LINE, rich menu, หน้าเว็บ)</div>
-        <label style="display:flex; align-items:center; gap:10px; font-family:var(--font-body); font-size:14px; cursor:pointer">
-          <input type="checkbox" data-feat-rent style="width:18px; height:18px; cursor:pointer">
-          <span><b>บริการเช่ารายวัน</b> — ถ้าร้านคุณไม่มีให้เช่า ปิดสวิตช์นี้ ระบบจะไม่พูดถึง "เช่า" ที่ไหนเลย</span>
-        </label>
+      <div class="br-section" style="border:2px solid var(--accent,#FFB81C)">
+        <h2 style="font-size:18px">⚡ ระบบเช่าสินค้า (เปิด/ปิดทั้งร้าน)</h2>
+        <div class="sub">เมื่อ <b>ปิด</b> — ปุ่มเช่า, ราคาเช่า, และคำว่า "เช่า" จะหายไปจากทุกหน้าทันที ลูกค้าจะไม่เห็นเลย ปุ่มซื้อสินค้าจะขยายเต็มช่อง</div>
+        <input type="checkbox" data-feat-rent style="display:none">
+        <div style="margin-top:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <button type="button" data-rent-toggle-btn style="font-size:16px;font-weight:800;padding:13px 36px;border-radius:10px;border:2px solid #000;cursor:pointer;min-width:200px;transition:background .2s">กำลังโหลด…</button>
+          <span style="font-size:13px;color:var(--fg-2)" data-rent-toggle-hint></span>
+        </div>
       </div>
 
       <div class="br-section">

@@ -292,6 +292,7 @@
 
     function render() {
       var list = S.getProducts().filter(function (p) {
+        if (p.hidden) return false;
         if (state.q) { var hay = (p.name + " " + p.brand + " " + p.sku + " " + S.categoryLabel(p.category)).toLowerCase(); if (hay.indexOf(state.q.toLowerCase()) < 0) return false; }
         if (state.cats.length && state.cats.indexOf(p.category) < 0) return false;
         if (state.brands.length && state.brands.indexOf(p.brand) < 0) return false;

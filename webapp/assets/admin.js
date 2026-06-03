@@ -172,9 +172,9 @@
         "<thead><tr><th>สินค้า</th><th>หมวด</th><th class=num>คงเหลือ</th><th class=num>เช่าอยู่</th><th>ที่จัดเก็บ</th><th class=num>ต้นทุน</th><th class=num>ราคาขาย</th><th class=num>เช่า/วัน</th><th>จัดการ</th></tr></thead><tbody>" +
         list.map(function (p) {
           var av = S.available(p);
-          return "<tr>" +
+          return "<tr" + (p.hidden ? ' style="opacity:.45"' : "") + ">" +
             '<td><div class="prod-cell">' + miniVisual(p) +
-              '<div><div class="prod-name">' + p.name + '</div><div class="prod-sku">' + p.sku + " · " + p.brand + " · " + saleRent(p) + "</div></div></div></td>" +
+              '<div><div class="prod-name">' + p.name + (p.hidden ? ' <span style="font-size:11px;color:#c00;font-weight:700">[ซ่อน]</span>' : "") + '</div><div class="prod-sku">' + p.sku + " · " + p.brand + " · " + saleRent(p) + "</div></div></div></td>" +
             "<td>" + S.categoryLabel(p.category) + "</td>" +
             '<td class="num"><span class="stock-n ' + (av <= 3 ? "low" : "") + '">' + av + "</span></td>" +
             '<td class="num"><span class="rented-n">' + (p.rented || 0) + "</span></td>" +
@@ -184,12 +184,14 @@
             '<td class="num">' + (p.forRent ? S.money(p.rentPerDay) : "—") + "</td>" +
             '<td><div class="row-actions">' +
               '<button class="btn btn-sm btn-ghost" data-edit="' + p.id + '">แก้ไข</button>' +
+              '<button class="btn btn-sm btn-ghost" data-hideprod="' + p.id + '">' + (p.hidden ? "แสดง" : "ซ่อน") + "</button>" +
               '<button class="btn btn-sm" data-restock="' + p.id + '">+สต็อก</button>' +
               '<button class="btn btn-sm btn-danger" data-del="' + p.id + '">ลบ</button>' +
             "</div></td></tr>";
         }).join("") + "</tbody>";
 
       tb.querySelectorAll("[data-edit]").forEach(function (b) { b.onclick = function () { openProductModal(S.getProduct(b.dataset.edit)); }; });
+      tb.querySelectorAll("[data-hideprod]").forEach(function (b) { b.onclick = function () { var pr = S.getProduct(b.dataset.hideprod); if (!pr) return; S.saveProduct(Object.assign({}, pr, { hidden: !pr.hidden })); U.toast(pr.hidden ? "แสดงสินค้าแล้ว" : "ซ่อนสินค้าแล้ว", "ok"); render(); }; });
       tb.querySelectorAll("[data-restock]").forEach(function (b) {
         b.onclick = function () {
           var n = prompt("เพิ่มสต็อกกี่ชิ้น? (ใส่จำนวนลบเพื่อหักออก)", "5");
@@ -898,9 +900,18 @@
       });
     }
 
-    function render() {
+    function updateRentBtn() {
+      var btn = document.querySelector("[data-rent-toggle-btn]");
+      var hint = document.querySelector("[data-rent-toggle-hint]");
       var rentCb = document.querySelector("[data-feat-rent]");
-      if (rentCb) rentCb.checked = !!state.config.rentEnabled;
+      var on = !!state.config.rentEnabled;
+      if (rentCb) rentCb.checked = on;
+      if (btn) { btn.textContent = on ? "✅ เปิดการเช่า — กดเพื่อปิด" : "🚫 ปิดการเช่า — กดเพื่อเปิด"; btn.style.background = on ? "var(--dw-yellow,#FFB81C)" : "#f0f0f0"; }
+      if (hint) hint.textContent = on ? "ลูกค้าจะเห็นปุ่มเช่าและราคาเช่าตามปกติ" : "ปุ่มซื้อสินค้าขยายเต็มช่อง — ไม่มีคำว่าเช่าที่ไหนเลย";
+    }
+
+    function render() {
+      updateRentBtn();
       greetingEl.value = state.config.greeting || "";
       fallbackEl.value = state.config.fallback || "";
       var rules = state.config.rules || [];
@@ -985,6 +996,14 @@
       render();
     });
     saveBtn.addEventListener("click", save);
+
+    var rentToggleBtn = document.querySelector("[data-rent-toggle-btn]");
+    if (rentToggleBtn) rentToggleBtn.addEventListener("click", function () {
+      collectFromDom();
+      state.config.rentEnabled = !state.config.rentEnabled;
+      updateRentBtn();
+      save();
+    });
 
     // ===== Web chat config (bot_config/web_replies) — แยกจาก LINE bot =====
     var webGreetingEl = document.querySelector("[data-web-greeting]");
@@ -1260,7 +1279,14 @@
 
   function openProductModal(p) {
     var isNew = !p;
-    p = p || { icon: "drill", category: "drill", brand: "DEWALT", forSale: true, forRent: true, stock: 0, rented: 0, cost: 0, price: 0, rentPerDay: 0, location: "", sku: "", name: "", desc: "", specs: [], images: [], warrantyYears: 1, motorType: "ไร้แปรงถ่าน (Brushless)", shipSize: "" };
+    p = p || { icon: "drill", category: "drill", brand: "DEWALT", forSale: true, forRent: true, stock: 0, rented: 0, cost: 0, price: 0, rentPerDay: 0, location: "", sku: "", name: "", desc: "", specs: [], images: [], warrantyYears: 1, motorType: "ไร้แปรงถ่าน (Brushless)", shipSize: "", hidden: false };
+    // mutable specs array (shared between spec-rows IIFE and AI-parse IIFE)
+    var specs = (p.specs || []).map(function (s) {
+      if (Array.isArray(s)) return { k: String(s[0] || ""), v: String(s[1] || "") };
+      if (s && typeof s === "object") return { k: String(s.label || s.k || ""), v: String(s.value || s.v || "") };
+      if (typeof s === "string") { var m = s.match(/^([^:：—\t]+)[:：—\t]\s*(.*)$/); return m ? { k: m[1].trim(), v: m[2].trim() } : { k: s, v: "" }; }
+      return { k: "", v: "" };
+    });
     var icons = ["drill", "driver", "saw", "grinder", "rotary", "battery", "charger", "measure", "wrench", "laser", "compressor", "box", "tool"];
     var owner = S.isOwner();
     var pendingImages = (p.images && p.images.length) ? p.images.slice() : (p.image ? [p.image] : []);
@@ -1285,11 +1311,16 @@
       '<div class="f2"><div class="field"><label>ค่าเช่า/วัน (บาท)</label><input data-f="rentPerDay" type="number" min="0" value="' + p.rentPerDay + '"></div>' +
       '<div class="field"><label>จำนวนในสต็อก</label><input data-f="stock" type="number" min="0" value="' + p.stock + '"></div></div>' +
       '<div class="f-check"><label><input type="checkbox" data-f="forSale"' + (p.forSale ? " checked" : "") + "> ขายขาด</label>" +
-        '<label><input type="checkbox" data-f="forRent"' + (p.forRent ? " checked" : "") + "> ให้เช่า</label></div>" +
+        '<label><input type="checkbox" data-f="forRent"' + (p.forRent ? " checked" : "") + "> ให้เช่า</label>' +
+        '<label><input type="checkbox" data-f="hidden"' + (p.hidden ? " checked" : "") + '> <span style="color:#c00">ซ่อนจากร้านค้า</span></label></div>' +
+      '<div class="field"><label>ข้อมูลจำเพาะ (สเปค)</label>' +
+        '<div data-specrows></div>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-addspec style="margin-top:6px">+ เพิ่มสเปค</button>' +
+      '</div>' +
       '<div class="field"><label>รายละเอียด</label>' +
       '<div style="display:flex;gap:8px;align-items:flex-start">' +
         '<textarea data-f="desc" rows="4" style="flex:1">' + esc(p.desc) + '</textarea>' +
-        '<button type="button" class="btn btn-ghost btn-sm" data-ai-parse style="white-space:nowrap;margin-top:2px" title="วางข้อมูลสินค้าดิบแล้วกดนี้ — AI จะแยกข้อมูลใส่ฟอร์มให้">✨ AI แยก</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-ai-parse style="white-space:nowrap;margin-top:2px" title="วางข้อมูลสินค้าดิบในช่อง รายละเอียด แล้วกด — AI จะแยกชื่อ, สเปค, แบรนด์ฯ ใส่ฟอร์มให้">✨ AI แยก</button>' +
       '</div>' +
       '<div class="img-hint">วางรายละเอียดสินค้าดิบในช่องแล้วกด "✨ AI แยก" — AI จะช่วยแยกชื่อ, สเปค, แบรนด์ฯ ให้อัตโนมัติ</div>' +
       '</div>';
@@ -1299,12 +1330,17 @@
       function chk(f) { var el = root.querySelector("[data-f=" + f + "]"); return el ? el.checked : false; }
       var name = val("name").trim();
       if (!name) { U.toast("กรุณากรอกชื่อสินค้า", "err"); return false; }
+      var savedSpecs = [];
+      root.querySelectorAll("[data-srow]").forEach(function (row) {
+        var k = row.querySelector("[data-sk]"); var v = row.querySelector("[data-sv]");
+        if (k && k.value.trim()) savedSpecs.push([k.value.trim(), v ? v.value.trim() : ""]);
+      });
       var data = {
         id: p.id, name: name, brand: val("brand").trim() || "—", sku: val("sku").trim() || S.genId("SKU"),
         category: val("category"), icon: val("icon"), location: val("location").trim() || "ยังไม่ระบุ",
         cost: +val("cost") || 0, price: +val("price") || 0, rentPerDay: +val("rentPerDay") || 0,
-        stock: +val("stock") || 0, forSale: chk("forSale"), forRent: chk("forRent"),
-        desc: val("desc").trim(), specs: p.specs || [], rented: p.rented || 0,
+        stock: +val("stock") || 0, forSale: chk("forSale"), forRent: chk("forRent"), hidden: chk("hidden"),
+        desc: val("desc").trim(), specs: savedSpecs, rented: p.rented || 0,
         warrantyYears: +val("warrantyYears") || 0, motorType: val("motorType").trim() || "—", shipSize: val("shipSize").trim(),
       };
       if (owner) { data.images = pendingImages.slice(); data.image = pendingImages[0] || ""; }
@@ -1316,10 +1352,36 @@
       return true;
     });
 
-    // wire AI parse button
+    // wire spec rows + AI parse (shared scope via outer `specs` variable)
     (function () {
       var modalEl = document.querySelector(".modal-bg");
       if (!modalEl) return;
+      var specRowsEl = modalEl.querySelector("[data-specrows]");
+      var addSpecBtn = modalEl.querySelector("[data-addspec]");
+
+      function renderSpecRows() {
+        if (!specRowsEl) return;
+        specRowsEl.innerHTML = specs.map(function (s, i) {
+          return '<div class="spec-row" data-srow="' + i + '">' +
+            '<input class="spec-k" data-sk="' + i + '" value="' + esc(s.k) + '" placeholder="รายการ เช่น แรงดัน">' +
+            '<input class="spec-v" data-sv="' + i + '" value="' + esc(s.v) + '" placeholder="ค่า เช่น 20V">' +
+            '<button type="button" class="btn btn-sm btn-danger" data-sdel="' + i + '">×</button></div>';
+        }).join("");
+        specRowsEl.querySelectorAll("[data-sdel]").forEach(function (b) {
+          b.onclick = function () { syncSpecRows(); specs.splice(+b.dataset.sdel, 1); renderSpecRows(); };
+        });
+      }
+      function syncSpecRows() {
+        if (!specRowsEl) return;
+        specRowsEl.querySelectorAll("[data-srow]").forEach(function (row) {
+          var i = +row.dataset.srow; if (!specs[i]) return;
+          var k = row.querySelector("[data-sk]"); if (k) specs[i].k = k.value;
+          var v = row.querySelector("[data-sv]"); if (v) specs[i].v = v.value;
+        });
+      }
+      renderSpecRows();
+      if (addSpecBtn) addSpecBtn.addEventListener("click", function () { syncSpecRows(); specs.push({ k: "", v: "" }); renderSpecRows(); });
+
       var parseBtn = modalEl.querySelector("[data-ai-parse]");
       if (!parseBtn) return;
       parseBtn.addEventListener("click", function () {
@@ -1335,7 +1397,7 @@
         }).then(function (r) { return r.json(); }).then(function (data) {
           parseBtn.disabled = false;
           parseBtn.textContent = "✨ AI แยก";
-          if (!data.ok || !data.parsed) { U.toast("AI แยกไม่สำเร็จ ลองอีกครั้ง", "err"); return; }
+          if (!data.ok || !data.parsed) { U.toast("AI แยกไม่สำเร็จ: " + (data.message || data.error || "ลองอีกครั้ง"), "err"); return; }
           var parsed = data.parsed;
           function setField(attr, val) {
             if (val === undefined || val === null || val === "") return;
@@ -1350,14 +1412,18 @@
           if (parsed.warrantyYears) setField("warrantyYears", parsed.warrantyYears);
           if (parsed.category) {
             var catEl = modalEl.querySelector("[data-f=category]");
-            if (catEl) {
-              var opt = catEl.querySelector('[value="' + parsed.category + '"]');
-              if (opt) catEl.value = parsed.category;
-            }
+            if (catEl) { var opt = catEl.querySelector('[value="' + parsed.category + '"]'); if (opt) catEl.value = parsed.category; }
           }
-          // build desc from desc + specs
-          var specText = Array.isArray(parsed.specs) && parsed.specs.length ? "\n\nสเปค:\n" + parsed.specs.map(function (s) { return "• " + s; }).join("\n") : "";
-          if (descEl) descEl.value = (parsed.desc || raw) + specText;
+          // populate spec rows from parsed.specs (replaces existing rows)
+          if (Array.isArray(parsed.specs) && parsed.specs.length) {
+            specs = parsed.specs.map(function (s) {
+              if (typeof s === "string") { var m = s.match(/^([^:：—\t]+)[:：—\t]\s*(.*)$/); return m ? { k: m[1].trim(), v: m[2].trim() } : { k: s, v: "" }; }
+              if (Array.isArray(s)) return { k: String(s[0] || ""), v: String(s[1] || "") };
+              return { k: String(s.label || s.k || s), v: String(s.value || s.v || "") };
+            });
+            renderSpecRows();
+          }
+          if (descEl && parsed.desc) descEl.value = parsed.desc;
           U.toast("AI แยกข้อมูลเรียบร้อย — ตรวจสอบแล้วกดบันทึก", "ok");
         }).catch(function () {
           parseBtn.disabled = false;
@@ -1555,7 +1621,7 @@
   function initSettings() {
     var st = S.getSettings();
     var root = document.querySelector("[data-setroot]");
-    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "phone", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "chatGreeting", "chatFallback", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
+    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "phone", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
     var openSunEl = root.querySelector("[data-open-sun]"); if (openSunEl) openSunEl.checked = st.openSun !== false;
     var sdays = (st.specialDays || []).map(function (d) { return { date: d.date, open: !!d.open, note: d.note || "" }; });
     var sdayList = root.querySelector("[data-sdaylist]");
@@ -1602,26 +1668,6 @@
     }
     renderFaq();
     root.querySelector("[data-faqadd]").addEventListener("click", function () { syncFaq(); faq.push({ q: "", a: "" }); renderFaq(); });
-
-    // ----- Chat rules editor -----
-    var chat = (st.chatRules || []).map(function (r) { return { keywords: r.keywords, answer: r.answer }; });
-    var chatList = root.querySelector("[data-chatlist]");
-    function syncChat() {
-      if (!chatList) return;
-      chatList.querySelectorAll("[data-ck]").forEach(function (i) { chat[+i.dataset.ck].keywords = i.value; });
-      chatList.querySelectorAll("[data-ca]").forEach(function (t) { chat[+t.dataset.ca].answer = t.value; });
-    }
-    function renderChat() {
-      if (!chatList) return;
-      chatList.innerHTML = chat.map(function (c, i) {
-        return '<div class="faq-edit"><div style="display:flex;flex-direction:column;gap:8px;flex:1">' +
-          '<input data-ck="' + i + '" value="' + esc(c.keywords || "") + '" placeholder="คำค้น เช่น เวลา, เปิด, กี่โมง">' +
-          '<textarea data-ca="' + i + '" rows="2" placeholder="คำตอบ">' + esc(c.answer || "") + "</textarea></div>" +
-          '<button class="btn btn-sm btn-danger" data-cdel="' + i + '">ลบ</button></div>';
-      }).join("");
-      chatList.querySelectorAll("[data-cdel]").forEach(function (b) { b.onclick = function () { syncChat(); chat.splice(+b.dataset.cdel, 1); renderChat(); }; });
-    }
-    if (chatList) { renderChat(); root.querySelector("[data-chatadd]").addEventListener("click", function () { syncChat(); chat.push({ keywords: "", answer: "" }); renderChat(); }); }
 
     // ----- Brands editor -----
     var brands = (st.brands || []).map(function (b) { return { name: b.name, tag: b.tag, primary: !!b.primary }; });
@@ -1717,14 +1763,13 @@
     }
 
     function doSave() {
-      syncFaq(); syncBrands(); syncFlashItems(); syncChat(); syncSdays();
+      syncFaq(); syncBrands(); syncFlashItems(); syncSdays();
       var patch = {};
       simpleKeys.forEach(function (k) { var el = root.querySelector('[data-set="' + k + '"]'); patch[k] = el ? el.value : st[k]; });
       if (openSunEl) patch.openSun = openSunEl.checked;
       patch.specialDays = sdays.filter(function (d) { return d.date; });
       patch.heroPhrases = phrasesEl.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
       patch.faq = faq.filter(function (f) { return (f.q || "").trim(); });
-      patch.chatRules = chat.filter(function (c) { return (c.keywords || "").trim() && (c.answer || "").trim(); });
       patch.qrImage = pendingQR;
       patch.brands = brands.filter(function (b) { return (b.name || "").trim(); });
       if (promoEnabled) patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image };
