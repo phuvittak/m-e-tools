@@ -1621,7 +1621,7 @@
   function initSettings() {
     var st = S.getSettings();
     var root = document.querySelector("[data-setroot]");
-    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "phone", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
+    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
     var openSunEl = root.querySelector("[data-open-sun]"); if (openSunEl) openSunEl.checked = st.openSun !== false;
     var sdays = (st.specialDays || []).map(function (d) { return { date: d.date, open: !!d.open, note: d.note || "" }; });
     var sdayList = root.querySelector("[data-sdaylist]");
@@ -1637,6 +1637,21 @@
       sdayList.querySelectorAll("[data-sd-del]").forEach(function (b) { b.onclick = function () { syncSdays(); sdays.splice(+b.dataset.sdDel, 1); renderSdays(); }; });
     }
     if (sdayList) { renderSdays(); root.querySelector("[data-sday-add]").addEventListener("click", function () { syncSdays(); sdays.push({ date: "", open: false, note: "" }); renderSdays(); }); }
+    var phoneRaw = String(st.phone || "");
+    var phones = (phoneRaw.match(/[0-9][0-9()+\-\s]{5,}[0-9]/g) || []).map(function (p) { return p.replace(/\s+/g, " ").trim(); }).filter(Boolean);
+    if (!phones.length && phoneRaw.trim()) phones = [phoneRaw.trim()];
+    var phoneList = root.querySelector("[data-phonelist]");
+    function syncPhones() { if (!phoneList) return; phones = []; phoneList.querySelectorAll("[data-ph-val]").forEach(function (el) { phones.push(el.value); }); }
+    function renderPhones() {
+      if (!phoneList) return;
+      var arr = phones.length ? phones : [""];
+      phoneList.innerHTML = arr.map(function (p, i) {
+        return '<div class="row-edit" data-ph="' + i + '" style="margin-bottom:6px"><input data-ph-val value="' + esc(p || "") + '" placeholder="เช่น 053-104699" style="flex:1">' +
+          '<button class="btn btn-sm btn-danger" data-ph-del="' + i + '">ลบ</button></div>';
+      }).join("");
+      phoneList.querySelectorAll("[data-ph-del]").forEach(function (b) { b.onclick = function () { syncPhones(); phones.splice(+b.dataset.phDel, 1); renderPhones(); }; });
+    }
+    if (phoneList) { renderPhones(); var phAddBtn = root.querySelector("[data-phone-add]"); if (phAddBtn) phAddBtn.addEventListener("click", function () { syncPhones(); phones.push(""); renderPhones(); }); }
     simpleKeys.forEach(function (k) { var el = root.querySelector('[data-set="' + k + '"]'); if (el) el.value = st[k] || ""; });
     var phrasesEl = root.querySelector('[data-set="heroPhrases"]'); if (phrasesEl) phrasesEl.value = (st.heroPhrases || []).join("\n");
 
@@ -1763,9 +1778,10 @@
     }
 
     function doSave() {
-      syncFaq(); syncBrands(); syncFlashItems(); syncSdays();
+      syncFaq(); syncBrands(); syncFlashItems(); syncSdays(); syncPhones();
       var patch = {};
       simpleKeys.forEach(function (k) { var el = root.querySelector('[data-set="' + k + '"]'); patch[k] = el ? el.value : st[k]; });
+      patch.phone = phones.map(function (p) { return p.trim(); }).filter(Boolean).join(", ");
       if (openSunEl) patch.openSun = openSunEl.checked;
       patch.specialDays = sdays.filter(function (d) { return d.date; });
       patch.heroPhrases = phrasesEl.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
