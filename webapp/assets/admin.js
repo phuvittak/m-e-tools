@@ -1311,7 +1311,7 @@
       '<div class="f2"><div class="field"><label>ค่าเช่า/วัน (บาท)</label><input data-f="rentPerDay" type="number" min="0" value="' + p.rentPerDay + '"></div>' +
       '<div class="field"><label>จำนวนในสต็อก</label><input data-f="stock" type="number" min="0" value="' + p.stock + '"></div></div>' +
       '<div class="f-check"><label><input type="checkbox" data-f="forSale"' + (p.forSale ? " checked" : "") + "> ขายขาด</label>" +
-        '<label><input type="checkbox" data-f="forRent"' + (p.forRent ? " checked" : "") + "> ให้เช่า</label>' +
+        '<label><input type="checkbox" data-f="forRent"' + (p.forRent ? " checked" : "") + '> ให้เช่า</label>' +
         '<label><input type="checkbox" data-f="hidden"' + (p.hidden ? " checked" : "") + '> <span style="color:#c00">ซ่อนจากร้านค้า</span></label></div>' +
       '<div class="field"><label>ข้อมูลจำเพาะ (สเปค)</label>' +
         '<div data-specrows></div>' +
