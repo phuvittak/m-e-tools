@@ -76,6 +76,7 @@
       '<nav class="me-header-nav">' +
       navLink("index.html", "หน้าแรก", active === "home") +
       navLink("shop.html", 'สินค้า<span data-rent-only> / เช่า-ซื้อ</span>', active === "shop") +
+      navLink("catalog.html", "แคตตาล็อก", active === "catalog") +
       navLink("orders.html", "ติดตามคำสั่งซื้อ", active === "orders") +
       "</nav>" +
       '<div class="me-header-right">' + accountArea() +
@@ -127,7 +128,7 @@
         "</div>" +
         '<div class="me-footer-col"><div class="me-footer-h">เมนู</div>' +
           '<a href="index.html">หน้าแรก</a><a href="shop.html">สินค้า<span data-rent-only> / เช่า-ซื้อ</span></a>' +
-          '<a href="cart.html">ตะกร้า</a><a href="orders.html">ติดตามคำสั่งซื้อ</a></div>' +
+          '<a href="catalog.html">แคตตาล็อก</a><a href="cart.html">ตะกร้า</a><a href="orders.html">ติดตามคำสั่งซื้อ</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">ช่วยเหลือ</div>' +
           '<a href="index.html#faq">คำถามที่พบบ่อย</a><a href="#" data-open-chat>ติดต่อร้าน (แชท)</a>' +
           '<a href="login.html">เข้าสู่ระบบ</a><a href="register.html">สมัครสมาชิก</a></div>' +

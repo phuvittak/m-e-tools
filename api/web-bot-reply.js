@@ -1,16 +1,15 @@
 /* =====================================================================
    M.E.Tools — Web chat bot reply (Vercel Node.js Function)
    ---------------------------------------------------------------------
-   ลูกค้าพิมพ์ในเว็บแชท (มุมขวาล่าง) → client เขียน user doc แล้วเรียก
-   endpoint นี้ → ตรวจว่า user อยู่โหมด human ไหม + คำนวณคำตอบบอทจาก
-   bot_config + เขียน reply กลับเป็น role:"bot"
+   ลูกค้าพิมพ์ในเว็บแชท → endpoint นี้ตอบกลับ
+   ลำดับ: human-mode check → ทักทาย → keyword rules → Claude AI → fallback
 
-   ไม่ใช้ Claude AI ที่นี่ — แค่ keyword + fallback (เร็ว ฟรี ปรับใน
-   /admin/bot-replies.html ได้)
+   config อ่านจาก bot_config/web_replies (แยกจาก LINE bot ใน /replies)
    ===================================================================== */
 
 const FIREBASE_PROJECT = 'metools-724dc';
 const FIRESTORE_DB = 'default';
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 
 function unwrapFsValue(v) {
   if (!v || typeof v !== 'object') return null;
@@ -30,7 +29,7 @@ function unwrapFsValue(v) {
 }
 
 async function getBotConfig() {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_config/replies`;
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_config/web_replies`;
   try {
     const r = await fetch(url);
     if (!r.ok) return { rentEnabled: true, greeting: '', fallback: '', rules: [] };
@@ -61,29 +60,57 @@ async function getSession(userId) {
   } catch { return null; }
 }
 
-function computeReply(text, cfg) {
+function keywordReply(text, cfg) {
   const t = String(text || '').toLowerCase().trim();
-  if (!t) return '';
-  // 1) Rent off + ลูกค้าถามเรื่องเช่า → บอกตรง
+  if (!t) return null;
   if (cfg.rentEnabled === false && /(เช่า|rent|เช็า)/i.test(t)) {
-    return 'ขออภัยครับ ตอนนี้ร้านยังไม่มีบริการเช่าเครื่องมือนะครับ 🙏\nมีแต่จำหน่ายขาดทั้งหมด';
+    return 'ขออภัยครับ ตอนนี้ร้านยังไม่มีบริการเช่าเครื่องมือ มีแต่จำหน่ายขาดทั้งหมด 🙏';
   }
-  // 2) ทักทาย
-  if (/^(สวัสดี|หวัดดี|สวัด|hello|hi|hey|hej)/i.test(t)) {
-    return cfg.greeting || 'สวัสดีครับ 🙏 M.E.Tools ยินดีให้บริการ — สนใจสิ่งใดครับ?';
+  if (/^(สวัสดี|หวัดดี|สวัด|hello|hi|hey)/i.test(t)) {
+    return cfg.greeting || 'สวัสดีครับ 🙏 M.E.Tools ยินดีให้บริการ — สอบถามได้เลยครับ';
   }
-  // 3) "ติดต่อแอดมิน" / "ติดต่อเจ้าของ" → เงียบ (ให้แอดมินตอบเอง — bot ไม่ตอบ)
   if (/(ติดต่อ\s*(แอดมิน|เจ้าของ|คน)|คุยกับ\s*(แอดมิน|เจ้าของ|คน)|พนักงานจริง|มนุษย์)/i.test(t)) {
-    return ''; // ไม่ตอบ — admin จะมาตอบเอง
+    return ''; // admin จะมาตอบเอง
   }
-  // 4) ลองคีย์เวิร์ดที่เจ้าของตั้งไว้
   for (const r of cfg.rules) {
     for (const kw of r.keywords) {
       if (kw && t.indexOf(kw) >= 0) return r.answer;
     }
   }
-  // 5) Fallback
-  return cfg.fallback || 'ขอบคุณสำหรับข้อความครับ 🙏\nสนใจเครื่องมือหมวดไหนเป็นพิเศษครับ?';
+  return null;
+}
+
+async function aiReply(text, cfg) {
+  if (!ANTHROPIC_API_KEY) return null;
+  const systemPrompt = `คุณคือบอทผู้ช่วยของร้าน M.E.Tools ท่ารั้ว เชียงใหม่
+จำหน่ายและให้เช่าเครื่องมือช่าง DEWALT, MAKITA, BOSCH, STANLEY ของแท้ 100%
+ที่ตั้ง: 199/6 ม.7 ต.สันปูเลย อ.ดอยสะเก็ด จ.เชียงใหม่ 50220
+โทร: 081-3706466 (มือถือ) / 053-104699 (สำนักงาน)
+เวลาทำการ: จันทร์–เสาร์ 8:00–17:00 / อาทิตย์ 8:00–15:00
+
+${cfg.rentEnabled === false ? 'หมายเหตุ: ร้านนี้ไม่มีบริการเช่า มีแต่จำหน่ายขาด\n' : ''}
+ตอบเป็นภาษาไทย กระชับ เป็นมิตร ไม่เกิน 3 ประโยค
+ถ้าไม่แน่ใจ ให้แนะนำโทรมาถามร้านโดยตรง`;
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: text }],
+      }),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data?.content?.[0]?.text?.trim() || null;
+  } catch { return null; }
 }
 
 async function writeBotMessage(userId, replyText) {
@@ -115,7 +142,6 @@ export default async function handler(req, res) {
   const text = String(body.text || '').trim();
   if (!userId || !text) { res.status(400).json({ error: 'missing-fields' }); return; }
 
-  // ถ้า user อยู่โหมด human (แอดมินกำลังคุย) → บอทเงียบ
   const session = await getSession(userId);
   if (session && session.mode === 'human') {
     res.status(200).json({ ok: true, skipped: 'human-mode' });
@@ -123,7 +149,20 @@ export default async function handler(req, res) {
   }
 
   const cfg = await getBotConfig();
-  const reply = computeReply(text, cfg);
+
+  // 1) keyword / greeting / contact rules
+  let reply = keywordReply(text, cfg);
+
+  // 2) Claude AI fallback (ถ้า keyword ไม่ตรง)
+  if (reply === null) {
+    reply = await aiReply(text, cfg);
+  }
+
+  // 3) hardcoded fallback
+  if (reply === null) {
+    reply = cfg.fallback || 'ขอบคุณสำหรับข้อความครับ 🙏 สนใจเครื่องมือหมวดไหนเป็นพิเศษครับ?';
+  }
+
   if (!reply) {
     res.status(200).json({ ok: true, skipped: 'no-reply' });
     return;

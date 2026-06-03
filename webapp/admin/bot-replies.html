@@ -82,6 +82,31 @@
           <span class="save-status" data-status></span>
         </div>
       </div>
+
+      <!-- ===================== เว็บแชท AI (แยกจาก LINE) ===================== -->
+      <div class="br-section" style="border-color:var(--accent,#FFB81C);border-width:2px">
+        <h2 style="color:var(--accent,#FFB81C)">⚡ แชทเว็บไซต์ (AI ตอบอัตโนมัติ)</h2>
+        <div class="sub">การตั้งค่าส่วนนี้ <b>แยกจาก LINE bot ด้านบน</b> ทั้งหมด — บอทเว็บใช้ Claude AI ตอบถ้าไม่เจอคีย์เวิร์ด · LINE bot ไม่ได้รับผลกระทบจากส่วนนี้</div>
+        <div class="br-field">
+          <label>ข้อความทักทายเว็บแชท</label>
+          <textarea data-web-greeting rows="3" placeholder="เช่น สวัสดีครับ 🙏 M.E.Tools ยินดีให้บริการ — สอบถามได้เลยครับ"></textarea>
+        </div>
+        <div class="br-field">
+          <label>คำตอบสำรองเว็บแชท (ถ้า AI ตอบไม่ได้)</label>
+          <textarea data-web-fallback rows="2" placeholder="เช่น ขอบคุณสำหรับข้อความครับ สนใจโทรสอบถามเพิ่มเติมได้เลยนะครับ"></textarea>
+        </div>
+        <div class="br-field">
+          <label>คีย์เวิร์ดเว็บแชท (ตอบก่อน AI — เรียงตามลำดับ)</label>
+          <div class="br-rules" data-web-rules>
+            <div class="br-empty">กำลังโหลด…</div>
+          </div>
+        </div>
+        <div class="br-toolbar">
+          <button class="btn btn-secondary" data-web-add type="button">+ เพิ่มคีย์เวิร์ดเว็บ</button>
+          <button class="btn btn-primary" data-web-save type="button">บันทึกการตั้งค่าเว็บแชท</button>
+          <span class="save-status" data-web-status></span>
+        </div>
+      </div>
     </main>
   </div>
   <script src="../assets/thai-geo.js"></script>

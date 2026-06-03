@@ -6,7 +6,7 @@
   var S = window.MEStore, U = window.MEUI;
   var page = document.body.getAttribute("data-page");
 
-  U.mountChrome(page === "home" ? "home" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : "");
+  U.mountChrome(page === "home" ? "home" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : "");
 
   var routes = { home: initHome, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister };
   if (routes[page]) routes[page]();

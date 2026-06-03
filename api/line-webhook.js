@@ -19,8 +19,11 @@ const SHOP = {
   company: 'บริษัท เอ็ม.อี.ทูลส์ จำกัด',
   shortName: 'M.E.Tools ท่ารั้ว',
   address: '199/6 ม.7 ต.สันปูเลย อ.ดอยสะเก็ด จ.เชียงใหม่ 50220',
-  phone: '081-3706466, 053-104699',
-  phoneCall: '0813706466', // tel: link
+  phoneMobile: '081-3706466',
+  phoneMobileCall: '0813706466',
+  phoneOffice: '053-104699',
+  phoneOfficeCall: '053104699',
+  lineId: '@metools',
   hoursWeek: 'จันทร์ – เสาร์ 8:00 – 17:00 น.',
   hoursSun: 'อาทิตย์ 8:00 – 15:00 น.',
   line: 'https://lin.ee/so6euhT',
@@ -48,7 +51,7 @@ const CATEGORY_LABELS = {
   power: 'เครื่องมือไฟฟ้าอื่นๆ',
 };
 
-const HUMAN_HANDOFF_TTL_MS = 4 * 60 * 60 * 1000; // 4 ชั่วโมงให้คนคุยกันก่อน
+const HUMAN_HANDOFF_TTL_MS = 2 * 60 * 60 * 1000; // 2 ชั่วโมง จากนั้นบอทกลับมาตอบอัตโนมัติ
 
 // ===== Intent detection ================================================
 function detectCategory(text) {
@@ -212,7 +215,7 @@ async function getSession(userId) {
     if (!res.ok) return null;
     const doc = await res.json();
     const fields = {}; for (const k in doc.fields || {}) fields[k] = unwrapFsValue(doc.fields[k]);
-    // โหมด human ใช้ TTL ยาวกว่า (4 ชม)
+    // โหมด human ใช้ TTL 2 ชม — หลังจากนั้นบอทกลับมาตอบเอง
     const ttl = fields.mode === 'human' ? HUMAN_HANDOFF_TTL_MS : SESSION_TTL_MS;
     if (fields.updatedAt && Date.now() - new Date(fields.updatedAt).getTime() > ttl) return null;
     return fields;
@@ -373,11 +376,15 @@ function flexContactMenu() {
         contents: [
           {
             type: 'button', style: 'primary', color: COLOR.black, height: 'sm',
-            action: { type: 'uri', label: `📞 โทร ${SHOP.phone.split(',')[0].trim()}`, uri: `tel:${SHOP.phoneCall}` },
+            action: { type: 'uri', label: `📱 มือถือ ${SHOP.phoneMobile}`, uri: `tel:${SHOP.phoneMobileCall}` },
           },
           {
-            type: 'button', style: 'primary', color: COLOR.yellow, height: 'sm',
-            action: { type: 'message', label: '💬 ส่งข้อความถึงแอดมิน', text: 'ติดต่อแอดมิน' },
+            type: 'button', style: 'primary', color: '#333333', height: 'sm',
+            action: { type: 'uri', label: `☎️ สำนักงาน ${SHOP.phoneOffice}`, uri: `tel:${SHOP.phoneOfficeCall}` },
+          },
+          {
+            type: 'button', style: 'primary', color: '#06C755', height: 'sm',
+            action: { type: 'uri', label: `💬 LINE ${SHOP.lineId}`, uri: SHOP.line },
           },
           {
             type: 'button', style: 'secondary', height: 'sm',
@@ -411,7 +418,7 @@ function defaultWelcomeText(opts = {}) {
     `${SHOP.hoursSun}`,
     ``,
     `📞 หากไม่มีการตอบกลับภายใน 24 ชม.`,
-    `ติดต่อได้ที่ ${SHOP.phone}`
+    `ติดต่อได้ที่ ${SHOP.phoneMobile} / ${SHOP.phoneOffice}`
   );
   return lines.join('\n');
 }
@@ -624,7 +631,7 @@ function buildAISystemPrompt(products) {
 
 == ข้อมูลร้าน ==
 ที่อยู่: ${SHOP.address}
-โทร: ${SHOP.phone}
+โทร: ${SHOP.phoneMobile} (มือถือ) / ${SHOP.phoneOffice} (สำนักงาน)
 LINE: ${SHOP.line}
 เวลาทำการ: ${SHOP.hoursWeek} | ${SHOP.hoursSun}
 
@@ -646,7 +653,7 @@ ${catalogText}
 - ข้อยกเว้น: ถ้าลูกค้าพิมพ์รหัส (DCD805) ตอบรายละเอียดเต็มได้เลย ราคาท้ายสุด
 
 == กฎเด็ดขาด ==
-- ถ้าไม่ทราบ → ให้โทร ${SHOP.phone}
+- ถ้าไม่ทราบ → ให้โทร ${SHOP.phoneMobile} หรือ ${SHOP.phoneOffice}
 - ถ้าคำถามนอกเรื่องร้าน → ขอโทษและพากลับเรื่องเครื่องมือ
 - ถ้าคำถามต้องการตอบจากคนจริง (เช่น ขอต่อราคา, ขอใบเสนอราคา, ปัญหาเฉพาะ) → บอก "ขอแจ้งแอดมินนะครับ" และจบ`;
 }
@@ -709,7 +716,7 @@ async function handleMessage(userId, text, token) {
   if (wantsHuman(text)) {
     await setSession(userId, { mode: 'human' });
     await pushHandoffToAdmin(userId, text, token);
-    return `รับทราบครับ 🙏\nผมได้แจ้งแอดมินแล้ว เดี๋ยวแอดมินจะตอบคุณในเร็ว ๆ นี้\n\nระหว่างนี้โทรหาเราได้ที่ ${SHOP.phone}`;
+    return `รับทราบครับ 🙏\nผมได้แจ้งแอดมินแล้ว เดี๋ยวแอดมินจะตอบคุณในเร็ว ๆ นี้\n\nระหว่างนี้โทรหาเราได้ที่\n📱 ${SHOP.phoneMobile}\n☎️ ${SHOP.phoneOffice}`;
   }
 
   // 1.5) โหลด config ที่เจ้าของตั้งไว้จาก Firestore (cache 5 นาที)

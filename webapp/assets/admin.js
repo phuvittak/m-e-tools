@@ -985,6 +985,123 @@
     });
     saveBtn.addEventListener("click", save);
 
+    // ===== Web chat config (bot_config/web_replies) — แยกจาก LINE bot =====
+    var webGreetingEl = document.querySelector("[data-web-greeting]");
+    var webFallbackEl = document.querySelector("[data-web-fallback]");
+    var webRulesBox = document.querySelector("[data-web-rules]");
+    var webAddBtn = document.querySelector("[data-web-add]");
+    var webSaveBtn = document.querySelector("[data-web-save]");
+    var webStatusEl = document.querySelector("[data-web-status]");
+
+    if (webGreetingEl && webRulesBox) {
+      var webState = { config: { greeting: "", fallback: "", rules: [] } };
+
+      function renderWebRules() {
+        var rules = webState.config.rules || [];
+        if (!rules.length) {
+          webRulesBox.innerHTML = '<div class="br-empty">ยังไม่มีกฎเว็บแชท — กด "+ เพิ่มคีย์เวิร์ดเว็บ"</div>';
+          return;
+        }
+        webRulesBox.innerHTML = rules.map(function (r) {
+          return '<div class="br-rule" data-wrid="' + esc(r.id) + '">' +
+            '<div class="br-rule-head">' +
+              '<input data-wr-label placeholder="ชื่อกฎ" value="' + esc(r.label) + '">' +
+              '<button class="br-rule-del" type="button" data-wdel>ลบ</button>' +
+            '</div>' +
+            '<div class="br-field"><label>คีย์เวิร์ด (คั่น ,)</label>' +
+              '<input data-wr-kw value="' + esc((r.keywords || []).join(", ")) + '">' +
+            '</div>' +
+            '<div class="br-field"><label>คำตอบ</label>' +
+              '<textarea data-wr-ans>' + esc(r.answer) + '</textarea>' +
+            '</div>' +
+          '</div>';
+        }).join("");
+        webRulesBox.querySelectorAll(".br-rule").forEach(function (card) {
+          card.querySelector("[data-wdel]").addEventListener("click", function () {
+            var id = card.getAttribute("data-wrid");
+            webState.config.rules = webState.config.rules.filter(function (r) { return r.id !== id; });
+            renderWebRules();
+          });
+        });
+      }
+
+      function collectWebFromDom() {
+        webState.config.greeting = webGreetingEl.value.trim();
+        webState.config.fallback = webFallbackEl.value.trim();
+        var rules = [];
+        webRulesBox.querySelectorAll(".br-rule").forEach(function (card) {
+          var id = card.getAttribute("data-wrid");
+          var label = card.querySelector("[data-wr-label]").value.trim();
+          var kw = card.querySelector("[data-wr-kw]").value
+            .split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+          var ans = card.querySelector("[data-wr-ans]").value.trim();
+          if (!kw.length && !ans) return;
+          rules.push({ id: id || genId(), label: label, keywords: kw, answer: ans });
+        });
+        webState.config.rules = rules;
+      }
+
+      function loadWebConfig() {
+        // wait for Firebase to be ready (re-use state.fs from LINE bot load)
+        var wait = function () {
+          if (!state.fs) { setTimeout(wait, 300); return; }
+          var fs = state.fs;
+          var ref = fs.doc(fs.db, "bot_config", "web_replies");
+          fs.getDoc(ref).then(function (snap) {
+            if (snap && snap.exists && snap.exists()) {
+              var d = snap.data() || {};
+              webState.config = {
+                greeting: d.greeting || "",
+                fallback: d.fallback || "",
+                rules: Array.isArray(d.rules) ? d.rules.map(function (r) {
+                  return { id: r.id || genId(), label: r.label || "", keywords: r.keywords || [], answer: r.answer || "" };
+                }) : []
+              };
+            }
+            webGreetingEl.value = webState.config.greeting;
+            webFallbackEl.value = webState.config.fallback;
+            renderWebRules();
+          }).catch(function () { renderWebRules(); });
+        };
+        wait();
+      }
+
+      function saveWebConfig() {
+        if (!state.fs) { return; }
+        collectWebFromDom();
+        webSaveBtn.disabled = true;
+        webStatusEl.textContent = "กำลังบันทึก…";
+        var fs = state.fs;
+        var ref = fs.doc(fs.db, "bot_config", "web_replies");
+        var sess = S.session() || {};
+        fs.setDoc(ref, {
+          greeting: webState.config.greeting,
+          fallback: webState.config.fallback,
+          rules: webState.config.rules,
+          updatedAt: fs.serverTimestamp(),
+          updatedBy: sess.email || sess.name || "owner"
+        }).then(function () {
+          webSaveBtn.disabled = false;
+          webStatusEl.textContent = "บันทึกแล้ว ✓";
+          setTimeout(function () { webStatusEl.textContent = ""; }, 2500);
+          if (U && U.toast) U.toast("บันทึกการตั้งค่าเว็บแชทเรียบร้อย", "ok");
+        }).catch(function (e) {
+          webSaveBtn.disabled = false;
+          webStatusEl.textContent = "";
+          setAlert("บันทึกเว็บแชทไม่สำเร็จ: " + (e.message || e), "err");
+        });
+      }
+
+      webAddBtn.addEventListener("click", function () {
+        collectWebFromDom();
+        webState.config.rules.push({ id: genId(), label: "", keywords: [], answer: "" });
+        renderWebRules();
+      });
+      webSaveBtn.addEventListener("click", saveWebConfig);
+
+      loadWebConfig();
+    }
+
     load();
   }
 
@@ -1168,7 +1285,13 @@
       '<div class="field"><label>จำนวนในสต็อก</label><input data-f="stock" type="number" min="0" value="' + p.stock + '"></div></div>' +
       '<div class="f-check"><label><input type="checkbox" data-f="forSale"' + (p.forSale ? " checked" : "") + "> ขายขาด</label>" +
         '<label><input type="checkbox" data-f="forRent"' + (p.forRent ? " checked" : "") + "> ให้เช่า</label></div>" +
-      '<div class="field"><label>รายละเอียด</label><textarea data-f="desc" rows="3">' + esc(p.desc) + "</textarea></div>";
+      '<div class="field"><label>รายละเอียด</label>' +
+      '<div style="display:flex;gap:8px;align-items:flex-start">' +
+        '<textarea data-f="desc" rows="4" style="flex:1">' + esc(p.desc) + '</textarea>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-ai-parse style="white-space:nowrap;margin-top:2px" title="วางข้อมูลสินค้าดิบแล้วกดนี้ — AI จะแยกข้อมูลใส่ฟอร์มให้">✨ AI แยก</button>' +
+      '</div>' +
+      '<div class="img-hint">วางรายละเอียดสินค้าดิบในช่องแล้วกด "✨ AI แยก" — AI จะช่วยแยกชื่อ, สเปค, แบรนด์ฯ ให้อัตโนมัติ</div>' +
+      '</div>';
 
     openModal(isNew ? "เพิ่มสินค้าใหม่" : "แก้ไขสินค้า", body, function (root) {
       function val(f) { var el = root.querySelector("[data-f=" + f + "]"); return el ? el.value : ""; }
@@ -1191,6 +1314,57 @@
       if (window.__invRender) window.__invRender();
       return true;
     });
+
+    // wire AI parse button
+    (function () {
+      var modalEl = document.querySelector(".modal-bg");
+      if (!modalEl) return;
+      var parseBtn = modalEl.querySelector("[data-ai-parse]");
+      if (!parseBtn) return;
+      parseBtn.addEventListener("click", function () {
+        var descEl = modalEl.querySelector("[data-f=desc]");
+        var raw = descEl ? descEl.value.trim() : "";
+        if (!raw) { U.toast("กรุณาวางรายละเอียดสินค้าในช่อง 'รายละเอียด' ก่อนกด AI แยก", "err"); return; }
+        parseBtn.disabled = true;
+        parseBtn.textContent = "กำลังวิเคราะห์…";
+        fetch("/api/ai-parse-product", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: raw })
+        }).then(function (r) { return r.json(); }).then(function (data) {
+          parseBtn.disabled = false;
+          parseBtn.textContent = "✨ AI แยก";
+          if (!data.ok || !data.parsed) { U.toast("AI แยกไม่สำเร็จ ลองอีกครั้ง", "err"); return; }
+          var parsed = data.parsed;
+          function setField(attr, val) {
+            if (val === undefined || val === null || val === "") return;
+            var el = modalEl.querySelector("[data-f=" + attr + "]");
+            if (el) el.value = val;
+          }
+          setField("name", parsed.name);
+          setField("brand", parsed.brand);
+          setField("sku", parsed.sku);
+          setField("motorType", parsed.motorType);
+          setField("shipSize", parsed.shipSize);
+          if (parsed.warrantyYears) setField("warrantyYears", parsed.warrantyYears);
+          if (parsed.category) {
+            var catEl = modalEl.querySelector("[data-f=category]");
+            if (catEl) {
+              var opt = catEl.querySelector('[value="' + parsed.category + '"]');
+              if (opt) catEl.value = parsed.category;
+            }
+          }
+          // build desc from desc + specs
+          var specText = Array.isArray(parsed.specs) && parsed.specs.length ? "\n\nสเปค:\n" + parsed.specs.map(function (s) { return "• " + s; }).join("\n") : "";
+          if (descEl) descEl.value = (parsed.desc || raw) + specText;
+          U.toast("AI แยกข้อมูลเรียบร้อย — ตรวจสอบแล้วกดบันทึก", "ok");
+        }).catch(function () {
+          parseBtn.disabled = false;
+          parseBtn.textContent = "✨ AI แยก";
+          U.toast("เชื่อมต่อ AI ไม่สำเร็จ", "err");
+        });
+      });
+    })();
 
     // wire multi-image gallery (owner only)
     if (owner) {
@@ -1457,15 +1631,42 @@
       brandList.querySelectorAll("[data-bt]").forEach(function (i) { brands[+i.dataset.bt].tag = i.value; });
       brandList.querySelectorAll("[data-bp]").forEach(function (i) { brands[+i.dataset.bp].primary = i.checked; });
     }
+    var _dragSrcIdx = null;
     function renderBrands() {
       if (!brandList) return;
       brandList.innerHTML = brands.map(function (b, i) {
-        return '<div class="row-edit"><input data-bn="' + i + '" value="' + esc(b.name) + '" placeholder="ชื่อแบรนด์" style="flex:1">' +
+        return '<div class="row-edit" draggable="true" data-brow="' + i + '" style="cursor:grab">' +
+          '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 6px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
+          '<input data-bn="' + i + '" value="' + esc(b.name) + '" placeholder="ชื่อแบรนด์" style="flex:1">' +
           '<input data-bt="' + i + '" value="' + esc(b.tag || "") + '" placeholder="คำอธิบายสั้น" style="flex:1.4">' +
           '<label class="f-check"><input type="checkbox" data-bp="' + i + '"' + (b.primary ? " checked" : "") + "> เด่น</label>" +
           '<button class="btn btn-sm btn-danger" data-bdel="' + i + '">ลบ</button></div>';
       }).join("");
-      brandList.querySelectorAll("[data-bdel]").forEach(function (b) { b.onclick = function () { syncBrands(); brands.splice(+b.dataset.bdel, 1); renderBrands(); }; });
+      brandList.querySelectorAll("[data-bdel]").forEach(function (b) {
+        b.onclick = function () { syncBrands(); brands.splice(+b.dataset.bdel, 1); renderBrands(); };
+      });
+      // drag-and-drop reorder
+      brandList.querySelectorAll("[data-brow]").forEach(function (row) {
+        row.addEventListener("dragstart", function (e) {
+          syncBrands();
+          _dragSrcIdx = +row.dataset.brow;
+          e.dataTransfer.effectAllowed = "move";
+          row.style.opacity = "0.4";
+        });
+        row.addEventListener("dragend", function () { row.style.opacity = ""; });
+        row.addEventListener("dragover", function (e) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; row.style.background = "var(--bg-hover,#f5f5f5)"; });
+        row.addEventListener("dragleave", function () { row.style.background = ""; });
+        row.addEventListener("drop", function (e) {
+          e.preventDefault();
+          row.style.background = "";
+          var dst = +row.dataset.brow;
+          if (_dragSrcIdx === null || _dragSrcIdx === dst) return;
+          var moved = brands.splice(_dragSrcIdx, 1)[0];
+          brands.splice(dst, 0, moved);
+          _dragSrcIdx = null;
+          renderBrands();
+        });
+      });
     }
     if (brandList) { renderBrands(); root.querySelector("[data-brand-add]").addEventListener("click", function () { syncBrands(); brands.push({ name: "", tag: "", primary: false }); renderBrands(); }); }
 
