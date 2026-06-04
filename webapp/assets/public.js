@@ -8,6 +8,11 @@
 
   U.mountChrome(page === "home" ? "home" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : "");
 
+  // เมื่อแคตตาล็อกจาก cloud มาถึง (ลูกค้า) → วาดส่วนที่ขึ้นกับสินค้าใหม่
+  // ต้องประกาศ + ผูก listener "ก่อน" เรียก route เพราะ route จะตั้งค่า pageRefresh เอง
+  var pageRefresh = null;
+  window.addEventListener("me-products-loaded", function () { if (pageRefresh) try { pageRefresh(); } catch (e) {} });
+
   var routes = { home: initHome, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog };
   if (routes[page]) routes[page]();
 
@@ -186,27 +191,31 @@
       else typewriter(typeEl, phrases);
     }
 
-    var box = document.querySelector("[data-cats]");
-    if (box) {
-      var products = S.getProducts().filter(function (p) { return !p.hidden; });
-      box.innerHTML = S.getCategories().filter(function (c) { return !c.hidden; }).map(function (c) {
-        var n = products.filter(function (p) { return p.category === c.key; }).length;
-        var visual = c.image
-          ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
-          : '<span class="me-cat-ic">' + U.iconSvg(c.icon || iconForCat(c.key), 40) + "</span>";
-        return (
-          '<a class="me-cat" href="shop.html?cat=' + c.key + '">' +
-          visual +
-          '<span class="me-cat-name">' + esc(c.label) + "</span>" +
-          '<span class="me-cat-count">' + n + " รายการ</span></a>"
-        );
-      }).join("");
+    function paintHomeProducts() {
+      var box = document.querySelector("[data-cats]");
+      if (box) {
+        var products = S.getProducts().filter(function (p) { return !p.hidden; });
+        box.innerHTML = S.getCategories().filter(function (c) { return !c.hidden; }).map(function (c) {
+          var n = products.filter(function (p) { return p.category === c.key; }).length;
+          var visual = c.image
+            ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
+            : '<span class="me-cat-ic">' + U.iconSvg(c.icon || iconForCat(c.key), 40) + "</span>";
+          return (
+            '<a class="me-cat" href="shop.html?cat=' + c.key + '">' +
+            visual +
+            '<span class="me-cat-name">' + esc(c.label) + "</span>" +
+            '<span class="me-cat-count">' + n + " รายการ</span></a>"
+          );
+        }).join("");
+      }
+      var feat = document.querySelector("[data-featured]");
+      if (feat) {
+        feat.innerHTML = S.getProducts().filter(function (p) { return !p.hidden; }).slice(0, 6).map(cardHtml).join("");
+        wireCards(feat);
+      }
     }
-    var feat = document.querySelector("[data-featured]");
-    if (feat) {
-      feat.innerHTML = S.getProducts().filter(function (p) { return !p.hidden; }).slice(0, 6).map(cardHtml).join("");
-      wireCards(feat);
-    }
+    paintHomeProducts();
+    pageRefresh = paintHomeProducts; // วาดใหม่เมื่อแคตตาล็อก cloud มาถึง
     // FAQ accordion (editable in back office)
     var faqBox = document.querySelector("[data-faq]");
     if (faqBox) {
@@ -236,66 +245,69 @@
   function initShop() {
     var state = { q: U.qp("q") || "", cats: U.qp("cat") ? [U.qp("cat")] : [], brands: U.qp("brand") ? [U.qp("brand")] : [], mode: U.qp("mode") || "all", sort: "default", priceMin: 0, priceMax: 0, inStock: false };
 
-    var products = S.getProducts().filter(function (p) { return !p.hidden; });
     var fbox = document.querySelector("[data-filters]");
-    var productBrands = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
-    var settingBrands = S.getSettings().brands || [];
-    var hiddenBrands = settingBrands.filter(function (b) { return b.hidden; }).map(function (b) { return b.name; });
-    var brandOrder = settingBrands.map(function (b) { return b.name; });
-    var allBrands = brandOrder.filter(function (b) { return productBrands.indexOf(b) >= 0; })
-      .concat(productBrands.filter(function (b) { return brandOrder.indexOf(b) < 0; }))
-      .filter(function (b) { return hiddenBrands.indexOf(b) < 0; });
-    var catCounts = {};
-    products.forEach(function (p) { catCounts[p.category] = (catCounts[p.category] || 0) + 1; });
-
-    fbox.innerHTML =
-      "<h3>ตัวกรอง</h3>" +
-      '<div class="filter-group"><span class="lbl">ช่วงราคา (บาท)</span>' +
-      '<div class="price-range-row">' +
-      '<input type="number" min="0" step="100" placeholder="ต่ำสุด" data-pmin class="price-inp"> –' +
-      '<input type="number" min="0" step="100" placeholder="สูงสุด" data-pmax class="price-inp">' +
-      '</div></div>' +
-      '<div class="filter-group">' +
-      '<label class="check"><input type="checkbox" data-f="instock"> เฉพาะมีสต็อก</label></div>' +
-      '<div class="filter-group"><span class="lbl">ประเภทสินค้า</span>' +
-      S.getCategories().filter(function (c) { return !c.hidden; }).map(function (c) {
-        var n = catCounts[c.key] || 0;
-        return '<label class="check"><input type="checkbox" data-f="cat" value="' + c.key + '"' + (state.cats.indexOf(c.key) >= 0 ? " checked" : "") + '> ' + esc(c.label) + ' <span class="filter-count">(' + n + ')</span></label>';
-      }).join("") + "</div>" +
-      '<div class="filter-group"><span class="lbl">แบรนด์</span>' +
-      allBrands.map(function (b) { return '<label class="check"><input type="checkbox" data-f="brand" value="' + b + '"' + (state.brands.indexOf(b) >= 0 ? " checked" : "") + '> ' + b + '</label>'; }).join("") + "</div>" +
-      '<div class="filter-group"><span class="lbl">รูปแบบ</span>' +
-      '<label class="check"><input type="radio" name="mode" data-f="mode" value="all" checked> ทั้งหมด</label>' +
-      '<label class="check"><input type="radio" name="mode" data-f="mode" value="buy"> ซื้อสินค้า</label>' +
-      '<label class="check" data-rent-only><input type="radio" name="mode" data-f="mode" value="rent"> เช่าสินค้า</label></div>' +
-      '<button class="me-btn me-btn-ghost me-btn-sm" data-clear>ล้างตัวกรอง</button>';
-
-    var pminEl = fbox.querySelector("[data-pmin]");
-    var pmaxEl = fbox.querySelector("[data-pmax]");
-    pminEl.addEventListener("input", function () { state.priceMin = parseInt(pminEl.value, 10) || 0; render(); });
-    pmaxEl.addEventListener("input", function () { state.priceMax = parseInt(pmaxEl.value, 10) || 0; render(); });
-
     var sinput = document.querySelector("[data-q]");
-    if (sinput) { sinput.value = state.q; sinput.addEventListener("input", function () { state.q = sinput.value.trim(); render(); }); }
     var sortSel = document.querySelector("[data-sort]");
+
+    // สร้าง/วาดแถบตัวกรองใหม่จากสินค้าปัจจุบัน (เรียกซ้ำได้เมื่อ cloud มาถึง)
+    function buildSidebar() {
+      var products = S.getProducts().filter(function (p) { return !p.hidden; });
+      var productBrands = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
+      var settingBrands = S.getSettings().brands || [];
+      var hiddenBrands = settingBrands.filter(function (b) { return b.hidden; }).map(function (b) { return b.name; });
+      var brandOrder = settingBrands.map(function (b) { return b.name; });
+      var allBrands = brandOrder.filter(function (b) { return productBrands.indexOf(b) >= 0; })
+        .concat(productBrands.filter(function (b) { return brandOrder.indexOf(b) < 0; }))
+        .filter(function (b) { return hiddenBrands.indexOf(b) < 0; });
+      var catCounts = {};
+      products.forEach(function (p) { catCounts[p.category] = (catCounts[p.category] || 0) + 1; });
+
+      fbox.innerHTML =
+        "<h3>ตัวกรอง</h3>" +
+        '<div class="filter-group"><span class="lbl">ช่วงราคา (บาท)</span>' +
+        '<div class="price-range-row">' +
+        '<input type="number" min="0" step="100" placeholder="ต่ำสุด" data-pmin class="price-inp"> –' +
+        '<input type="number" min="0" step="100" placeholder="สูงสุด" data-pmax class="price-inp">' +
+        '</div></div>' +
+        '<div class="filter-group">' +
+        '<label class="check"><input type="checkbox" data-f="instock"' + (state.inStock ? " checked" : "") + '> เฉพาะมีสต็อก</label></div>' +
+        '<div class="filter-group"><span class="lbl">ประเภทสินค้า</span>' +
+        S.getCategories().filter(function (c) { return !c.hidden; }).map(function (c) {
+          var n = catCounts[c.key] || 0;
+          return '<label class="check"><input type="checkbox" data-f="cat" value="' + c.key + '"' + (state.cats.indexOf(c.key) >= 0 ? " checked" : "") + '> ' + esc(c.label) + ' <span class="filter-count">(' + n + ')</span></label>';
+        }).join("") + "</div>" +
+        '<div class="filter-group"><span class="lbl">แบรนด์</span>' +
+        allBrands.map(function (b) { return '<label class="check"><input type="checkbox" data-f="brand" value="' + b + '"' + (state.brands.indexOf(b) >= 0 ? " checked" : "") + '> ' + b + '</label>'; }).join("") + "</div>" +
+        '<div class="filter-group"><span class="lbl">รูปแบบ</span>' +
+        '<label class="check"><input type="radio" name="mode" data-f="mode" value="all"' + (state.mode === "all" ? " checked" : "") + '> ทั้งหมด</label>' +
+        '<label class="check"><input type="radio" name="mode" data-f="mode" value="buy"' + (state.mode === "buy" ? " checked" : "") + '> ซื้อสินค้า</label>' +
+        '<label class="check" data-rent-only><input type="radio" name="mode" data-f="mode" value="rent"' + (state.mode === "rent" ? " checked" : "") + '> เช่าสินค้า</label></div>' +
+        '<button class="me-btn me-btn-ghost me-btn-sm" data-clear>ล้างตัวกรอง</button>';
+
+      var pminEl = fbox.querySelector("[data-pmin]");
+      var pmaxEl = fbox.querySelector("[data-pmax]");
+      if (state.priceMin) pminEl.value = state.priceMin;
+      if (state.priceMax) pmaxEl.value = state.priceMax;
+      pminEl.addEventListener("input", function () { state.priceMin = parseInt(pminEl.value, 10) || 0; render(); });
+      pmaxEl.addEventListener("input", function () { state.priceMax = parseInt(pmaxEl.value, 10) || 0; render(); });
+      fbox.querySelector("[data-clear]").addEventListener("click", function () {
+        state.q = ""; state.cats = []; state.brands = []; state.mode = "all"; state.sort = "default"; state.priceMin = 0; state.priceMax = 0; state.inStock = false;
+        if (sinput) sinput.value = "";
+        if (sortSel) sortSel.value = "default";
+        buildSidebar(); render();
+      });
+    }
+
+    if (sinput) { sinput.value = state.q; sinput.addEventListener("input", function () { state.q = sinput.value.trim(); render(); }); }
     if (sortSel) sortSel.addEventListener("change", function () { state.sort = sortSel.value; render(); });
 
+    // delegation บน fbox (อยู่ถาวร) — ทำงานแม้แถบตัวกรองถูกวาดใหม่
     fbox.addEventListener("change", function (e) {
       var f = e.target.getAttribute("data-f");
       if (f === "cat") state.cats = checkedValues(fbox, "cat");
       else if (f === "brand") state.brands = checkedValues(fbox, "brand");
       else if (f === "mode") state.mode = e.target.value;
       else if (f === "instock") state.inStock = e.target.checked;
-      render();
-    });
-    fbox.querySelector("[data-clear]").addEventListener("click", function () {
-      state.q = ""; state.cats = []; state.brands = []; state.mode = "all"; state.sort = "default"; state.priceMin = 0; state.priceMax = 0; state.inStock = false;
-      if (sinput) sinput.value = "";
-      if (pminEl) pminEl.value = "";
-      if (pmaxEl) pmaxEl.value = "";
-      fbox.querySelectorAll("input[type=checkbox]").forEach(function (c) { c.checked = false; });
-      var allRadio = fbox.querySelector("input[value=all]"); if (allRadio) allRadio.checked = true;
-      if (sortSel) sortSel.value = "default";
       render();
     });
 
@@ -326,11 +338,13 @@
       var rc = document.querySelector("[data-count]");
       if (rc) rc.textContent = "พบ " + list.length + " รายการ";
     }
-    render();
+    buildSidebar(); render();
+    pageRefresh = function () { buildSidebar(); render(); };
   }
 
   /* ===================== PRODUCT ===================== */
   function initProduct() {
+    pageRefresh = initProduct; // re-วาดเมื่อสินค้าจาก cloud มาถึง (กรณียังไม่พบตอนแรก)
     var id = U.qp("id");
     var p = S.getProduct(id);
     var root = document.querySelector("[data-product]");
@@ -795,6 +809,7 @@
   function initCatalog() {
     var box = document.querySelector("[data-book]");
     if (!box) return;
+    pageRefresh = initCatalog; // re-วาดเมื่อแคตตาล็อกจาก cloud มาถึง
     var st = S.getSettings();
     var products = S.getProducts().filter(function (p) { return !p.hidden; });
 

@@ -20,6 +20,7 @@
     purchases: "me_purchases",
     chats: "me_chats",
     seeded: "me_seeded_v2",
+    cloudProducts: "me_cloud_products", // catalog pulled from Firestore (customers only)
   };
 
   // ===== Firebase web config for REAL online chat (shared by ALL visitors) =====
@@ -364,6 +365,120 @@
     });
   }
 
+  /* ---------- Cloud sync: PRODUCT CATALOG ↔ Firestore -------------- */
+  // โครงสร้าง:
+  //   products/{id}  — 1 doc ต่อสินค้า 1 ตัว (รวมรูป base64) → หน้าร้านลูกค้าอ่าน
+  //   products/catalog — เอกสารรวม (ตัดรูปออก) → บอท LINE อ่าน (api/line-webhook.js)
+  // เขียน: เฉพาะเครื่องเจ้าของ (auto-sync ตอน save + ปุ่ม "ซิงค์สินค้า")
+  // อ่าน:  หน้าร้านลูกค้าใช้ REST (public read ตาม firestore.rules) ไม่ต้อง auth
+
+  // ให้แน่ใจว่ามี anonymous auth ก่อนเขียน (rule products ต้องการ request.auth != null)
+  function ensureCloudAuth(m) {
+    if (m.auth && m.auth.currentUser) return Promise.resolve(m);
+    return m.authMod.signInAnonymously(m.auth).then(function () { return m; }).catch(function () { return m; });
+  }
+  // เตรียม doc สินค้า 1 ตัว — ตัด undefined + กันขนาดเกินลิมิต Firestore (~1MB)
+  function cleanProductDoc(p) {
+    var clean = JSON.parse(JSON.stringify(p)); // ตัด undefined/ฟังก์ชัน
+    function size() { try { return JSON.stringify(clean).length; } catch (e) { return 0; } }
+    if (size() > 950000 && clean.images && clean.images.length > 1) clean.images = [clean.images[0]];
+    if (size() > 950000) { clean.images = []; clean.image = ""; } // รูปใหญ่เกิน — เก็บแค่ข้อความ
+    clean.available = available(p);
+    clean.updatedAt = new Date().toISOString();
+    return clean;
+  }
+  // เอกสารรวมสำหรับบอท LINE (ตัดรูป/มีเดียออก ให้เล็ก)
+  function buildCatalogItems() {
+    var items = getLocalProducts().filter(function (p) { return !p.hidden; }).map(function (p) {
+      var clean = {}, skip = { images: 1, image: 1, frames360: 1, parts: 1, partsBase: 1 };
+      for (var k in p) if (Object.prototype.hasOwnProperty.call(p, k) && !skip[k]) clean[k] = p[k];
+      clean.available = available(p);
+      if (Array.isArray(clean.specs)) {
+        clean.specs = clean.specs.map(function (s) {
+          if (Array.isArray(s)) return { label: String(s[0] || ""), value: String(s[1] || "") };
+          if (s && typeof s === "object") return { label: String(s.label || ""), value: String(s.value || "") };
+          return { label: "", value: String(s || "") };
+        });
+      }
+      return clean;
+    });
+    return JSON.parse(JSON.stringify(items));
+  }
+  // push สินค้า 1 ตัวขึ้น cloud (fire-and-forget)
+  function cloudPushProduct(p) {
+    if (!p || !p.id) return;
+    loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      return fs.setDoc(fs.doc(m.db, "products", String(p.id)), cleanProductDoc(p));
+    }).catch(function (err) { console.warn("[cloud product push]", p.id, err && err.message); });
+  }
+  function cloudDeleteProductDoc(id) {
+    if (!id) return;
+    loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      return fs.deleteDoc(fs.doc(m.db, "products", String(id)));
+    }).catch(function (err) { console.warn("[cloud product del]", id, err && err.message); });
+  }
+  // rebuild เอกสารรวมสำหรับบอท — debounce กันยิงถี่ตอน import หลายตัว
+  var _catalogTimer = null;
+  function scheduleCatalogSync() {
+    if (_catalogTimer) clearTimeout(_catalogTimer);
+    _catalogTimer = setTimeout(function () { _catalogTimer = null; cloudSyncCatalogAggregate(); }, 1500);
+  }
+  function cloudSyncCatalogAggregate() {
+    loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod, items = buildCatalogItems();
+      return fs.setDoc(fs.doc(m.db, "products", "catalog"), { items: items, count: items.length, updatedAt: fs.serverTimestamp() });
+    }).catch(function (err) { console.warn("[cloud catalog]", err && err.message); });
+  }
+  // ซิงค์ทั้งหมด (ปุ่มในหน้าคลังสินค้า) — เขียนทุก doc สินค้า + เอกสารรวมสำหรับบอท
+  // progressCb(done, total) เผื่ออัปเดตสถานะปุ่ม. คืน Promise<count>
+  function cloudSyncAllProducts(progressCb) {
+    var all = getLocalProducts();
+    return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod, i = 0;
+      function next() {
+        if (i >= all.length) return Promise.resolve();
+        var p = all[i++];
+        if (progressCb) { try { progressCb(i, all.length); } catch (e) {} }
+        return fs.setDoc(fs.doc(m.db, "products", String(p.id)), cleanProductDoc(p)).then(next, next);
+      }
+      return next().then(function () {
+        var items = buildCatalogItems();
+        return fs.setDoc(fs.doc(m.db, "products", "catalog"), { items: items, count: items.length, updatedAt: fs.serverTimestamp() });
+      }).then(function () { return all.length; });
+    });
+  }
+  // โหลดแคตตาล็อกจาก cloud → เก็บใน key แยก (ไม่ทับ me_products ของเจ้าของ)
+  // ใช้ REST (public read) — ลูกค้าไม่ต้อง auth. ข้าม doc "catalog" (อันนั้นของบอท)
+  function cloudLoadProducts() {
+    var cfg = parseFbConfig(firebaseCfg());
+    if (!cfg || !cfg.projectId) return Promise.resolve(false);
+    var base = "https://firestore.googleapis.com/v1/projects/" + cfg.projectId + "/databases/default/documents/products";
+    var out = [];
+    function page(token) {
+      var url = base + "?pageSize=300" + (token ? "&pageToken=" + encodeURIComponent(token) : "");
+      return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+        if (!data) return;
+        (data.documents || []).forEach(function (doc) {
+          var id = (doc.name || "").split("/").pop();
+          if (id === "catalog") return;
+          var obj = {}, f = doc.fields || {};
+          for (var k in f) obj[k] = unwrapFs(f[k]);
+          if (!obj.id) obj.id = id;
+          out.push(obj);
+        });
+        if (data.nextPageToken) return page(data.nextPageToken);
+      });
+    }
+    return page(null).then(function () {
+      try { localStorage.setItem(KEY.cloudProducts, JSON.stringify(out)); } catch (e) {}
+      dispatch();
+      try { global.dispatchEvent(new CustomEvent("me-products-loaded")); } catch (e) {}
+      return out.length;
+    }).catch(function (err) { console.warn("[cloud products load]", err && err.message); return false; });
+  }
+
   // add warranty / motor / shipping-size defaults to a seed product
   function enrichSeed(p) {
     var noMotor = p.icon === "battery" || p.icon === "charger" || p.category === "hand" || p.category === "measure";
@@ -508,29 +623,46 @@
   function fulfillmentLabel(f) { return f === "delivery" ? "บริการจัดส่ง" : "รับสินค้าหน้าร้าน"; }
 
   /* ---------- Products -------------------------------------------- */
-  function getProducts() { return read(KEY.products, []); }
+  // เจ้าของร้าน (owner) = แหล่งข้อมูลจริง ใช้ me_products ใน localStorage เสมอ
+  // ลูกค้า/คนทั่วไป = อ่านแคตตาล็อกที่ดึงมาจาก cloud (me_cloud_products) ถ้ามี
+  //   ถ้ายังไม่มา (เปิดครั้งแรก/ออฟไลน์) ใช้ local เป็น fallback แล้ว re-render เมื่อ cloud มา
+  // เหตุผล: ห้ามให้ cloud มาทับ me_products ของเจ้าของ (อาจมีของที่ยังไม่ได้ซิงค์)
+  function getProducts() {
+    if (!isOwner()) {
+      var cloud = read(KEY.cloudProducts, null);
+      if (cloud && cloud.length) return cloud;
+    }
+    return read(KEY.products, []);
+  }
+  // เฉพาะข้อมูลในเครื่องเจ้าของ (ไม่สน cloud) — ใช้ตอนซิงค์ขึ้น cloud
+  function getLocalProducts() { return read(KEY.products, []); }
   function getProduct(id) {
     return getProducts().filter(function (p) { return p.id === id; })[0] || null;
   }
   function available(p) { return Math.max(0, (p.stock || 0) - (p.rented || 0)); }
 
   function saveProduct(p) {
-    var list = getProducts();
+    var list = getLocalProducts();
+    var saved = p;
     if (!p.id) {
       p.id = genId("p").toLowerCase();
       list.push(p);
+      saved = p;
     } else {
       var found = false;
       for (var i = 0; i < list.length; i++) {
-        if (list[i].id === p.id) { list[i] = Object.assign(list[i], p); found = true; break; }
+        if (list[i].id === p.id) { list[i] = Object.assign(list[i], p); saved = list[i]; found = true; break; }
       }
-      if (!found) list.push(p);
+      if (!found) { list.push(p); saved = p; }
     }
     write(KEY.products, list);
-    return p;
+    // auto-sync ขึ้น cloud — เฉพาะเครื่องเจ้าของ (ลูกค้าเขียน cloud ไม่ได้ + ไม่ควรเขียน)
+    if (isOwner()) { cloudPushProduct(saved); scheduleCatalogSync(); }
+    return saved;
   }
   function deleteProduct(id) {
-    write(KEY.products, getProducts().filter(function (p) { return p.id !== id; }));
+    write(KEY.products, getLocalProducts().filter(function (p) { return p.id !== id; }));
+    if (isOwner()) { cloudDeleteProductDoc(id); scheduleCatalogSync(); }
   }
   // adjust physical stock by delta (+ receive, - shrink/sell off the books)
   function adjustStock(id, delta) {
@@ -1137,8 +1269,9 @@
     CATEGORIES: CATEGORIES, categoryLabel: categoryLabel, getCategories: getCategories,
     typeLabel: typeLabel, statusLabel: statusLabel, fulfillmentLabel: fulfillmentLabel,
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
-    getProducts: getProducts, getProduct: getProduct, available: available,
+    getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,
     saveProduct: saveProduct, deleteProduct: deleteProduct, adjustStock: adjustStock,
+    cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, cloudPushProduct: cloudPushProduct,
     getCart: getCart, addToCart: addToCart, updateCartItem: updateCartItem,
     removeCartItem: removeCartItem, clearCart: clearCart,
     cartCount: cartCount, cartLines: cartLines, cartTotals: cartTotals,

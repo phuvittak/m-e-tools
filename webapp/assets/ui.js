@@ -152,6 +152,9 @@
     // โหลด settings + ship_rates จาก cloud — ทำให้หน้าร้านเห็นค่าล่าสุดที่แอดมินบันทึก
     // โดยไม่ต้องล้าง localStorage หรือ login admin
     if (S.cloudLoadPublicSettings) S.cloudLoadPublicSettings();
+    // โหลดแคตตาล็อกสินค้าจาก cloud สำหรับลูกค้า/คนทั่วไป — เจ้าของใช้ข้อมูลในเครื่อง (master)
+    // เก็บใน key แยก ไม่ทับ me_products ของเจ้าของ → หน้าร้าน re-render เมื่อ event "me-products-loaded"
+    if (!S.isOwner() && S.cloudLoadProducts) S.cloudLoadProducts();
   }
 
   // Phase B+: โหลดสวิตช์ฟีเจอร์ของร้าน (rentEnabled ฯลฯ) — body class ควบคุม CSS

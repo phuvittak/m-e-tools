@@ -180,7 +180,7 @@
     if (nolocChk) nolocChk.addEventListener("change", function () { state.noloc = nolocChk.checked; render(); });
     document.querySelector("[data-add]").addEventListener("click", function () { openProductModal(null); });
     var syncBtn = document.querySelector("[data-sync-bot]");
-    if (syncBtn) syncBtn.addEventListener("click", function () { syncProductsToFirebase(syncBtn); });
+    if (syncBtn) syncBtn.addEventListener("click", function () { syncCatalogToCloud(syncBtn); });
 
     function render() {
       var alertBox = document.querySelector("[data-alert]");
@@ -273,13 +273,13 @@
     return fields;
   }
 
-  function syncProductsToFirebase(btn) {
-    var cfg = window.parseFbConfig ? window.parseFbConfig(S.firebaseCfg ? S.firebaseCfg() : "") : null;
-    if (!cfg) { U.toast("ยังไม่ได้ตั้ง Firebase Config ในหน้า ตั้งค่าเว็บไซต์", "err"); return; }
-
+  // ซิงค์แคตตาล็อกขึ้น cloud ด้วยมือ — เขียนทุก doc สินค้า (products/{id} รวมรูป) ให้หน้าร้านลูกค้า
+  // อ่าน + เอกสารรวม products/catalog (ตัดรูปออก) ให้บอท LINE. auto-sync ทำงานตอนบันทึกอยู่แล้ว
+  // จึงเหลือไว้สำหรับ "อัปโหลดสินค้าเดิมครั้งแรก" หรือดันซ้ำเมื่อมีปัญหา
+  function syncCatalogToCloud(btn) {
+    if (!S.cloudSyncAllProducts) { U.toast("ฟังก์ชันซิงค์ยังไม่พร้อม — ลองรีโหลดหน้า", "err"); return; }
     var origText = btn.textContent;
     btn.disabled = true;
-    function status(s) { btn.textContent = s; console.log("[sync]", s); }
     var finished = false;
     function done(msg, kind) {
       if (finished) return;
@@ -290,69 +290,18 @@
       console.log("[sync] done —", kind, msg);
     }
     var hardTimeout = setTimeout(function () {
-      done("Timeout 30 วิ — ดู Console (F12) ว่าค้างขั้นไหน", "err");
-    }, 30000);
+      done("Timeout — ดู Console (F12) ว่าค้างขั้นไหน (อาจตั้ง Firebase Config / เปิด Anonymous Auth ยัง)", "err");
+    }, 120000);
 
-    status("โหลด SDK…");
-
-    function go() {
-      status("เริ่ม Firebase…");
-      try {
-        if (!firebase.apps.length) firebase.initializeApp(cfg);
-      } catch (e) { done("Firebase init: " + e.message, "err"); return; }
-      if (!firebase.auth) { done("Firebase Auth ไม่ได้โหลด", "err"); return; }
-      status("เข้าสู่ระบบ…");
-      firebase.auth().signInAnonymously().then(function (cred) {
-        status("เตรียมข้อมูล…");
-        var items = S.getProducts().filter(function (p) { return !p.hidden; }).map(function (p) {
-          var clean = {};
-          for (var k in p) if (Object.prototype.hasOwnProperty.call(p, k) && k !== "images" && k !== "image") clean[k] = p[k];
-          clean.available = S.available(p);
-          if (Array.isArray(clean.specs)) {
-            clean.specs = clean.specs.map(function (s) {
-              if (Array.isArray(s)) return { label: String(s[0] || ""), value: String(s[1] || "") };
-              if (s && typeof s === "object") return { label: String(s.label || ""), value: String(s.value || "") };
-              return { label: "", value: String(s || "") };
-            });
-          }
-          return clean;
-        });
-        var body = { fields: toFsFields({ items: items, count: items.length, updatedAt: new Date() }) };
-        return cred.user.getIdToken().then(function (token) {
-          status("กำลังเขียน " + items.length + " รายการ…");
-          var url = "https://firestore.googleapis.com/v1/projects/" + cfg.projectId +
-            "/databases/" + FIRESTORE_DB + "/documents/products/catalog";
-          return fetch(url, {
-            method: "PATCH",
-            headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          }).then(function (res) {
-            return res.text().then(function (txt) { return { ok: res.ok, status: res.status, text: txt }; });
-          });
-        });
-      }).then(function (result) {
-        if (result.ok) {
-          done("ซิงค์สินค้า " + S.getProducts().length + " รายการไปบอท LINE แล้ว ✓", "ok");
-        } else {
-          var snippet = (result.text || "").slice(0, 200);
-          done("ซิงค์ไม่สำเร็จ [HTTP " + result.status + "]: " + snippet, "err");
-        }
-      }).catch(function (e) {
-        var code = e && e.code ? " [" + e.code + "]" : "";
-        done("ซิงค์ไม่สำเร็จ" + code + ": " + (e.message || e), "err");
-      });
-    }
-
-    function loadScript(src, ok, err) {
-      if (document.querySelector('script[src="' + src + '"]')) { ok(); return; }
-      var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = err || ok;
-      document.head.appendChild(s);
-    }
-    if (window.firebase && firebase.auth) { go(); return; }
-    var base = "https://www.gstatic.com/firebasejs/10.12.2/";
-    loadScript(base + "firebase-app-compat.js", function () {
-      loadScript(base + "firebase-auth-compat.js", go, function () { done("โหลด Firebase Auth SDK ไม่สำเร็จ", "err"); });
-    }, function () { done("โหลด Firebase SDK ไม่สำเร็จ — ลองปิด ad blocker", "err"); });
+    btn.textContent = "กำลังซิงค์…";
+    S.cloudSyncAllProducts(function (i, total) {
+      if (!finished) btn.textContent = "ซิงค์ " + i + "/" + total + "…";
+    }).then(function (count) {
+      done("ซิงค์สินค้า " + count + " รายการขึ้น cloud แล้ว (รวมรูป + อัปเดตบอท LINE) ✓", "ok");
+    }).catch(function (e) {
+      var code = e && e.code ? " [" + e.code + "]" : "";
+      done("ซิงค์ไม่สำเร็จ" + code + ": " + (e && e.message || e), "err");
+    });
   }
 
   /* ---------- shared: ensure Firebase Auth + return ID token --------------- */
