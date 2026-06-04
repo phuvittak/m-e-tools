@@ -66,6 +66,27 @@
     var shell = document.querySelector("[data-shell]");
     shell.insertAdjacentHTML("afterbegin", side);
     document.querySelector("[data-logout]").addEventListener("click", function () { S.logout(); window.location.href = "../login.html"; });
+
+    mountBackToTop();
+  }
+
+  /* floating "back to top" button — appears once the page is scrolled down */
+  function mountBackToTop() {
+    if (document.querySelector(".back-to-top")) return;
+    var btn = document.createElement("button");
+    btn.className = "back-to-top";
+    btn.type = "button";
+    btn.setAttribute("aria-label", "กลับขึ้นบนสุด");
+    btn.title = "กลับขึ้นบนสุด";
+    btn.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6"/><path d="M5 12l7-7 7 7"/></svg>';
+    btn.addEventListener("click", function () { window.scrollTo({ top: 0, behavior: "smooth" }); });
+    document.body.appendChild(btn);
+    function onScroll() {
+      var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+      btn.classList.toggle("show", y > 300);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
   }
 
   /* ===================== DASHBOARD ===================== */
@@ -146,12 +167,17 @@
 
   /* ===================== INVENTORY ===================== */
   function initInventory() {
-    var state = { q: "", cat: "" };
+    var state = { q: "", cat: "", noloc: false };
     var search = document.querySelector("[data-search]");
     var catSel = document.querySelector("[data-catfilter]");
+    var nolocChk = document.querySelector("[data-noloc]");
+    var nolocCount = document.querySelector("[data-noloc-count]");
     catSel.innerHTML = '<option value="">ทุกหมวด</option>' + S.CATEGORIES.map(function (c) { return '<option value="' + c.key + '">' + c.label + "</option>"; }).join("");
+    // a product has "no storage location" if location is blank or the placeholder
+    function noLoc(p) { var l = (p.location || "").trim(); return !l || l === "ยังไม่ระบุ"; }
     search.addEventListener("input", function () { state.q = search.value.trim().toLowerCase(); render(); });
     catSel.addEventListener("change", function () { state.cat = catSel.value; render(); });
+    if (nolocChk) nolocChk.addEventListener("change", function () { state.noloc = nolocChk.checked; render(); });
     document.querySelector("[data-add]").addEventListener("click", function () { openProductModal(null); });
     var syncBtn = document.querySelector("[data-sync-bot]");
     if (syncBtn) syncBtn.addEventListener("click", function () { syncProductsToFirebase(syncBtn); });
@@ -162,8 +188,15 @@
       alertBox.innerHTML = lowAll.length ? "⚠ มีสินค้าใกล้หมด <b>" + lowAll.length + "</b> รายการ — ควรเติมสต็อก" : "";
       alertBox.style.display = lowAll.length ? "block" : "none";
 
+      // keep the "no location" badge count in sync with the whole catalog
+      if (nolocCount) {
+        var nl = S.getProducts().filter(noLoc).length;
+        nolocCount.textContent = nl ? "(" + nl + ")" : "";
+      }
+
       var list = S.getProducts().filter(function (p) {
         if (state.cat && p.category !== state.cat) return false;
+        if (state.noloc && !noLoc(p)) return false;
         if (state.q) { var h = (p.name + " " + p.brand + " " + p.sku + " " + p.location).toLowerCase(); if (h.indexOf(state.q) < 0) return false; }
         return true;
       });

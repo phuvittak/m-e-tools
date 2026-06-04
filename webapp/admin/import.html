@@ -70,6 +70,14 @@
 
         <div id="xlsxOpts" style="display:none">
           <hr class="divider">
+          <div style="background:#fff8e8;border:1px solid #ffe2a8;border-radius:8px;padding:12px 14px;margin-bottom:14px">
+            <div style="font-weight:700;margin-bottom:4px">⚡ วิเคราะห์ทั้งไฟล์อัตโนมัติ (แนะนำ)</div>
+            <div class="sub" style="margin-bottom:10px">กดปุ่มเดียว ระบบจะอ่าน <b>ทุกชีต</b> ในไฟล์ เดาหัวตาราง+คอลัมน์ให้เอง วิเคราะห์แบรนด์จากชื่อสินค้า แล้วสรุปทั้งไฟล์ให้ดูก่อนเพิ่ม</div>
+            <button class="imp-btn" id="xlsxAutoBtn">⚡ วิเคราะห์ทั้งไฟล์</button>
+            <div id="xlsxSummary" style="display:none;margin-top:12px"></div>
+          </div>
+
+          <div class="sub" style="margin-bottom:8px"><strong>หรือจับคู่คอลัมน์เอง</strong> (กรณีไฟล์ซับซ้อน อยากเลือกชีต/คอลัมน์เอง):</div>
           <div class="imp-opt-row">
             <div class="imp-field"><label>ชีต (Sheet)</label><select id="xlsxSheet"></select></div>
             <div class="imp-field"><label>แถวหัวตาราง (Header)</label><select id="xlsxHeaderRow"></select></div>
@@ -354,6 +362,8 @@
       importBtn: document.getElementById("xlsxImportBtn"),
       importStatus: document.getElementById("xlsxImportStatus"),
       update: document.getElementById("xlsxUpdate"),
+      auto: document.getElementById("xlsxAutoBtn"),
+      summary: document.getElementById("xlsxSummary"),
     };
 
     // product categories (must match store.js keys)
@@ -391,6 +401,47 @@
       category:   ["หมวดหมู่","หมวด","ประเภท","category","group","กลุ่ม"],
       desc:       ["รายละเอียด","คำอธิบาย","สเปค","spec","detail","note","หมายเหตุ"],
     };
+
+    // brands the shop carries — each entry: [canonicalName, [aliases/regex tokens]]
+    // detection scans the product name (and sheet name) for any token.
+    var BRANDS = [
+      ["DEWALT", ["dewalt", "เดอวอลท์", "ดีวอลท์", "ดีวอล", "เดวอล"]],
+      ["MAKITA", ["makita", "มากีต้า", "มากิต้า", "มาคิต้า"]],
+      ["BOSCH", ["bosch", "บอช", "บ๊อช"]],
+      ["MILWAUKEE", ["milwaukee", "มิลวอกี", "มิลวอลกี"]],
+      ["STANLEY", ["stanley", "สแตนเลย์", "สแตนเล่"]],
+      ["BLACK+DECKER", ["black+decker", "black&decker", "black & decker", "black decker", "แบล็คแอนด์เดกเกอร์"]],
+      ["HIKOKI", ["hikoki", "hi-koki"]],
+      ["HITACHI", ["hitachi", "ฮิตาชิ"]],
+      ["INGCO", ["ingco", "อิงโก้", "อิงโก"]],
+      ["TOTAL", ["total tools", "total "]],
+      ["OSUKA", ["osuka", "โอสุกะ", "ไอแม็กช์", "imax"]],
+      ["MASARU", ["masaru", "มาซารุ"]],
+      ["PUMPKIN", ["pumpkin", "พัมคิน", "ฟักทอง"]],
+      ["PUMA", ["puma", "พูม่า"]],
+      ["OKURA", ["okura", "โอคุระ"]],
+      ["ASAKI", ["asaki", "อาซากิ"]],
+      ["ROWEL", ["rowel", "โรเวล"]],
+      ["BURKIN", ["burkin", "เบอร์คิน"]],
+      ["VESSEL", ["vessel", "เวสเซล"]],
+      ["KNIPEX", ["knipex", "ไนเป็ก"]],
+      ["SANWA", ["sanwa", "ซันวา"]],
+      ["KARCHER", ["karcher", "คาเชอร์"]],
+      ["RYOBI", ["ryobi", "เรียวบิ"]],
+      ["WORX", ["worx"]],
+      ["DONGCHENG", ["dongcheng", "ตงเฉิง"]],
+    ];
+    function detectBrand(text) {
+      var t = String(text == null ? "" : text).toLowerCase();
+      if (!t) return "";
+      for (var i = 0; i < BRANDS.length; i++) {
+        var aliases = BRANDS[i][1];
+        for (var j = 0; j < aliases.length; j++) {
+          if (t.indexOf(aliases[j]) >= 0) return BRANDS[i][0];
+        }
+      }
+      return "";
+    }
 
     var state = { wb:null, aoa:[], headerRowIdx:0, cols:[] };
 
@@ -448,20 +499,45 @@
       state.headerRowIdx = +this.value; buildMapping();
     });
 
-    function loadSheet(idx) {
-      var ws = state.wb.Sheets[state.wb.SheetNames[idx]];
-      state.aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
-      // header-row picker: offer first up to 10 rows, auto-pick the one with most text cells
-      var maxScan = Math.min(10, state.aoa.length);
+    // pick the most likely header row within the first 10 rows of an AOA
+    function detectHeaderRow(aoa) {
+      var maxScan = Math.min(10, aoa.length);
       var bestRow = 0, bestScore = -1;
       for (var r = 0; r < maxScan; r++) {
-        var rowArr = state.aoa[r] || [];
+        var rowArr = aoa[r] || [];
         var nonEmpty = rowArr.filter(function (c) { return cell(c).length > 0; }).length;
         // header rows are mostly text labels, not numbers — weight text cells higher
         var textCells = rowArr.filter(function (c) { var t = cell(c); return t && !/^[\d.,\-%฿\s]+$/.test(t); }).length;
         var s = textCells * 2 + nonEmpty;
         if (s > bestScore) { bestScore = s; bestRow = r; }
       }
+      return bestRow;
+    }
+
+    // widest row width across the data block (handles ragged rows)
+    function sheetWidth(aoa, fromRow) {
+      var width = (aoa[fromRow] || []).length;
+      for (var r = fromRow; r < Math.min(aoa.length, fromRow + 40); r++) {
+        if (aoa[r] && aoa[r].length > width) width = aoa[r].length;
+      }
+      return width;
+    }
+
+    // auto-map every product field to a column index using header keywords
+    function autoMap(aoa, headerIdx) {
+      var width = sheetWidth(aoa, headerIdx);
+      var headers = [];
+      for (var i = 0; i < width; i++) headers.push(cell((aoa[headerIdx] || [])[i]));
+      var map = {};
+      FIELDS.forEach(function (fld) { map[fld.key] = guessColumn(fld.key, headers); });
+      return map;
+    }
+
+    function loadSheet(idx) {
+      var ws = state.wb.Sheets[state.wb.SheetNames[idx]];
+      state.aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+      var maxScan = Math.min(10, state.aoa.length);
+      var bestRow = detectHeaderRow(state.aoa);
       state.headerRowIdx = bestRow;
       els.headerRow.innerHTML = "";
       for (var i = 0; i < maxScan; i++) {
@@ -528,34 +604,176 @@
       return "";
     }
 
-    // build the array of product objects from current mapping
-    function buildProducts() {
-      var m = currentMapping();
-      var brandDefault = cell(els.brand.value);
-      var catDefault = els.cat.value || "power";
+    // core: turn an AOA + column map into product objects.
+    // opts = { brandDefault, catDefault, brandHint } (brandHint = sheet name, used last)
+    function buildRows(aoa, headerIdx, m, opts) {
+      opts = opts || {};
+      var brandDefault = opts.brandDefault || "";
+      var catDefault = opts.catDefault || "power";
+      var brandHint = opts.brandHint || "";
       var out = [];
-      for (var r = state.headerRowIdx + 1; r < state.aoa.length; r++) {
-        var row = state.aoa[r] || [];
+      for (var r = headerIdx + 1; r < aoa.length; r++) {
+        var row = aoa[r] || [];
         function g(key) { var i = m[key]; return i != null && i >= 0 ? cell(row[i]) : ""; }
         var name = g("name");
         if (!name) continue; // skip rows without a product name (collapses multi-row blocks)
-        if (/^(อะไหล่|รวม|หมวด|รายการ|ยี่ห้อ|brand)$/i.test(name)) continue; // skip obvious sub-header rows
-        var rentN = m.rentPerDay >= 0 ? num(row[m.rentPerDay]) : 0;
-        var p = {
+        if (/^(อะไหล่|รวม|หมวด|รายการ|ยี่ห้อ|brand|total|sum)$/i.test(name)) continue; // skip sub-header rows
+        // BRAND: explicit column → detect from name → sheet-name hint → default
+        var brand = g("brand") || detectBrand(name) || brandHint || brandDefault || "—";
+        out.push({
           name: name,
           sku: g("sku"),
-          brand: g("brand") || brandDefault || "—",
+          brand: brand,
           price: m.price >= 0 ? num(row[m.price]) : 0,
           cost: m.cost >= 0 ? num(row[m.cost]) : 0,
-          rentPerDay: rentN,
+          rentPerDay: m.rentPerDay >= 0 ? num(row[m.rentPerDay]) : 0,
           stock: m.stock >= 0 ? num(row[m.stock]) : 0,
           unit: g("unit"),
           category: matchCategory(g("category")) || catDefault,
           desc: g("desc"),
-        };
-        out.push(p);
+        });
       }
       return out;
+    }
+
+    // build from the CURRENT (manually-mapped) sheet
+    function buildProducts() {
+      return buildRows(state.aoa, state.headerRowIdx, currentMapping(), {
+        brandDefault: cell(els.brand.value),
+        catDefault: els.cat.value || "power",
+      });
+    }
+
+    // shared: render the preview table for a product array (scrolls into view)
+    function renderPreviewTable(products) {
+      var cols = [
+        ["name","ชื่อสินค้า"],["sku","SKU"],["brand","ยี่ห้อ"],["category","หมวด"],
+        ["price","ราคาขาย"],["cost","ต้นทุน"],["rentPerDay","เช่า/วัน"],["stock","สต็อก"],["unit","หน่วย"],
+      ];
+      var head = "<thead><tr><th>#</th>" + cols.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "</tr></thead>";
+      var rows = products.slice(0, 25).map(function (p, i) {
+        return "<tr><td>" + (i + 1) + "</td>" + cols.map(function (c) {
+          var v = p[c[0]];
+          var isNum = (c[0] === "price" || c[0] === "cost" || c[0] === "rentPerDay" || c[0] === "stock");
+          if (isNum) return '<td class="num">' + (v ? Number(v).toLocaleString("th-TH") : "—") + "</td>";
+          var key = c[0] === "category" ? (CATS.filter(function(x){return x.key===v;})[0] || {}).label || v : v;
+          return "<td>" + esc(key || "—") + "</td>";
+        }).join("") + "</tr>";
+      }).join("");
+      els.previewTable.innerHTML = head + "<tbody>" + rows + "</tbody>";
+      els.previewTitle.textContent = "พบ " + products.length + " รายการ (แสดง " + Math.min(25, products.length) + " แถวแรก)";
+      els.previewWrap.style.display = "block";
+      els.importStatus.textContent = "";
+    }
+
+    /* ---- AUTO-ANALYZE: drop a file, read every sheet, summarize the whole thing ---- */
+    function catLabel(key) {
+      var c = CATS.filter(function (x) { return x.key === key; })[0];
+      return c ? c.label : key;
+    }
+    els.auto.addEventListener("click", function () {
+      if (!state.wb) { setAlert("ยังไม่ได้เลือกไฟล์", "err"); return; }
+      var btn = els.auto;
+      btn.disabled = true; btn.textContent = "⏳ กำลังวิเคราะห์…";
+      try {
+        var all = [];
+        var perSheet = [];   // { name, count, headerRow, brandHint }
+        state.wb.SheetNames.forEach(function (sn) {
+          var ws = state.wb.Sheets[sn];
+          var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+          if (!aoa.length) { perSheet.push({ name: sn, count: 0, headerRow: 0, brandHint: "" }); return; }
+          var hr = detectHeaderRow(aoa);
+          var map = autoMap(aoa, hr);
+          if (map.name == null || map.name < 0) {
+            // no recognizable name column → assume first text column is the name
+            var width = sheetWidth(aoa, hr), firstText = -1;
+            for (var i = 0; i < width; i++) {
+              var v = cell((aoa[hr + 1] || aoa[hr] || [])[i]);
+              if (v && !/^[\d.,\-%฿\s]+$/.test(v)) { firstText = i; break; }
+            }
+            map.name = firstText;
+          }
+          var brandHint = detectBrand(sn);
+          var prods = (map.name != null && map.name >= 0)
+            ? buildRows(aoa, hr, map, { brandDefault: cell(els.brand.value), catDefault: els.cat.value || "power", brandHint: brandHint })
+            : [];
+          perSheet.push({ name: sn, count: prods.length, headerRow: hr, brandHint: brandHint });
+          all = all.concat(prods);
+        });
+
+        state.preview = all;
+
+        if (!all.length) {
+          els.summary.style.display = "block";
+          els.summary.innerHTML = '<div style="color:#c0392b;font-weight:700">ไม่พบรายการสินค้าในไฟล์นี้</div>' +
+            '<div class="sub">ลองใช้โหมด “จับคู่คอลัมน์เอง” ด้านล่าง เพื่อเลือกชีต/คอลัมน์ชื่อสินค้าด้วยตนเอง</div>';
+          els.previewWrap.style.display = "none";
+          btn.disabled = false; btn.textContent = "⚡ วิเคราะห์ทั้งไฟล์";
+          return;
+        }
+
+        // aggregate stats
+        var byBrand = {}, byCat = {}, noPrice = 0, noSku = 0, withStock = 0;
+        all.forEach(function (p) {
+          byBrand[p.brand || "—"] = (byBrand[p.brand || "—"] || 0) + 1;
+          byCat[p.category || "power"] = (byCat[p.category || "power"] || 0) + 1;
+          if (!(p.price > 0)) noPrice++;
+          if (!p.sku) noSku++;
+          if (p.stock > 0) withStock++;
+        });
+        function sortedEntries(obj) {
+          return Object.keys(obj).map(function (k) { return [k, obj[k]]; })
+            .sort(function (a, b) { return b[1] - a[1]; });
+        }
+        function chips(entries, labelFn) {
+          return entries.map(function (e) {
+            var lbl = labelFn ? labelFn(e[0]) : e[0];
+            return '<span style="display:inline-block;background:#fff;border:1px solid var(--border-3);border-radius:999px;padding:3px 11px;margin:0 6px 6px 0;font-size:12px;font-weight:600">' +
+              esc(lbl) + ' <b style="color:#1c5a99">' + e[1] + '</b></span>';
+          }).join("");
+        }
+
+        var brandEntries = sortedEntries(byBrand);
+        var detectedBrands = brandEntries.filter(function (e) { return e[0] !== "—"; }).length;
+        var sheetRows = perSheet.map(function (s) {
+          return '<tr><td>' + esc(s.name) + '</td>' +
+            '<td class="num">' + (s.count || "—") + '</td>' +
+            '<td>' + (s.brandHint ? esc(s.brandHint) : '<span style="color:var(--fg-2)">—</span>') + '</td></tr>';
+        }).join("");
+
+        var html =
+          '<div style="font-weight:800;font-size:15px;margin-bottom:8px">📊 สรุปทั้งไฟล์: พบ ' + all.length + ' รายการ จาก ' + state.wb.SheetNames.length + ' ชีต</div>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">' +
+            statBox("รายการทั้งหมด", all.length, "#1c5a99") +
+            statBox("แบรนด์ที่ตรวจพบ", detectedBrands, "#2e7d32") +
+            statBox("ยังไม่มีราคา", noPrice, noPrice ? "#c0392b" : "#777") +
+            statBox("ยังไม่มีรหัส SKU", noSku, "#a07000") +
+          '</div>' +
+          '<div style="font-weight:700;font-size:13px;margin:10px 0 6px">แยกตามแบรนด์</div>' +
+          '<div>' + chips(brandEntries) + '</div>' +
+          '<div style="font-weight:700;font-size:13px;margin:12px 0 6px">แยกตามหมวดหมู่</div>' +
+          '<div>' + chips(sortedEntries(byCat), catLabel) + '</div>' +
+          '<div style="font-weight:700;font-size:13px;margin:14px 0 6px">แยกตามชีต (Sheet)</div>' +
+          '<div class="imp-table-wrap" style="max-height:220px"><table class="imp-table">' +
+            '<thead><tr><th>ชีต</th><th>จำนวน</th><th>แบรนด์จากชื่อชีต</th></tr></thead><tbody>' + sheetRows + '</tbody></table></div>' +
+          '<div class="sub" style="margin-top:10px">ตรวจดูตัวอย่างด้านล่าง ถ้าถูกต้องกด <b>“เพิ่มทั้งหมดเข้าคลัง”</b> ได้เลย</div>';
+
+        els.summary.style.display = "block";
+        els.summary.innerHTML = html;
+
+        renderPreviewTable(all);
+        els.previewWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+        setAlert("");
+      } catch (err) {
+        setAlert("วิเคราะห์ไม่สำเร็จ: " + (err.message || err), "err");
+      }
+      btn.disabled = false; btn.textContent = "⚡ วิเคราะห์ทั้งไฟล์";
+    });
+
+    function statBox(label, value, color) {
+      return '<div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--border-3);border-radius:8px;padding:10px 12px">' +
+        '<div style="font-size:22px;font-weight:800;color:' + color + '">' + value + '</div>' +
+        '<div style="font-size:11px;color:var(--fg-2);font-weight:600">' + esc(label) + '</div></div>';
     }
 
     /* ---- preview ---- */
@@ -571,23 +789,7 @@
         setAlert("ไม่พบแถวที่มีชื่อสินค้า — ลองเปลี่ยนแถวหัวตาราง หรือคอลัมน์ชื่อสินค้า", "err");
         return;
       }
-      var cols = [
-        ["name","ชื่อสินค้า"],["sku","SKU"],["brand","ยี่ห้อ"],["category","หมวด"],
-        ["price","ราคาขาย"],["cost","ต้นทุน"],["rentPerDay","เช่า/วัน"],["stock","สต็อก"],["unit","หน่วย"],
-      ];
-      var head = "<thead><tr><th>#</th>" + cols.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "</tr></thead>";
-      var rows = products.slice(0, 25).map(function (p, i) {
-        return "<tr><td>" + (i + 1) + "</td>" + cols.map(function (c) {
-          var v = p[c[0]];
-          var isNum = (c[0] === "price" || c[0] === "cost" || c[0] === "rentPerDay" || c[0] === "stock");
-          if (isNum) return '<td class="num">' + (v ? Number(v).toLocaleString("th-TH") : "—") + "</td>";
-          return "<td>" + esc(v || "—") + "</td>";
-        }).join("") + "</tr>";
-      }).join("");
-      els.previewTable.innerHTML = head + "<tbody>" + rows + "</tbody>";
-      els.previewTitle.textContent = "พบ " + products.length + " รายการ (แสดง " + Math.min(25, products.length) + " แถวแรก)";
-      els.previewWrap.style.display = "block";
-      els.importStatus.textContent = "";
+      renderPreviewTable(products);
       els.previewWrap.scrollIntoView({ behavior: "smooth", block: "start" });
       setAlert("");
     });
