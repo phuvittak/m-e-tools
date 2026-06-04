@@ -18,7 +18,7 @@
     .catalog-empty { text-align:center; padding:60px 20px; color:#bbb; font-size:15px }
     .book { position:relative; width:min(1060px,97vw) }
     .book-spread {
-      position:relative; display:flex; width:100%; aspect-ratio:1.52/1;
+      position:relative; display:flex; width:100%; aspect-ratio:1.414/1;
       perspective:2600px; box-shadow:0 26px 60px rgba(0,0,0,.5); border-radius:3px; background:var(--cat-paper)
     }
     .book-page { position:relative; width:50%; height:100%; background:var(--cat-paper); overflow:hidden; cursor:pointer }
@@ -32,6 +32,10 @@
     .book-leaf-face { position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden;
       background:var(--cat-paper); overflow:hidden }
     .book-leaf-back { transform:rotateY(180deg) }
+    /* dimming sweep while a leaf turns (edge-on page catches less light) */
+    .book-leaf-shade { position:absolute; inset:0; background:#0a0a0a; opacity:0; pointer-events:none;
+      animation:oskShade .72s ease both }
+    @keyframes oskShade { 0%{opacity:0} 50%{opacity:.4} 100%{opacity:0} }
 
     /* ---- nav ---- */
     .book-nav { display:flex; align-items:center; gap:18px }
@@ -80,11 +84,44 @@
     .catalog-nav a { color:var(--dw-yellow,#FFB81C); font-weight:600; font-size:14px; text-decoration:none }
     .catalog-nav a:hover { text-decoration:underline }
 
+    /* ---- OSUKA-style 4-up product page (2x2 grid) ---- */
+    .osk-page { padding:clamp(6px,1vw,12px); gap:clamp(5px,.8vw,9px) }
+    .osk-masthead { display:flex; align-items:center; justify-content:space-between; flex:0 0 auto; padding:1px 3px 4px }
+    .osk-mark { font-family:var(--font-display,inherit); font-weight:900; letter-spacing:.12em; color:var(--cat-red); font-size:clamp(11px,1.4vw,16px) }
+    .osk-page-brand { font-weight:800; color:var(--cat-ink); font-size:clamp(9px,1.1vw,13px); letter-spacing:.04em }
+    .osk-grid { flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:clamp(5px,.8vw,9px) }
+    .osk-card { min-height:0; min-width:0; display:flex; flex-direction:column; gap:clamp(2px,.4vw,4px);
+      border:1px solid #e6e6e6; border-radius:5px; padding:clamp(4px,.6vw,7px); overflow:hidden; background:#fff }
+    .osk-card-empty { border:none; background:transparent }
+    .osk-name { background:var(--cat-red); color:#fff; font-weight:700; line-height:1.2; border-radius:3px; padding:3px 6px;
+      font-size:clamp(8px,.95vw,12px); flex:0 0 auto; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical }
+    .osk-img { position:relative; flex:0 0 auto; height:clamp(56px,9vw,118px); background:#f6f6f6; border-radius:4px; overflow:hidden }
+    .osk-photo { position:absolute; inset:0; background:center/contain no-repeat }
+    .osk-photo-ph { display:flex; align-items:center; justify-content:center; color:#cfcfcf }
+    .osk-chip { position:absolute; top:3px; left:3px; z-index:2; background:rgba(21,23,28,.82); color:#fff; font-weight:700;
+      font-size:clamp(6px,.75vw,9px); letter-spacing:.03em; padding:1px 6px; border-radius:20px }
+    .osk-mini-label { color:var(--cat-red); font-weight:800; font-size:clamp(7px,.85vw,10px); margin-top:1px; flex:0 0 auto }
+    .osk-inbox { display:flex; flex-wrap:wrap; gap:2px; flex:0 0 auto }
+    .osk-inbox span { width:clamp(14px,2vw,22px); height:clamp(14px,2vw,22px); background:#f6f6f6 center/contain no-repeat;
+      border:1px solid #ececec; border-radius:3px }
+    .osk-bul { margin:0; padding:0; list-style:none; font-size:clamp(7px,.82vw,10px); line-height:1.35; flex:0 1 auto; min-height:0; overflow:hidden }
+    .osk-bul li { position:relative; padding-left:9px }
+    .osk-bul li::before { content:""; position:absolute; left:2px; top:.5em; width:3px; height:3px; border-radius:50%; background:var(--cat-red) }
+    .osk-bul-hl { color:#333 }
+    .osk-price { width:100%; border-collapse:collapse; margin-top:auto; font-size:clamp(7px,.82vw,10px); flex:0 0 auto; table-layout:fixed }
+    .osk-price th { background:var(--cat-ink); color:#fff; font-weight:600; padding:2px 3px; text-align:center; line-height:1.15 }
+    .osk-price th.c-srp, .osk-price th.c-ctrl { background:var(--cat-red) }
+    .osk-price th.c-qty { background:#5a5e66 }
+    .osk-price td { border:1px solid #e4e4e4; padding:2px 3px; font-weight:700; text-align:center; color:var(--cat-ink) }
+    .osk-price td.c-ctrl { color:var(--cat-red) }
+
     /* ---- mobile: single page ---- */
     @media (max-width:760px) {
-      .book-spread { aspect-ratio:.74/1 }
+      .book-spread { aspect-ratio:.707/1 }
       .book-page.book-left { display:none }
       .book-page.book-right { width:100% }
+      .osk-page { padding:7px }
+      .osk-grid { gap:5px }
     }
   </style>
 </head>

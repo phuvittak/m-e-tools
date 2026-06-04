@@ -747,41 +747,49 @@
       '<div class="cat-cover-hint">แตะหน้า หรือใช้ปุ่ม ‹ › เพื่อเปิดดู</div>' +
       "</div>";
   }
-  function catPageHtml(p, brand) {
+  function catCardHtml(p, brand) {
     var imgs = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
     var main = imgs[0] || "";
-    var photo = main
-      ? '<div class="cat-card-photo" style="background-image:url(' + JSON.stringify(main) + ')"></div>'
-      : '<div class="cat-card-photo cat-card-photo-ph">' + U.iconSvg(p.icon || "tool", 64) + "</div>";
+    var img = main
+      ? '<div class="osk-photo" style="background-image:url(' + JSON.stringify(main) + ')"></div>'
+      : '<div class="osk-photo osk-photo-ph">' + U.iconSvg(p.icon || "tool", 52) + "</div>";
+    var chip = brand ? '<span class="osk-chip">' + esc(brand) + "</span>" : "";
     var inbox = imgs.slice(1, 6);
     var inboxHtml = inbox.length
-      ? '<div class="cat-inbox-label">สินค้าภายในกล่อง</div><div class="cat-inbox">' +
+      ? '<div class="osk-mini-label">สินค้าภายในกล่อง</div><div class="osk-inbox">' +
         inbox.map(function (im) { return '<span style="background-image:url(' + JSON.stringify(im) + ')"></span>'; }).join("") + "</div>"
       : "";
-    var specs = (p.specs || []).filter(function (s) { return s && (s[0] || s[1]); }).slice(0, 7);
+    var specs = (p.specs || []).filter(function (s) { return s && (s[0] || s[1]); }).slice(0, 6);
     var specsHtml = specs.length
-      ? '<div class="cat-sec-label">รายละเอียดสินค้า</div><ul class="cat-specs">' +
-        specs.map(function (s) { return "<li>" + esc(s[0]) + (s[1] ? ": " + esc(s[1]) : "") + "</li>"; }).join("") + "</ul>"
+      ? '<div class="osk-mini-label">รายละเอียดสินค้า</div><ul class="osk-bul">' +
+        specs.map(function (s) { return "<li>" + esc(s[0]) + (s[1] ? " : " + esc(s[1]) : "") + "</li>"; }).join("") + "</ul>"
       : "";
-    var hl = (p.highlights || []).filter(Boolean).slice(0, 4);
+    var hl = (p.highlights || []).filter(Boolean).slice(0, 3);
     var hlHtml = hl.length
-      ? '<div class="cat-sec-label">จุดเด่น</div><ul class="cat-highlights">' +
+      ? '<div class="osk-mini-label">จุดเด่น</div><ul class="osk-bul osk-bul-hl">' +
         hl.map(function (h) { return "<li>" + esc(h) + "</li>"; }).join("") + "</ul>"
       : "";
-    var rows = '<tr><th>รหัสสินค้า</th><td>' + esc(p.sku || "-") + "</td></tr>" +
-      "<tr><th>ราคา (SRP)</th><td>" + S.money(p.price || 0) + "</td></tr>";
-    if (p.priceCtrl) rows += '<tr><th>ราคาคุม</th><td class="ctrl">' + S.money(p.priceCtrl) + "</td></tr>";
-    if (p.qtyPerBox) rows += "<tr><th>จำนวน</th><td>" + esc(String(p.qtyPerBox)) + " ตัว</td></tr>";
-    return '<div class="cat-page">' +
-      '<div class="cat-brandbar">' + esc(brand || p.brand || "") + "</div>" +
-      '<div class="cat-page-body"><div class="cat-card">' +
-        '<div class="cat-card-head">' + esc(p.name || "") + "</div>" +
-        '<div class="cat-card-main">' + photo +
-          '<div class="cat-card-side">' + inboxHtml + specsHtml + "</div>" +
-        "</div>" +
-        hlHtml +
-        '<table class="cat-price">' + rows + "</table>" +
-      "</div></div>" +
+    var qty = p.qtyPerBox > 0;
+    var head = '<tr><th class="c-code">รหัสสินค้า</th><th class="c-srp">SRP</th><th class="c-ctrl">ราคาคุม</th>' +
+      (qty ? '<th class="c-qty">จำนวน</th>' : "") + "</tr>";
+    var body = "<tr><td>" + esc(p.sku || "-") + "</td>" +
+      "<td>" + S.money(p.price || 0) + "</td>" +
+      '<td class="c-ctrl">' + (p.priceCtrl ? S.money(p.priceCtrl) : "—") + "</td>" +
+      (qty ? "<td>" + esc(String(p.qtyPerBox)) + " ตัว</td>" : "") + "</tr>";
+    return '<div class="osk-card">' +
+      '<div class="osk-name">' + esc(p.name || "") + "</div>" +
+      '<div class="osk-img">' + chip + img + "</div>" +
+      inboxHtml + specsHtml + hlHtml +
+      '<table class="osk-price">' + head + body + "</table>" +
+    "</div>";
+  }
+  function catProductPageHtml(items, brand) {
+    var cards = items.map(function (p) { return catCardHtml(p, brand); });
+    while (cards.length < 4) cards.push('<div class="osk-card osk-card-empty"></div>');
+    return '<div class="cat-page osk-page">' +
+      '<div class="osk-masthead"><span class="osk-mark">M.E.TOOLS</span>' +
+        '<span class="osk-page-brand">' + esc(brand || "") + "</span></div>" +
+      '<div class="osk-grid">' + cards.join("") + "</div>" +
     "</div>";
   }
   function initCatalog() {
@@ -795,18 +803,21 @@
     var brands = brandOrder.filter(function (b) { return present.indexOf(b) >= 0; })
       .concat(present.filter(function (b) { return brandOrder.indexOf(b) < 0; }));
 
-    var ordered = [];
+    var groups = [];
     brands.forEach(function (b) {
-      products.filter(function (p) { return p.brand === b; }).forEach(function (p) { ordered.push({ p: p, b: b }); });
+      var list = products.filter(function (p) { return p.brand === b; });
+      if (list.length) groups.push({ brand: b, list: list });
     });
-    products.filter(function (p) { return brands.indexOf(p.brand) < 0; })
-      .forEach(function (p) { ordered.push({ p: p, b: p.brand || "สินค้า" }); });
+    var noBrand = products.filter(function (p) { return !p.brand || brands.indexOf(p.brand) < 0; });
+    if (noBrand.length) groups.push({ brand: "อื่นๆ", list: noBrand });
 
-    if (!ordered.length) { box.innerHTML = '<div class="catalog-empty">ยังไม่มีสินค้าในแคตตาล็อก</div>'; return; }
+    if (!groups.length) { box.innerHTML = '<div class="catalog-empty">ยังไม่มีสินค้าในแคตตาล็อก</div>'; return; }
 
     var BLANK = '<div class="cat-page cat-blank"></div>';
     var pages = [catCoverHtml(st)];
-    ordered.forEach(function (it) { pages.push(catPageHtml(it.p, it.b)); });
+    groups.forEach(function (g) {
+      for (var i = 0; i < g.list.length; i += 4) pages.push(catProductPageHtml(g.list.slice(i, i + 4), g.brand));
+    });
     if (pages.length % 2 !== 0) pages.push(BLANK);
 
     box.innerHTML =
@@ -842,8 +853,8 @@
       var leaf = document.createElement("div");
       leaf.className = "book-leaf";
       leaf.style.left = left; leaf.style.width = width; leaf.style.transformOrigin = origin;
-      var f = document.createElement("div"); f.className = "book-leaf-face"; f.innerHTML = frontHtml;
-      var bk = document.createElement("div"); bk.className = "book-leaf-face book-leaf-back"; bk.innerHTML = backHtml;
+      var f = document.createElement("div"); f.className = "book-leaf-face"; f.innerHTML = frontHtml + '<div class="book-leaf-shade"></div>';
+      var bk = document.createElement("div"); bk.className = "book-leaf-face book-leaf-back"; bk.innerHTML = backHtml + '<div class="book-leaf-shade"></div>';
       leaf.appendChild(f); leaf.appendChild(bk);
       return leaf;
     }
