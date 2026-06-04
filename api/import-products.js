@@ -2,10 +2,11 @@
    M.E.Tools — AI product importer (Vercel Node.js Function)
    ---------------------------------------------------------------------
    แอดมินป้อน URL หน้าสินค้า (KTW / iToolmart / ใดก็ได้) → endpoint นี้
-   fetch HTML → strip → ส่ง Claude ให้แยกข้อมูลสินค้า → return products[]
+   fetch HTML → strip → ส่ง Gemini ให้แยกข้อมูลสินค้า → return products[]
    ===================================================================== */
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL = 'gemini-2.0-flash';
 
 function stripHtml(html) {
   return html
@@ -64,29 +65,30 @@ async function fetchPageText(url) {
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const html = await r.text();
   const text = stripHtml(html);
-  return text.slice(0, 20000); // Claude ไม่ต้องการมากกว่านี้
+  return text.slice(0, 20000); // Gemini ไม่ต้องการมากกว่านี้
 }
 
-async function parseWithClaude(text) {
-  if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY ไม่ได้ตั้งค่า');
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
+async function parseWithGemini(text) {
+  if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY ไม่ได้ตั้งค่า');
+  const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/'
+    + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+  const r = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: text }],
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: 'user', parts: [{ text: text }] }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 4096,
+        responseMimeType: 'application/json',
+      },
     }),
     signal: AbortSignal.timeout(30000),
   });
-  if (!r.ok) { const e = await r.text(); throw new Error('Anthropic: ' + e.slice(0, 200)); }
+  if (!r.ok) { const e = await r.text(); throw new Error('Gemini: ' + e.slice(0, 200)); }
   const data = await r.json();
-  const raw = data?.content?.[0]?.text?.trim() || '[]';
+  const raw = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]').trim();
   try {
     return JSON.parse(raw);
   } catch {
@@ -119,7 +121,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const products = await parseWithClaude(pageText);
+    const products = await parseWithGemini(pageText);
     if (!Array.isArray(products)) {
       res.status(200).json({ ok: true, products: [], warning: 'ไม่พบสินค้าในหน้านี้' });
       return;
