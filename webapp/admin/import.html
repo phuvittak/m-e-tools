@@ -589,17 +589,24 @@
       var btn = els.importBtn;
       btn.disabled = true; btn.textContent = "⏳ กำลังเพิ่ม…";
 
+      function normName(s) { return String(s == null ? "" : s).trim().toLowerCase().replace(/\s+/g, " "); }
+
       var list = S.getProducts();
-      var bySku = {};
-      list.forEach(function (p) { if (p.sku) bySku[String(p.sku).trim().toLowerCase()] = p; });
+      var bySku = {}, byName = {};
+      list.forEach(function (p) {
+        if (p.sku) bySku[String(p.sku).trim().toLowerCase()] = p;
+        if (p.name) byName[normName(p.name)] = p;
+      });
 
       var added = 0, updated = 0, skipped = 0;
       products.forEach(function (p) {
         if (!p.name) { skipped++; return; }
-        var key = p.sku ? String(p.sku).trim().toLowerCase() : "";
-        var imported = {
+        var skuKey = p.sku ? String(p.sku).trim().toLowerCase() : "";
+        var nameKey = normName(p.name);
+        // fields to write. Only include sku when the file actually had one,
+        // so updating a no-sku product keeps its existing sku instead of churning it.
+        var fields = {
           name: p.name,
-          sku: p.sku || S.genId("SKU"),
           brand: p.brand || "—",
           category: p.category || "power",
           price: p.price || 0,
@@ -611,18 +618,24 @@
           desc: p.desc || (p.unit ? ("หน่วย: " + p.unit) : ""),
           specs: p.unit ? [["หน่วยนับ", p.unit]] : [],
         };
-        if (doUpdate && key && bySku[key]) {
-          // merge imported fields onto existing product (keep id, images, rented)
-          Object.assign(bySku[key], imported);
+        if (p.sku) fields.sku = p.sku;
+
+        // match an existing product: by SKU when present, otherwise by name
+        var existing = skuKey ? bySku[skuKey] : byName[nameKey];
+        if (doUpdate && existing) {
+          Object.assign(existing, fields); // keep id, images, rented, (and sku if none imported)
           updated++;
         } else {
           var fresh = Object.assign({
             id: S.genId("p").toLowerCase(),
+            sku: p.sku || S.genId("SKU"),
             rented: 0, motorType: "—", warrantyYears: 0, shipSize: "",
             icon: "tool", location: "ยังไม่ระบุ", images: [], image: "", hidden: false,
-          }, imported);
+          }, fields);
           list.push(fresh);
-          if (key) bySku[key] = fresh; // dedup within this same batch
+          // register both keys so repeated rows in the same batch also dedup
+          if (fresh.sku) bySku[String(fresh.sku).trim().toLowerCase()] = fresh;
+          byName[nameKey] = fresh;
           added++;
         }
       });
