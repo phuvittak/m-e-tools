@@ -443,6 +443,28 @@
       return "";
     }
 
+    // category keywords (ordered: most specific first). detection scans the
+    // product name for any token → returns the category key. keys match CATS.
+    var CAT_HINTS = [
+      ["battery", ["แบตเตอรี่", "แบตเตอรี", "แบต ", "แท่นชาร์จ", "ที่ชาร์จ", "ชาร์จ", "battery", "charger"]],
+      ["measure", ["ตลับเมตร", "ระดับน้ำ", "เลเซอร์วัด", "เลเซอร์", "laser", "มัลติมิเตอร์", "multimeter", "ไมโครมิเตอร์", "เวอร์เนีย", "เครื่องมือวัด", "เครื่องวัด", "วัดระยะ", "วัดมุม", "ลูกดิ่ง", "meter"]],
+      ["grinder", ["เครื่องเจียร", "เครื่องเจีย", "หินเจีย", "ลูกหมู", "เจียร", "เจีย", "grinder", "เครื่องขัด", "เครื่องตัดไฟเบอร์", "ตัดไฟเบอร์"]],
+      ["saw", ["เลื่อยวงเดือน", "เลื่อยจิ๊กซอ", "เลื่อยฉลุ", "เลื่อยชัก", "เลื่อยโซ่", "เลื่อยยนต์", "เลื่อยตัดองศา", "เลื่อย", "jigsaw", "circular saw", "chainsaw", "reciprocating", "miter", "saw"]],
+      ["drill", ["สว่านกระแทก", "สว่านโรตารี", "สว่านไร้สาย", "สว่านไฟฟ้า", "สว่าน", "ไขควงไฟฟ้า", "ไขควงกระแทก", "ไขควงไร้สาย", "ไขควง", "impact driver", "hammer drill", "drill", "screwdriver", "driver"]],
+      ["hand", ["ประแจปอนด์", "ประแจแหวน", "ประแจเลื่อน", "ประแจ", "คีมล็อค", "คีมตัด", "คีม", "ค้อน", "สิ่ว", "ตะไบ", "ชุดบล็อก", "บล็อก", "ชุดเครื่องมือ", "ชุดประแจ", "คัตเตอร์", "เหล็กงัด", "ไขควงมือ", "socket", "wrench", "plier", "hammer", "spanner"]],
+    ];
+    function detectCategory(text) {
+      var t = String(text == null ? "" : text).toLowerCase();
+      if (!t) return "";
+      for (var i = 0; i < CAT_HINTS.length; i++) {
+        var toks = CAT_HINTS[i][1];
+        for (var j = 0; j < toks.length; j++) {
+          if (t.indexOf(toks[j]) >= 0) return CAT_HINTS[i][0];
+        }
+      }
+      return "";
+    }
+
     var state = { wb:null, aoa:[], headerRowIdx:0, cols:[] };
 
     function log(msg, clear) {
@@ -620,6 +642,8 @@
         if (/^(อะไหล่|รวม|หมวด|รายการ|ยี่ห้อ|brand|total|sum)$/i.test(name)) continue; // skip sub-header rows
         // BRAND: explicit column → detect from name → sheet-name hint → default
         var brand = g("brand") || detectBrand(name) || brandHint || brandDefault || "—";
+        // CATEGORY: explicit column → detect from name → default
+        var category = matchCategory(g("category")) || detectCategory(name) || catDefault;
         out.push({
           name: name,
           sku: g("sku"),
@@ -629,7 +653,7 @@
           rentPerDay: m.rentPerDay >= 0 ? num(row[m.rentPerDay]) : 0,
           stock: m.stock >= 0 ? num(row[m.stock]) : 0,
           unit: g("unit"),
-          category: matchCategory(g("category")) || catDefault,
+          category: category,
           desc: g("desc"),
         });
       }
