@@ -86,6 +86,17 @@
         </div>
       </div>
 
+      <!-- ============ Cleanup: remove duplicate products ============ -->
+      <div class="imp-card">
+        <h2>🧹 ล้างรายการซ้ำในคลัง</h2>
+        <div class="sub">ตรวจสินค้าทั้งคลัง ถ้าซ้ำกัน (รหัส SKU ซ้ำ หรือชื่อซ้ำ) จะเก็บไว้ตัวเดียว (ตัวที่ข้อมูลครบสุด) แล้วลบที่เหลือ — มีให้ยืนยันก่อนลบ</div>
+        <div class="imp-product-footer" style="border:none;padding-top:0;margin-top:0">
+          <button class="imp-btn imp-btn-ghost" id="dedupScanBtn">🔍 ตรวจหาของซ้ำ</button>
+          <button class="imp-btn" id="dedupRunBtn" style="display:none">🧹 ลบของซ้ำ</button>
+          <span class="imp-status" id="dedupStatus"></span>
+        </div>
+      </div>
+
       <div id="xlsxPreviewWrap" style="display:none">
         <div class="imp-card">
           <h2 id="xlsxPreviewTitle">ตัวอย่างข้อมูล</h2>
@@ -653,6 +664,81 @@
       var msg = "✅ เพิ่มใหม่ " + added + " รายการ" + (updated ? " · อัปเดต " + updated + " รายการ" : "") + (skipped ? " · ข้าม " + skipped : "");
       els.importStatus.textContent = msg;
       setAlert(msg + " — ไปที่หน้า “คลังสินค้า” เพื่อตรวจสอบและกดซิงค์ขึ้นบอท LINE", "ok");
+    });
+
+    /* ---- cleanup: remove duplicate products (by SKU, else by name) ---- */
+    var dedupEls = {
+      scan: document.getElementById("dedupScanBtn"),
+      run: document.getElementById("dedupRunBtn"),
+      status: document.getElementById("dedupStatus"),
+    };
+    function normName2(s) { return String(s == null ? "" : s).trim().toLowerCase().replace(/\s+/g, " "); }
+    // higher score = more complete record → keep this one
+    function richness(p) {
+      var s = 0;
+      if (p.price > 0) s += 3;
+      if (p.cost > 0) s += 1;
+      if (p.stock > 0) s += 1;
+      if (p.images && p.images.length) s += 4;
+      if (p.image) s += 2;
+      if (p.desc) s += Math.min(3, String(p.desc).length / 20);
+      if (Array.isArray(p.specs) && p.specs.length) s += 1;
+      if (p.sku && !/^sku-/i.test(p.sku)) s += 1; // a real sku beats an auto-generated one
+      return s;
+    }
+    // returns { removeIds:[...], groups:n } for the current catalog
+    function findDuplicates() {
+      var list = S.getProducts();
+      var groups = {};
+      list.forEach(function (p) {
+        var key = p.sku ? ("sku:" + String(p.sku).trim().toLowerCase()) : ("name:" + normName2(p.name));
+        (groups[key] = groups[key] || []).push(p);
+      });
+      var removeIds = [], dupGroups = 0;
+      Object.keys(groups).forEach(function (k) {
+        var g = groups[k];
+        if (g.length < 2) return;
+        dupGroups++;
+        // keep the richest; tie → keep the first in catalog order
+        var keep = g[0], keepScore = richness(g[0]);
+        for (var i = 1; i < g.length; i++) {
+          var sc = richness(g[i]);
+          if (sc > keepScore) { keep = g[i]; keepScore = sc; }
+        }
+        g.forEach(function (p) { if (p.id !== keep.id) removeIds.push(p.id); });
+      });
+      return { removeIds: removeIds, dupGroups: dupGroups, total: list.length };
+    }
+
+    dedupEls.scan.addEventListener("click", function () {
+      var res = findDuplicates();
+      if (!res.removeIds.length) {
+        dedupEls.run.style.display = "none";
+        dedupEls.status.textContent = "✅ ไม่พบรายการซ้ำ (ทั้งหมด " + res.total + " รายการ)";
+        return;
+      }
+      dedupEls.run.style.display = "";
+      dedupEls.run.textContent = "🧹 ลบของซ้ำ " + res.removeIds.length + " รายการ";
+      dedupEls.status.textContent = "พบ " + res.dupGroups + " กลุ่มที่ซ้ำ — จะลบ " + res.removeIds.length + " รายการ เหลือกลุ่มละ 1";
+    });
+
+    dedupEls.run.addEventListener("click", function () {
+      var res = findDuplicates();
+      if (!res.removeIds.length) { dedupEls.status.textContent = "ไม่มีของซ้ำให้ลบแล้ว"; dedupEls.run.style.display = "none"; return; }
+      if (!window.confirm("จะลบสินค้าซ้ำ " + res.removeIds.length + " รายการ (เก็บไว้กลุ่มละ 1)\nการลบนี้ย้อนกลับไม่ได้ ยืนยันหรือไม่?")) return;
+      var removeSet = {};
+      res.removeIds.forEach(function (id) { removeSet[id] = true; });
+      var kept = S.getProducts().filter(function (p) { return !removeSet[p.id]; });
+      try {
+        localStorage.setItem(S.KEY.products, JSON.stringify(kept));
+        window.dispatchEvent(new CustomEvent("me-store-change"));
+      } catch (e) {
+        dedupEls.status.textContent = "❌ ลบไม่สำเร็จ: " + (e.message || e);
+        return;
+      }
+      dedupEls.run.style.display = "none";
+      dedupEls.status.textContent = "✅ ลบของซ้ำแล้ว " + res.removeIds.length + " รายการ — เหลือ " + kept.length + " รายการ";
+      setAlert("ล้างรายการซ้ำแล้ว เหลือ " + kept.length + " รายการ — อย่าลืมไปกดซิงค์ขึ้นบอท LINE ในหน้าคลังสินค้า", "ok");
     });
   })();
   </script>
