@@ -225,6 +225,71 @@ img { max-width: 100%; display: block; }
 .pd-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
 .pd-thumb { width: 64px; height: 64px; border: 2px solid var(--ink); background-size: cover; background-position: center; cursor: pointer; padding: 0; opacity: .6; transition: opacity 120ms; }
 .pd-thumb.on, .pd-thumb:hover { opacity: 1; outline: 3px solid var(--dw-yellow); outline-offset: -2px; }
+
+/* ===== product media viewer (gallery / 360 spin / exploded parts) ===== */
+.pd-viewer { display: flex; flex-direction: column; gap: 12px; }
+.pdv-tabs { display: flex; gap: 0; border: 3px solid var(--ink); flex-wrap: wrap; }
+.pdv-tab { flex: 1 1 auto; font-family: var(--font-display-th); font-style: italic; font-weight: 800; font-size: 14px; padding: 10px 12px; background: #fff; border: none; border-right: 3px solid var(--ink); cursor: pointer; color: var(--ink); white-space: nowrap; }
+.pdv-tab:last-child { border-right: none; }
+.pdv-tab.on { background: var(--ink); color: var(--dw-yellow); }
+.pdv-tab:hover:not(.on) { background: var(--dw-yellow); }
+.pdv-panels { position: relative; }
+.pdv-panel[hidden] { display: none; }
+
+/* photos */
+.pd-main { position: relative; cursor: zoom-in; }
+.pd-zoom-hint { position: absolute; bottom: 8px; right: 8px; font-family: var(--font-mono); font-size: 11px; background: var(--ink); color: var(--dw-yellow); padding: 3px 8px; pointer-events: none; opacity: 0; transition: opacity 120ms; }
+.pd-main:hover .pd-zoom-hint, .pd-main:focus .pd-zoom-hint { opacity: 1; }
+
+/* 360 spin */
+.pd-spin { display: flex; flex-direction: column; gap: 12px; }
+.pd-spin-stage { position: relative; aspect-ratio: 1/1; border: 3px solid var(--ink); box-shadow: 6px 6px 0 0 var(--ink); background-size: cover; background-position: center; background-color: var(--concrete-100); cursor: grab; touch-action: pan-y; user-select: none; }
+.pd-spin-stage.grabbing { cursor: grabbing; }
+.pd-spin-badge { position: absolute; top: 8px; left: 8px; font-family: var(--font-display-en); font-style: italic; font-weight: 800; font-size: 13px; background: var(--workboot-blue); color: #fff; padding: 3px 9px; letter-spacing: .04em; }
+.pd-spin-grab { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 11px; background: var(--ink); color: var(--dw-yellow); padding: 3px 10px; pointer-events: none; }
+.pd-spin-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pd-spin-play { font-family: var(--font-display-th); font-style: italic; font-weight: 800; font-size: 13px; padding: 8px 14px; background: #fff; border: 3px solid var(--ink); box-shadow: 3px 3px 0 0 var(--ink); cursor: pointer; color: var(--ink); white-space: nowrap; }
+.pd-spin-play:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 0 var(--ink); }
+.pd-spin-play.on { background: var(--ink); color: var(--dw-yellow); }
+.pd-spin-range { flex: 1; min-width: 120px; accent-color: var(--ink); height: 6px; cursor: pointer; }
+
+/* exploded parts */
+.pd-parts { display: flex; flex-direction: column; gap: 12px; }
+.pd-parts-stage { position: relative; aspect-ratio: 1/1; border: 3px solid var(--ink); box-shadow: 6px 6px 0 0 var(--ink); background-size: cover; background-position: center; background-color: var(--concrete-100); }
+.pd-parts-stage[data-noimg] { background-image: repeating-linear-gradient(45deg, var(--concrete-100) 0, var(--concrete-100) 12px, var(--concrete-300) 12px, var(--concrete-300) 24px); }
+.pd-hot { position: absolute; transform: translate(-50%,-50%); width: 30px; height: 30px; border-radius: 999px; border: 3px solid var(--ink); background: var(--dw-yellow); color: var(--ink); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 0 0 var(--ink); z-index: 2; }
+.pd-hot::before { content: ""; position: absolute; inset: -6px; border-radius: 999px; border: 2px solid var(--dw-yellow); opacity: .9; animation: pd-hot-pulse 1.6s ease-out infinite; }
+.pd-hot-num { font-family: var(--font-display-en); font-style: italic; font-weight: 800; font-size: 14px; line-height: 1; }
+.pd-hot:hover { background: var(--ink); color: var(--dw-yellow); }
+.pd-hot.open { background: var(--price-red); color: #fff; }
+.pd-hot.open::before { animation: none; }
+@keyframes pd-hot-pulse { 0% { transform: scale(.7); opacity: .9; } 100% { transform: scale(1.5); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pd-hot::before { animation: none; } }
+.pd-parts-cap { font-family: var(--font-body); font-size: 13px; line-height: 1.5; color: var(--fg-1); background: var(--paper); border-left: 6px solid var(--dw-yellow); padding: 8px 12px; }
+.pd-part-callout { position: absolute; z-index: 5; width: 180px; transform: translate(12px,-50%) scale(.92); opacity: 0; transition: opacity 140ms ease, transform 140ms cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+.pd-part-callout.show { opacity: 1; transform: translate(12px,-50%) scale(1); pointer-events: auto; }
+.pd-part-callout.flip { transform: translate(-100%,-50%) scale(.92); margin-left: -12px; }
+.pd-part-callout.flip.show { transform: translate(-100%,-50%) scale(1); margin-left: -12px; }
+.pd-part-img { width: 100%; aspect-ratio: 4/3; border: 3px solid var(--ink); background-size: cover; background-position: center; background-color: #fff; }
+.pd-part-img--ph { display: flex; align-items: center; justify-content: center; font-family: var(--font-display-th); font-style: italic; font-weight: 800; color: var(--fg-3); background: repeating-linear-gradient(45deg, #fff 0, #fff 8px, var(--concrete-100) 8px, var(--concrete-100) 16px); }
+.pd-part-meta { background: var(--ink); color: #fff; border: 3px solid var(--ink); border-top: none; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; }
+.pd-part-label { font-family: var(--font-display-th); font-style: italic; font-weight: 800; font-size: 15px; color: var(--dw-yellow); }
+.pd-part-sku { font-family: var(--font-mono); font-size: 11px; color: #fff; opacity: .85; }
+.pd-part-note { font-family: var(--font-body); font-size: 12px; line-height: 1.45; color: #fff; opacity: .9; }
+.pd-part-close { align-self: flex-start; margin-top: 2px; font-family: var(--font-body); font-weight: 700; font-size: 11px; padding: 4px 10px; background: #fff; color: var(--ink); border: 2px solid #fff; cursor: pointer; }
+.pd-part-close:hover { background: var(--dw-yellow); }
+
+/* full-screen lightbox */
+.pd-lightbox { position: fixed; inset: 0; z-index: 200; background: rgba(11,11,11,.92); display: flex; align-items: center; justify-content: center; padding: 40px; }
+.pd-lb-img { width: min(86vw, 86vh); height: min(86vw, 86vh); background-size: contain; background-position: center; background-repeat: no-repeat; }
+.pd-lb-close { position: absolute; top: 18px; right: 18px; width: 46px; height: 46px; font-size: 22px; line-height: 1; background: var(--ink); color: var(--dw-yellow); border: 3px solid var(--dw-yellow); cursor: pointer; }
+.pd-lb-close:hover { background: var(--dw-yellow); color: var(--ink); }
+.pd-lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 54px; height: 54px; font-size: 32px; line-height: 1; background: var(--ink); color: var(--dw-yellow); border: 3px solid var(--dw-yellow); cursor: pointer; }
+.pd-lb-nav:hover { background: var(--dw-yellow); color: var(--ink); }
+.pd-lb-nav.prev { left: 18px; }
+.pd-lb-nav.next { right: 18px; }
+.pd-lb-count { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 13px; background: var(--ink); color: var(--dw-yellow); padding: 5px 12px; }
+
 .tile-brand { position: absolute; top: 8px; left: 8px; z-index: 2; font-family: var(--font-display-en); font-style: italic; font-size: 13px; background: var(--ink); color: var(--dw-yellow); padding: 2px 8px; letter-spacing: .03em; }
 .tile-badge { position: absolute; top: 8px; right: 8px; z-index: 2; font-family: var(--font-body); font-weight: 800; font-size: 10px; padding: 3px 8px; text-transform: uppercase; letter-spacing: .04em; border: 2px solid var(--ink); }
 .tile-badge.rent { background: var(--workboot-blue); color: #fff; }

@@ -344,7 +344,7 @@
     root.innerHTML =
       '<div class="crumbs"><a href="index.html">หน้าแรก</a> / <a href="shop.html">สินค้า</a> / ' +
         '<a href="shop.html?cat=' + p.category + '">' + S.categoryLabel(p.category) + "</a> / " + p.name + "</div>" +
-      '<div class="pd-grid"><div>' + productGallery(p) + "</div>" +
+      '<div class="pd-grid"><div>' + productViewer(p) + "</div>" +
         '<div class="pd-info"><span class="pd-brand">' + p.brand + "</span>" +
           '<h1 class="pd-name">' + p.name + "</h1>" +
           '<span class="' + (avail > 0 ? "stockpill in" : "stockpill out") + '">' +
@@ -361,7 +361,7 @@
             p.specs.map(function (s) { return "<tr><th>" + s[0] + "</th><td>" + s[1] + "</td></tr>"; }).join("") +
           "</tbody></table></div></div>";
 
-    wireGallery(root);
+    wireViewer(root, p);
 
     var bb = root.querySelector("[data-buybox]");
     function drawBuybox() {
@@ -948,22 +948,210 @@
       "</div></div>"
     );
   }
-  function productGallery(p) {
-    var imgs = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
-    if (!imgs.length) return "<div>" + U.productTile(p, { lg: true }) + "</div>";
-    return '<div class="pd-gallery"><div class="pd-main" data-pd-main style="background-image:url(' + JSON.stringify(imgs[0]) + ')"></div>' +
-      (imgs.length > 1 ? '<div class="pd-thumbs">' + imgs.map(function (im, i) { return '<button type="button" class="pd-thumb' + (i === 0 ? " on" : "") + '" data-pd-thumb="' + i + '" style="background-image:url(' + JSON.stringify(im) + ')"></button>'; }).join("") + "</div>" : "") +
-      "</div>";
+  /* ===================== PRODUCT MEDIA VIEWER =====================
+     Rich, optional media per product. Every field is optional — a viewer tab
+     only appears when its data exists, so products with none behave exactly
+     like the old simple gallery. The photos / 360° frames / part images are
+     shot & generated with Claude later, then dropped into these fields:
+
+       p.images    : ["url", ...]   ภาพสินค้าหลายรูป (แกลเลอรี + กดเพื่อซูม)
+       p.frames360 : ["url", ...]   เฟรมรูปเรียงรอบวัตถุ → ลากเพื่อหมุนดู 360°
+       p.partsBase : "url"          ภาพตัวเครื่องสำหรับโหมดแยกอะไหล่ (ไม่ใส่ = ใช้ images[0])
+       p.parts     : [{ x, y, label, sku, image, note }, ...]
+                     จุดอะไหล่ — x,y เป็น % (0–100) วางทับรูป
+                     ดับเบิลคลิกจุด → แยกชิ้นส่วน/อะไหล่จุดนั้นออกมาดูทีละจุด
+  */
+  function productImages(p) { return (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []); }
+  function clampPct(v) { v = parseFloat(v); if (isNaN(v)) return 50; return Math.max(0, Math.min(100, v)); }
+
+  function productViewer(p) {
+    var imgs = productImages(p);
+    var frames = (p.frames360 && p.frames360.length >= 2) ? p.frames360 : [];
+    var parts = (p.parts && p.parts.length) ? p.parts : [];
+    if (!imgs.length && !frames.length && !parts.length) return "<div>" + U.productTile(p, { lg: true }) + "</div>";
+
+    var tabs = [];
+    if (imgs.length) tabs.push(["photos", "🖼 รูปภาพ"]);
+    if (frames.length) tabs.push(["spin", "🔄 หมุน 360°"]);
+    if (parts.length) tabs.push(["parts", "🧩 อะไหล่ / แยกชิ้น"]);
+    var first = tabs[0][0];
+
+    var tabBar = tabs.length > 1
+      ? '<div class="pdv-tabs" role="tablist">' + tabs.map(function (t) {
+          return '<button type="button" class="pdv-tab' + (t[0] === first ? " on" : "") + '" data-pdv-tab="' + t[0] + '">' + t[1] + "</button>";
+        }).join("") + "</div>"
+      : "";
+
+    // photos
+    var photosPanel = imgs.length
+      ? '<div class="pdv-panel" data-pdv-panel="photos"' + (first === "photos" ? "" : " hidden") + '>' +
+        '<div class="pd-gallery"><div class="pd-main" data-pd-main role="button" tabindex="0" title="กดเพื่อขยายดูรูป" style="background-image:url(' + JSON.stringify(imgs[0]) + ')"><span class="pd-zoom-hint">🔍 กดเพื่อขยาย</span></div>' +
+        (imgs.length > 1 ? '<div class="pd-thumbs">' + imgs.map(function (im, i) { return '<button type="button" class="pd-thumb' + (i === 0 ? " on" : "") + '" data-pd-thumb="' + i + '" style="background-image:url(' + JSON.stringify(im) + ')"></button>'; }).join("") + "</div>" : "") +
+        "</div></div>"
+      : "";
+
+    // 360 spin
+    var spinPanel = frames.length
+      ? '<div class="pdv-panel" data-pdv-panel="spin"' + (first === "spin" ? "" : " hidden") + '>' +
+        '<div class="pd-spin" data-pd-spin>' +
+          '<div class="pd-spin-stage" data-spin-stage style="background-image:url(' + JSON.stringify(frames[0]) + ')">' +
+            '<span class="pd-spin-badge">360°</span><span class="pd-spin-grab">↔ ลากเพื่อหมุน</span></div>' +
+          '<div class="pd-spin-bar">' +
+            '<button type="button" class="pd-spin-play" data-spin-play>▶ หมุนอัตโนมัติ</button>' +
+            '<input type="range" class="pd-spin-range" data-spin-range min="0" max="' + (frames.length - 1) + '" value="0" aria-label="เลื่อนเพื่อหมุน"></div>' +
+        "</div></div>"
+      : "";
+
+    // exploded parts
+    var baseImg = p.partsBase || imgs[0] || "";
+    var partsPanel = parts.length
+      ? '<div class="pdv-panel" data-pdv-panel="parts"' + (first === "parts" ? "" : " hidden") + '>' +
+        '<div class="pd-parts" data-pd-parts>' +
+          '<div class="pd-parts-stage" data-parts-stage' + (baseImg ? ' style="background-image:url(' + JSON.stringify(baseImg) + ')"' : ' data-noimg="1"') + '>' +
+            parts.map(function (pt, i) {
+              return '<button type="button" class="pd-hot" data-hot="' + i + '" style="left:' + clampPct(pt.x) + '%;top:' + clampPct(pt.y) + '%" title="' + esc(pt.label || ("อะไหล่ #" + (i + 1))) + '"><span class="pd-hot-num">' + (i + 1) + "</span></button>";
+            }).join("") +
+          "</div>" +
+          '<div class="pd-parts-cap">💡 <b>ดับเบิลคลิก</b>ที่จุดหมายเลข เพื่อแยกชิ้นส่วน/อะไหล่จุดนั้นออกมาดูทีละจุด</div>' +
+        "</div></div>"
+      : "";
+
+    return '<div class="pd-viewer" data-pd-viewer>' + tabBar +
+      '<div class="pdv-panels">' + photosPanel + spinPanel + partsPanel + "</div></div>";
   }
-  function wireGallery(scope) {
-    var main = scope.querySelector("[data-pd-main]");
-    if (!main) return;
-    scope.querySelectorAll("[data-pd-thumb]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        main.style.backgroundImage = b.style.backgroundImage;
-        scope.querySelectorAll("[data-pd-thumb]").forEach(function (x) { x.classList.toggle("on", x === b); });
+
+  function wireViewer(scope, p) {
+    // tab switching
+    scope.querySelectorAll("[data-pdv-tab]").forEach(function (t) {
+      t.addEventListener("click", function () {
+        var key = t.getAttribute("data-pdv-tab");
+        scope.querySelectorAll("[data-pdv-tab]").forEach(function (x) { x.classList.toggle("on", x === t); });
+        scope.querySelectorAll("[data-pdv-panel]").forEach(function (pan) { pan.hidden = pan.getAttribute("data-pdv-panel") !== key; });
       });
     });
+
+    // photo gallery + lightbox
+    var imgs = productImages(p);
+    var main = scope.querySelector("[data-pd-main]");
+    if (main) {
+      scope.querySelectorAll("[data-pd-thumb]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          main.style.backgroundImage = b.style.backgroundImage;
+          scope.querySelectorAll("[data-pd-thumb]").forEach(function (x) { x.classList.toggle("on", x === b); });
+        });
+      });
+      function curIdx() { var on = scope.querySelector("[data-pd-thumb].on"); return on ? +on.getAttribute("data-pd-thumb") : 0; }
+      main.addEventListener("click", function () { openLightbox(imgs, curIdx()); });
+      main.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openLightbox(imgs, curIdx()); } });
+    }
+
+    // 360 spin
+    var spin = scope.querySelector("[data-pd-spin]");
+    if (spin) wireSpin(spin, p.frames360 || []);
+
+    // exploded parts
+    var partsEl = scope.querySelector("[data-pd-parts]");
+    if (partsEl) wireParts(partsEl, p.parts || []);
+  }
+
+  // drag / scrub / autoplay through an ordered set of frames
+  function wireSpin(root, frames) {
+    if (frames.length < 2) return;
+    var stage = root.querySelector("[data-spin-stage]");
+    var range = root.querySelector("[data-spin-range]");
+    var playBtn = root.querySelector("[data-spin-play]");
+    var idx = 0, timer = null;
+    function show(i) {
+      idx = ((i % frames.length) + frames.length) % frames.length;
+      stage.style.backgroundImage = "url(" + JSON.stringify(frames[idx]) + ")";
+      if (range) range.value = idx;
+    }
+    function start() { if (timer) return; timer = setInterval(function () { show(idx + 1); }, 120); playBtn.classList.add("on"); playBtn.textContent = "⏸ หยุดหมุน"; }
+    function stop() { if (!timer) return; clearInterval(timer); timer = null; playBtn.classList.remove("on"); playBtn.textContent = "▶ หมุนอัตโนมัติ"; }
+    if (playBtn) playBtn.addEventListener("click", function () { timer ? stop() : start(); });
+    if (range) range.addEventListener("input", function () { stop(); show(+range.value); });
+
+    var dragging = false, startX = 0, startIdx = 0;
+    function step() { return Math.max(6, stage.clientWidth / frames.length); }
+    function down(x) { dragging = true; startX = x; startIdx = idx; stop(); stage.classList.add("grabbing"); }
+    function move(x) { if (!dragging) return; show(startIdx - Math.round((x - startX) / step())); }
+    function up() { dragging = false; stage.classList.remove("grabbing"); }
+    stage.addEventListener("mousedown", function (e) { e.preventDefault(); down(e.clientX); });
+    window.addEventListener("mousemove", function (e) { move(e.clientX); });
+    window.addEventListener("mouseup", up);
+    stage.addEventListener("touchstart", function (e) { down(e.touches[0].clientX); }, { passive: true });
+    stage.addEventListener("touchmove", function (e) { move(e.touches[0].clientX); }, { passive: true });
+    stage.addEventListener("touchend", up);
+    show(0);
+  }
+
+  // double-click a hotspot to "explode" that part out into a callout
+  function wireParts(root, parts) {
+    var stage = root.querySelector("[data-parts-stage]");
+    var open = {};
+    function close(i) {
+      open[i] = false;
+      var hot = stage.querySelector('[data-hot="' + i + '"]'); if (hot) hot.classList.remove("open");
+      var call = stage.querySelector('[data-call="' + i + '"]'); if (call) call.parentNode.removeChild(call);
+    }
+    function toggle(i) {
+      if (open[i]) { close(i); return; }
+      open[i] = true;
+      var hot = stage.querySelector('[data-hot="' + i + '"]'); if (hot) hot.classList.add("open");
+      var pt = parts[i] || {};
+      var call = document.createElement("div");
+      call.className = "pd-part-callout";
+      call.setAttribute("data-call", i);
+      call.style.left = clampPct(pt.x) + "%";
+      call.style.top = clampPct(pt.y) + "%";
+      if (clampPct(pt.x) > 60) call.classList.add("flip");
+      call.innerHTML =
+        (pt.image ? '<div class="pd-part-img" style="background-image:url(' + JSON.stringify(pt.image) + ')"></div>' : '<div class="pd-part-img pd-part-img--ph">อะไหล่</div>') +
+        '<div class="pd-part-meta"><div class="pd-part-label">' + esc(pt.label || ("อะไหล่ #" + (i + 1))) + "</div>" +
+        (pt.sku ? '<div class="pd-part-sku">รหัส: ' + esc(pt.sku) + "</div>" : "") +
+        (pt.note ? '<div class="pd-part-note">' + esc(pt.note) + "</div>" : "") +
+        '<button type="button" class="pd-part-close" data-close="' + i + '">ปิด ✕</button></div>';
+      stage.appendChild(call);
+      requestAnimationFrame(function () { call.classList.add("show"); });
+      call.querySelector("[data-close]").addEventListener("click", function (e) { e.stopPropagation(); close(i); });
+    }
+    parts.forEach(function (pt, i) {
+      var hot = stage.querySelector('[data-hot="' + i + '"]');
+      if (!hot) return;
+      hot.addEventListener("dblclick", function (e) { e.preventDefault(); toggle(i); });
+      var lastTap = 0; // double-tap fallback for touch
+      hot.addEventListener("touchend", function (e) {
+        var now = Date.now();
+        if (now - lastTap < 320) { e.preventDefault(); toggle(i); lastTap = 0; } else { lastTap = now; }
+      });
+    });
+  }
+
+  // full-screen image lightbox with prev/next + keyboard
+  function openLightbox(imgs, start) {
+    if (!imgs || !imgs.length) return;
+    var i = start || 0;
+    var lb = document.createElement("div");
+    lb.className = "pd-lightbox";
+    lb.innerHTML =
+      '<button class="pd-lb-close" aria-label="ปิด">✕</button>' +
+      (imgs.length > 1 ? '<button class="pd-lb-nav prev" aria-label="ก่อนหน้า">‹</button>' : "") +
+      '<div class="pd-lb-img" data-lb-img></div>' +
+      (imgs.length > 1 ? '<button class="pd-lb-nav next" aria-label="ถัดไป">›</button>' : "") +
+      (imgs.length > 1 ? '<div class="pd-lb-count" data-lb-count></div>' : "");
+    document.body.appendChild(lb);
+    document.body.style.overflow = "hidden";
+    var imgEl = lb.querySelector("[data-lb-img]");
+    var countEl = lb.querySelector("[data-lb-count]");
+    function show() { i = ((i % imgs.length) + imgs.length) % imgs.length; imgEl.style.backgroundImage = "url(" + JSON.stringify(imgs[i]) + ")"; if (countEl) countEl.textContent = (i + 1) + " / " + imgs.length; }
+    function close() { document.body.style.overflow = ""; lb.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") close(); else if (e.key === "ArrowRight") { i++; show(); } else if (e.key === "ArrowLeft") { i--; show(); } }
+    lb.querySelector(".pd-lb-close").addEventListener("click", close);
+    lb.addEventListener("click", function (e) { if (e.target === lb) close(); });
+    var prev = lb.querySelector(".pd-lb-nav.prev"); if (prev) prev.addEventListener("click", function () { i--; show(); });
+    var next = lb.querySelector(".pd-lb-nav.next"); if (next) next.addEventListener("click", function () { i++; show(); });
+    document.addEventListener("keydown", onKey);
+    show();
   }
   function wireCards(scope) {
     scope.querySelectorAll("[data-quickadd]").forEach(function (b) {

@@ -1323,6 +1323,20 @@
     var icons = ["drill", "driver", "saw", "grinder", "rotary", "battery", "charger", "measure", "wrench", "laser", "compressor", "box", "tool"];
     var owner = S.isOwner();
     var pendingImages = (p.images && p.images.length) ? p.images.slice() : (p.image ? [p.image] : []);
+    // media viewer fields (360 frames + exploded parts) — text <-> data helpers
+    function textToParts(text) {
+      return String(text || "").split("\n").map(function (line) {
+        line = line.trim(); if (!line) return null;
+        var seg = line.split("|").map(function (s) { return s.trim(); });
+        var xy = (seg[0] || "").split(",");
+        return { x: parseFloat(xy[0]) || 0, y: parseFloat(xy[1]) || 0, label: seg[1] || "", sku: seg[2] || "", image: seg[3] || "", note: seg[4] || "" };
+      }).filter(Boolean);
+    }
+    function partsToText(parts) {
+      return (parts || []).map(function (pt) {
+        return [ (pt.x != null ? pt.x : "") + "," + (pt.y != null ? pt.y : ""), pt.label || "", pt.sku || "", pt.image || "", pt.note || "" ].join(" | ");
+      }).join("\n");
+    }
     var body =
       (owner
         ? '<div class="field"><label>รูปสินค้า — เพิ่มได้หลายรูป (รูปแรก = รูปหลัก)</label><div class="gal-edit" data-gallery></div>' +
@@ -1354,6 +1368,14 @@
       '</div>' +
       '<div class="field"><label>จุดเด่น (พิมพ์ 1 ข้อ / 1 บรรทัด · โชว์ในแคตตาล็อก)</label>' +
         '<textarea data-f="highlights" rows="3" placeholder="เช่น ใช้งานง่าย ปรับแรงบิดได้ · น้ำหนักเบา จับถนัดมือ (1 ข้อต่อบรรทัด)">' + esc((p.highlights || []).join("\n")) + '</textarea></div>' +
+      (owner
+        ? '<div class="field"><label>360° เฟรมหมุน — วาง URL รูปทีละบรรทัด (เรียงตามลำดับหมุน · ต้องมี ≥ 2 รูปจึงจะแสดงแท็บหมุน)</label>' +
+          '<textarea data-f="frames360" rows="3" placeholder="https://.../frame-01.jpg&#10;https://.../frame-02.jpg&#10;… (1 URL ต่อบรรทัด)">' + esc((p.frames360 || []).join("\n")) + '</textarea>' +
+          '<div class="img-hint">ใช้รูปชุดที่ถ่ายรอบสินค้า (เช่น 24–36 เฟรม) — ลูกค้าจะลาก/เลื่อนเพื่อหมุนดูรอบทิศ · เว้นว่างถ้ายังไม่มี</div></div>' +
+          '<div class="field"><label>จุดอะไหล่ / แยกชิ้น — 1 จุดต่อบรรทัด รูปแบบ: <code>x,y | ชื่อ | รหัส | URLรูป | หมายเหตุ</code></label>' +
+          '<textarea data-f="parts" rows="3" placeholder="50,40 | หัวจับดอกสว่าน | CHK-13 | https://.../chuck.jpg | ถอดเปลี่ยนได้&#10;72,65 | แบตเตอรี่ 20V | BAT-20 |  | กดปลดสลักด้านล่าง">' + esc(partsToText(p.parts || [])) + '</textarea>' +
+          '<div class="img-hint">x,y = ตำแหน่ง % บนรูป (0–100) · ลูกค้าดับเบิลคลิกจุดเพื่อแยกชิ้นส่วนออกมาดูทีละจุด · ช่องไหนไม่มีให้เว้นว่างได้ · เว้นทั้งช่องถ้ายังไม่มี</div></div>'
+        : '') +
       '<div class="field"><label>รายละเอียด</label>' +
       '<div style="display:flex;gap:8px;align-items:flex-start">' +
         '<textarea data-f="desc" rows="4" style="flex:1">' + esc(p.desc) + '</textarea>' +
@@ -1382,8 +1404,14 @@
         priceCtrl: +val("priceCtrl") || 0, qtyPerBox: +val("qtyPerBox") || 0,
         highlights: val("highlights").split("\n").map(function (s) { return s.trim(); }).filter(Boolean),
       };
-      if (owner) { data.images = pendingImages.slice(); data.image = pendingImages[0] || ""; }
-      else { data.images = p.images || []; data.image = p.image || ""; }
+      if (owner) {
+        data.images = pendingImages.slice(); data.image = pendingImages[0] || "";
+        data.frames360 = val("frames360").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+        data.parts = textToParts(val("parts"));
+      } else {
+        data.images = p.images || []; data.image = p.image || "";
+        data.frames360 = p.frames360 || []; data.parts = p.parts || [];
+      }
       try { S.saveProduct(data); }
       catch (e) { U.toast("บันทึกไม่สำเร็จ — รูปอาจใหญ่เกินไป ลองใช้รูปเล็กลง", "err"); return false; }
       U.toast(isNew ? "เพิ่มสินค้าแล้ว" : "บันทึกการแก้ไขแล้ว", "ok");
