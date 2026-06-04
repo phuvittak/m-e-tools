@@ -36,19 +36,75 @@
     .imp-src { padding:6px 12px; font-size:12px; font-weight:600; border:1px solid var(--border-3); border-radius:6px; background:#fff; cursor:pointer; text-decoration:none; color:var(--fg) }
     .imp-src:hover { background:var(--bg-2) }
     .divider { border:none; border-top:1px solid var(--border-3); margin:20px 0 }
+    .imp-opt-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px }
+    .imp-opt-row .imp-field { flex:1; min-width:160px }
+    .imp-map-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px; margin-top:6px }
+    .imp-map-grid .req label::after { content:" *"; color:#c0392b }
+    .imp-table-wrap { overflow:auto; max-height:440px; border:1px solid var(--border-3); border-radius:8px; margin-top:8px }
+    .imp-table { border-collapse:collapse; width:100%; font-size:12px }
+    .imp-table th, .imp-table td { border:1px solid var(--border-3); padding:5px 9px; text-align:left; white-space:nowrap; max-width:260px; overflow:hidden; text-overflow:ellipsis }
+    .imp-table th { background:var(--bg-2); position:sticky; top:0; z-index:1 }
+    .imp-table td.num { text-align:right; font-variant-numeric:tabular-nums }
+    .imp-file { padding:9px 12px; border:1px dashed var(--border-3); border-radius:8px; background:#fff; width:100%; box-sizing:border-box; font-size:13px }
+    .imp-pill { display:inline-block; font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px; background:#eef6ff; border:1px solid #bcdcff; color:#1c5a99; margin-left:6px }
   </style>
 </head>
 <body data-admin="import">
   <div class="admin" data-shell>
     <main class="main">
       <div class="topbar">
-        <div><h1>นำเข้าสินค้า (AI)</h1><div class="sub">วาง URL หน้าสินค้าจากเว็บอ้างอิง หรือวางข้อความดิบ — AI แยกข้อมูลให้อัตโนมัติแล้วเพิ่มเข้าคลัง</div></div>
+        <div><h1>นำเข้าสินค้า</h1><div class="sub">นำเข้าจากไฟล์ Excel / CSV ของร้าน (แนะนำ) — เลือกชีต จับคู่คอลัมน์ ตรวจสอบ แล้วเพิ่มเข้าคลังทีเดียวหลายรายการ</div></div>
       </div>
 
       <div class="alert" data-alert style="display:none"></div>
 
+      <!-- ============ PRIMARY: Excel / CSV bulk import ============ -->
       <div class="imp-card">
-        <h2>📎 นำเข้าจาก URL</h2>
+        <h2>📥 นำเข้าจากไฟล์ Excel / CSV ของร้าน <span class="imp-pill">แนะนำ</span></h2>
+        <div class="sub">รองรับ .xlsx / .xls / .csv — เลือกไฟล์รายการสินค้าของร้าน → เลือกชีตและแถวหัวตาราง → จับคู่คอลัมน์ให้ตรงกับช่องสินค้า → กดดูตัวอย่าง → เพิ่มเข้าคลัง (ระบบจะข้ามแถวที่ไม่มีชื่อสินค้าอัตโนมัติ)</div>
+
+        <div class="imp-row">
+          <input type="file" id="xlsxFile" class="imp-file" accept=".xlsx,.xls,.csv">
+        </div>
+        <div class="imp-log" id="xlsxLog" style="display:none"></div>
+
+        <div id="xlsxOpts" style="display:none">
+          <hr class="divider">
+          <div class="imp-opt-row">
+            <div class="imp-field"><label>ชีต (Sheet)</label><select id="xlsxSheet"></select></div>
+            <div class="imp-field"><label>แถวหัวตาราง (Header)</label><select id="xlsxHeaderRow"></select></div>
+            <div class="imp-field"><label>แบรนด์เริ่มต้น (ถ้าไฟล์ไม่มีคอลัมน์ยี่ห้อ)</label><input id="xlsxBrand" type="text" placeholder="เช่น DEWALT"></div>
+            <div class="imp-field"><label>หมวดหมู่เริ่มต้น</label><select id="xlsxCat"></select></div>
+          </div>
+
+          <div class="sub" style="margin:10px 0 2px"><strong>จับคู่คอลัมน์</strong> — เลือกว่าคอลัมน์ไหนในไฟล์ตรงกับข้อมูลสินค้าแต่ละช่อง (ระบบเดาให้แล้ว แก้ได้)</div>
+          <div class="imp-map-grid" id="xlsxMap"></div>
+
+          <div style="margin-top:14px">
+            <button class="imp-btn" id="xlsxPreviewBtn">👁️ ดูตัวอย่างข้อมูล</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="xlsxPreviewWrap" style="display:none">
+        <div class="imp-card">
+          <h2 id="xlsxPreviewTitle">ตัวอย่างข้อมูล</h2>
+          <div class="sub">ตรวจสอบความถูกต้องก่อนเพิ่ม — แสดงสูงสุด 25 แถวแรก</div>
+          <div class="imp-table-wrap"><table class="imp-table" id="xlsxPreviewTable"></table></div>
+          <div class="imp-product-footer">
+            <button class="imp-btn" id="xlsxImportBtn">➕ เพิ่มทั้งหมดเข้าคลัง</button>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600">
+              <input type="checkbox" id="xlsxUpdate" checked> อัปเดตสินค้าเดิมถ้ารหัส SKU ซ้ำ
+            </label>
+            <span class="imp-status" id="xlsxImportStatus"></span>
+          </div>
+          <div class="sub" style="margin-top:10px;color:#a07000">หลังเพิ่มแล้ว ไปที่หน้า <strong>คลังสินค้า</strong> เพื่อตรวจ/แก้รูป-หมวดหมู่ และกดปุ่ม <strong>“ซิงค์ขึ้นบอท LINE”</strong> เพื่อส่งให้บอทเห็นสินค้าใหม่</div>
+        </div>
+      </div>
+
+      <!-- ============ SECONDARY: AI URL / paste ============ -->
+      <div class="imp-card">
+        <h2>📎 นำเข้าจาก URL (AI) <span class="imp-pill" style="background:#f3f3f3;border-color:#ddd;color:#888">ทางเลือก</span></h2>
         <div class="sub">วาง URL หน้าสินค้าจากเว็บใดก็ได้ — ระบบจะ fetch HTML แล้วให้ AI แยกข้อมูลสินค้าให้</div>
         <div class="sub" style="color:#a07000">เว็บอ้างอิงแนะนำ (คลิกเพื่อเปิด):</div>
         <div class="imp-sources">
@@ -83,6 +139,7 @@
     </main>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../assets/thai-geo.js"></script>
   <script src="../assets/store.js"></script>
   <script src="../assets/ui.js"></script>
@@ -255,6 +312,334 @@
       this.disabled = true; this.textContent = "⏳ AI กำลังวิเคราะห์…";
       await doFetch("", text);
       this.disabled = false; this.textContent = "✨ AI แยกข้อมูล";
+    });
+  })();
+  </script>
+
+  <!-- ============ Excel / CSV bulk importer ============ -->
+  <script>
+  (function () {
+    var S = window.MEStore;
+    var alertBox = document.querySelector("[data-alert]");
+    function setAlert(msg, kind) {
+      if (!msg) { alertBox.style.display = "none"; return; }
+      alertBox.textContent = msg; alertBox.style.display = "block";
+      alertBox.style.background = kind === "err" ? "#fee" : "#efe";
+    }
+
+    var els = {
+      file: document.getElementById("xlsxFile"),
+      log: document.getElementById("xlsxLog"),
+      opts: document.getElementById("xlsxOpts"),
+      sheet: document.getElementById("xlsxSheet"),
+      headerRow: document.getElementById("xlsxHeaderRow"),
+      brand: document.getElementById("xlsxBrand"),
+      cat: document.getElementById("xlsxCat"),
+      map: document.getElementById("xlsxMap"),
+      previewBtn: document.getElementById("xlsxPreviewBtn"),
+      previewWrap: document.getElementById("xlsxPreviewWrap"),
+      previewTitle: document.getElementById("xlsxPreviewTitle"),
+      previewTable: document.getElementById("xlsxPreviewTable"),
+      importBtn: document.getElementById("xlsxImportBtn"),
+      importStatus: document.getElementById("xlsxImportStatus"),
+      update: document.getElementById("xlsxUpdate"),
+    };
+
+    // product categories (must match store.js keys)
+    var CATS = (S.getCategories && S.getCategories()) || [
+      { key:"drill", label:"สว่าน / ไขควง" }, { key:"saw", label:"เลื่อย" },
+      { key:"grinder", label:"เครื่องเจียร" }, { key:"battery", label:"แบต / ที่ชาร์จ" },
+      { key:"measure", label:"เครื่องมือวัด" }, { key:"hand", label:"เครื่องมือช่างมือ" },
+      { key:"power", label:"เครื่องมือไฟฟ้าอื่นๆ" },
+    ];
+
+    // product fields we let the user map to. key → {label, required, type}
+    var FIELDS = [
+      { key:"name",       label:"ชื่อสินค้า",     required:true,  type:"text" },
+      { key:"sku",        label:"รหัส SKU",       required:false, type:"text" },
+      { key:"brand",      label:"ยี่ห้อ/แบรนด์",  required:false, type:"text" },
+      { key:"price",      label:"ราคาขาย",        required:false, type:"num" },
+      { key:"cost",       label:"ต้นทุน",         required:false, type:"num" },
+      { key:"rentPerDay", label:"ค่าเช่า/วัน",    required:false, type:"num" },
+      { key:"stock",      label:"สต็อก (จำนวน)",  required:false, type:"num" },
+      { key:"unit",       label:"หน่วยนับ",        required:false, type:"text" },
+      { key:"category",   label:"หมวดหมู่",        required:false, type:"text" },
+      { key:"desc",       label:"รายละเอียด",      required:false, type:"text" },
+    ];
+
+    // keyword hints (lowercased) for auto-guessing which column maps to which field
+    var HINTS = {
+      name:       ["รายการสินค้า","ชื่อสินค้า","ชื่อ","รายการ","สินค้า","description","name","item","product","desc"],
+      sku:        ["รหัส sku","รหัสสินค้า","รหัส","sku","barcode","บาร์โค้ด","รุ่น","model","code","item code"],
+      brand:      ["ยี่ห้อ","แบรนด์","brand","maker"],
+      price:      ["ราคาขาย","ขาย online","ขายหน้าร้าน","ราคา","ขาย","price","sell","retail"],
+      cost:       ["ต้นทุน","ทุน","ราคาตั้ง","cost","ราคาทุน"],
+      rentPerDay: ["ค่าเช่า","เช่า/วัน","เช่า","rent"],
+      stock:      ["สต็อก","สต๊อก","สต็อค","คงเหลือ","จำนวน","stock","qty","quantity","คงคลัง"],
+      unit:       ["หน่วย","unit"],
+      category:   ["หมวดหมู่","หมวด","ประเภท","category","group","กลุ่ม"],
+      desc:       ["รายละเอียด","คำอธิบาย","สเปค","spec","detail","note","หมายเหตุ"],
+    };
+
+    var state = { wb:null, aoa:[], headerRowIdx:0, cols:[] };
+
+    function log(msg, clear) {
+      els.log.style.display = "block";
+      if (clear) els.log.innerHTML = "";
+      els.log.innerHTML += msg + "\n";
+      els.log.scrollTop = els.log.scrollHeight;
+    }
+    function colLetter(i) {
+      var s = ""; i = i + 1;
+      while (i > 0) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); }
+      return s;
+    }
+    function cell(v) { return v == null ? "" : String(v).trim(); }
+    function num(v) {
+      var s = String(v == null ? "" : v).replace(/[,  ฿]/g, "").replace(/[^0-9.\-]/g, "");
+      var n = parseFloat(s); return isNaN(n) ? 0 : n;
+    }
+    function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+    // populate default-category dropdown
+    els.cat.innerHTML = CATS.map(function (c) {
+      return '<option value="' + c.key + '"' + (c.key === "power" ? " selected" : "") + ">" + esc(c.label) + "</option>";
+    }).join("");
+
+    /* ---- file load ---- */
+    els.file.addEventListener("change", function () {
+      var f = this.files && this.files[0];
+      if (!f) return;
+      if (!window.XLSX) { setAlert("ไลบรารีอ่าน Excel ยังโหลดไม่เสร็จ ลองรีเฟรชหน้าแล้วลองใหม่", "err"); return; }
+      log("⏳ กำลังอ่านไฟล์: " + f.name, true);
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          state.wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+          els.sheet.innerHTML = state.wb.SheetNames.map(function (n, i) {
+            return '<option value="' + i + '">' + esc(n) + "</option>";
+          }).join("");
+          log("✅ พบ " + state.wb.SheetNames.length + " ชีต: " + state.wb.SheetNames.join(", "));
+          els.opts.style.display = "block";
+          loadSheet(0);
+          setAlert("");
+        } catch (err) {
+          log("❌ อ่านไฟล์ไม่สำเร็จ: " + (err.message || err));
+          setAlert("อ่านไฟล์ไม่สำเร็จ: " + (err.message || err), "err");
+        }
+      };
+      reader.onerror = function () { setAlert("อ่านไฟล์ไม่สำเร็จ", "err"); };
+      reader.readAsArrayBuffer(f);
+    });
+
+    els.sheet.addEventListener("change", function () { loadSheet(+this.value); });
+    els.headerRow.addEventListener("change", function () {
+      state.headerRowIdx = +this.value; buildMapping();
+    });
+
+    function loadSheet(idx) {
+      var ws = state.wb.Sheets[state.wb.SheetNames[idx]];
+      state.aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+      // header-row picker: offer first up to 10 rows, auto-pick the one with most text cells
+      var maxScan = Math.min(10, state.aoa.length);
+      var bestRow = 0, bestScore = -1;
+      for (var r = 0; r < maxScan; r++) {
+        var rowArr = state.aoa[r] || [];
+        var nonEmpty = rowArr.filter(function (c) { return cell(c).length > 0; }).length;
+        // header rows are mostly text labels, not numbers — weight text cells higher
+        var textCells = rowArr.filter(function (c) { var t = cell(c); return t && !/^[\d.,\-%฿\s]+$/.test(t); }).length;
+        var s = textCells * 2 + nonEmpty;
+        if (s > bestScore) { bestScore = s; bestRow = r; }
+      }
+      state.headerRowIdx = bestRow;
+      els.headerRow.innerHTML = "";
+      for (var i = 0; i < maxScan; i++) {
+        var preview = (state.aoa[i] || []).slice(0, 8).map(cell).filter(Boolean).join(" | ").slice(0, 70);
+        var opt = document.createElement("option");
+        opt.value = i; opt.textContent = "แถว " + (i + 1) + ": " + (preview || "(ว่าง)");
+        if (i === bestRow) opt.selected = true;
+        els.headerRow.appendChild(opt);
+      }
+      buildMapping();
+    }
+
+    function guessColumn(fieldKey, headers) {
+      var hints = HINTS[fieldKey] || [];
+      // exact-ish contains match, longest hint first
+      for (var h = 0; h < hints.length; h++) {
+        for (var c = 0; c < headers.length; c++) {
+          var head = headers[c].toLowerCase();
+          if (head && head.indexOf(hints[h]) >= 0) return c;
+        }
+      }
+      return -1;
+    }
+
+    function buildMapping() {
+      var headers = (state.aoa[state.headerRowIdx] || []).map(cell);
+      // figure out how many columns to offer (max width across data rows)
+      var width = headers.length;
+      for (var r = state.headerRowIdx; r < Math.min(state.aoa.length, state.headerRowIdx + 30); r++) {
+        if (state.aoa[r] && state.aoa[r].length > width) width = state.aoa[r].length;
+      }
+      state.cols = [];
+      for (var i = 0; i < width; i++) {
+        state.cols.push({ idx: i, label: headers[i] || ("คอลัมน์ " + colLetter(i)) });
+      }
+      // build a select per field
+      els.map.innerHTML = FIELDS.map(function (fld) {
+        var guess = guessColumn(fld.key, state.cols.map(function (c) { return c.label; }));
+        var opts = '<option value="-1">— ไม่ใช้ —</option>' + state.cols.map(function (c) {
+          return '<option value="' + c.idx + '"' + (c.idx === guess ? " selected" : "") +
+            ">" + esc(colLetter(c.idx) + ": " + c.label) + "</option>";
+        }).join("");
+        return '<div class="imp-field' + (fld.required ? " req" : "") + '">' +
+          '<label>' + esc(fld.label) + '</label>' +
+          '<select data-mapfield="' + fld.key + '">' + opts + '</select></div>';
+      }).join("");
+    }
+
+    function currentMapping() {
+      var m = {};
+      els.map.querySelectorAll("[data-mapfield]").forEach(function (sel) {
+        m[sel.getAttribute("data-mapfield")] = +sel.value;
+      });
+      return m;
+    }
+
+    function matchCategory(val) {
+      var t = cell(val).toLowerCase();
+      if (!t) return "";
+      for (var i = 0; i < CATS.length; i++) {
+        if (t === CATS[i].key || t.indexOf(CATS[i].key) >= 0) return CATS[i].key;
+        if (CATS[i].label && t.indexOf(CATS[i].label.toLowerCase()) >= 0) return CATS[i].key;
+      }
+      return "";
+    }
+
+    // build the array of product objects from current mapping
+    function buildProducts() {
+      var m = currentMapping();
+      var brandDefault = cell(els.brand.value);
+      var catDefault = els.cat.value || "power";
+      var out = [];
+      for (var r = state.headerRowIdx + 1; r < state.aoa.length; r++) {
+        var row = state.aoa[r] || [];
+        function g(key) { var i = m[key]; return i != null && i >= 0 ? cell(row[i]) : ""; }
+        var name = g("name");
+        if (!name) continue; // skip rows without a product name (collapses multi-row blocks)
+        if (/^(อะไหล่|รวม|หมวด|รายการ|ยี่ห้อ|brand)$/i.test(name)) continue; // skip obvious sub-header rows
+        var rentN = m.rentPerDay >= 0 ? num(row[m.rentPerDay]) : 0;
+        var p = {
+          name: name,
+          sku: g("sku"),
+          brand: g("brand") || brandDefault || "—",
+          price: m.price >= 0 ? num(row[m.price]) : 0,
+          cost: m.cost >= 0 ? num(row[m.cost]) : 0,
+          rentPerDay: rentN,
+          stock: m.stock >= 0 ? num(row[m.stock]) : 0,
+          unit: g("unit"),
+          category: matchCategory(g("category")) || catDefault,
+          desc: g("desc"),
+        };
+        out.push(p);
+      }
+      return out;
+    }
+
+    /* ---- preview ---- */
+    els.previewBtn.addEventListener("click", function () {
+      var mapping = currentMapping();
+      if (mapping.name == null || mapping.name < 0) {
+        setAlert("กรุณาเลือกคอลัมน์ “ชื่อสินค้า” ก่อน (จำเป็น)", "err"); return;
+      }
+      var products = buildProducts();
+      state.preview = products;
+      if (!products.length) {
+        els.previewWrap.style.display = "none";
+        setAlert("ไม่พบแถวที่มีชื่อสินค้า — ลองเปลี่ยนแถวหัวตาราง หรือคอลัมน์ชื่อสินค้า", "err");
+        return;
+      }
+      var cols = [
+        ["name","ชื่อสินค้า"],["sku","SKU"],["brand","ยี่ห้อ"],["category","หมวด"],
+        ["price","ราคาขาย"],["cost","ต้นทุน"],["rentPerDay","เช่า/วัน"],["stock","สต็อก"],["unit","หน่วย"],
+      ];
+      var head = "<thead><tr><th>#</th>" + cols.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "</tr></thead>";
+      var rows = products.slice(0, 25).map(function (p, i) {
+        return "<tr><td>" + (i + 1) + "</td>" + cols.map(function (c) {
+          var v = p[c[0]];
+          var isNum = (c[0] === "price" || c[0] === "cost" || c[0] === "rentPerDay" || c[0] === "stock");
+          if (isNum) return '<td class="num">' + (v ? Number(v).toLocaleString("th-TH") : "—") + "</td>";
+          return "<td>" + esc(v || "—") + "</td>";
+        }).join("") + "</tr>";
+      }).join("");
+      els.previewTable.innerHTML = head + "<tbody>" + rows + "</tbody>";
+      els.previewTitle.textContent = "พบ " + products.length + " รายการ (แสดง " + Math.min(25, products.length) + " แถวแรก)";
+      els.previewWrap.style.display = "block";
+      els.importStatus.textContent = "";
+      els.previewWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+      setAlert("");
+    });
+
+    /* ---- import (single batched write — fast + safe for big files) ---- */
+    els.importBtn.addEventListener("click", function () {
+      var products = state.preview || buildProducts();
+      if (!products.length) { setAlert("ไม่มีข้อมูลให้เพิ่ม", "err"); return; }
+      var doUpdate = els.update.checked;
+      var btn = els.importBtn;
+      btn.disabled = true; btn.textContent = "⏳ กำลังเพิ่ม…";
+
+      var list = S.getProducts();
+      var bySku = {};
+      list.forEach(function (p) { if (p.sku) bySku[String(p.sku).trim().toLowerCase()] = p; });
+
+      var added = 0, updated = 0, skipped = 0;
+      products.forEach(function (p) {
+        if (!p.name) { skipped++; return; }
+        var key = p.sku ? String(p.sku).trim().toLowerCase() : "";
+        var imported = {
+          name: p.name,
+          sku: p.sku || S.genId("SKU"),
+          brand: p.brand || "—",
+          category: p.category || "power",
+          price: p.price || 0,
+          cost: p.cost || 0,
+          rentPerDay: p.rentPerDay || 0,
+          stock: p.stock || 0,
+          forSale: true,
+          forRent: (p.rentPerDay || 0) > 0,
+          desc: p.desc || (p.unit ? ("หน่วย: " + p.unit) : ""),
+          specs: p.unit ? [["หน่วยนับ", p.unit]] : [],
+        };
+        if (doUpdate && key && bySku[key]) {
+          // merge imported fields onto existing product (keep id, images, rented)
+          Object.assign(bySku[key], imported);
+          updated++;
+        } else {
+          var fresh = Object.assign({
+            id: S.genId("p").toLowerCase(),
+            rented: 0, motorType: "—", warrantyYears: 0, shipSize: "",
+            icon: "tool", location: "ยังไม่ระบุ", images: [], image: "", hidden: false,
+          }, imported);
+          list.push(fresh);
+          if (key) bySku[key] = fresh; // dedup within this same batch
+          added++;
+        }
+      });
+
+      try {
+        localStorage.setItem(S.KEY.products, JSON.stringify(list));
+        window.dispatchEvent(new CustomEvent("me-store-change"));
+      } catch (e) {
+        btn.disabled = false; btn.textContent = "➕ เพิ่มทั้งหมดเข้าคลัง";
+        setAlert("บันทึกไม่สำเร็จ: " + (e.message || e) + " — ข้อมูลอาจเกินพื้นที่เก็บของเบราว์เซอร์ ลองนำเข้าทีละชีต", "err");
+        return;
+      }
+
+      btn.disabled = false; btn.textContent = "➕ เพิ่มทั้งหมดเข้าคลัง";
+      var msg = "✅ เพิ่มใหม่ " + added + " รายการ" + (updated ? " · อัปเดต " + updated + " รายการ" : "") + (skipped ? " · ข้าม " + skipped : "");
+      els.importStatus.textContent = msg;
+      setAlert(msg + " — ไปที่หน้า “คลังสินค้า” เพื่อตรวจสอบและกดซิงค์ขึ้นบอท LINE", "ok");
     });
   })();
   </script>
