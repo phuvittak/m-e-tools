@@ -673,6 +673,13 @@
       status: document.getElementById("dedupStatus"),
     };
     function normName2(s) { return String(s == null ? "" : s).trim().toLowerCase().replace(/\s+/g, " "); }
+    // a "real" sku — auto-generated ones (SKU-12345 / p-12345) don't count, so
+    // duplicates that only differ by a random auto-sku still group by name
+    function realSku(p) {
+      var s = p && p.sku ? String(p.sku).trim() : "";
+      if (!s || /^(sku|p)-\d/i.test(s)) return "";
+      return s.toLowerCase();
+    }
     // higher score = more complete record → keep this one
     function richness(p) {
       var s = 0;
@@ -691,7 +698,8 @@
       var list = S.getProducts();
       var groups = {};
       list.forEach(function (p) {
-        var key = p.sku ? ("sku:" + String(p.sku).trim().toLowerCase()) : ("name:" + normName2(p.name));
+        var rs = realSku(p);
+        var key = rs ? ("sku:" + rs) : ("name:" + normName2(p.name));
         (groups[key] = groups[key] || []).push(p);
       });
       var removeIds = [], dupGroups = 0;
