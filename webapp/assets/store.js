@@ -376,14 +376,39 @@
   }
 
   function seed() {
+    // Fresh install → start as a newly-opened shop: NO sample products, NO sample
+    // orders. The dashboard begins empty and fills up as real sales come in.
     if (!localStorage.getItem(KEY.seeded) || !localStorage.getItem(KEY.products)) {
-      write(KEY.products, SEED_PRODUCTS.map(function (p) { return enrichSeed(Object.assign({}, p)); }));
-      write(KEY.orders, demoOrders());
+      write(KEY.products, []);
+      write(KEY.orders, []);
       localStorage.setItem(KEY.seeded, "1");
     }
+    clearDemoData();   // strip leftover sample data from earlier (demo-seeded) installs
     seedShip();
     seedSettings();
     seedStaff();
+  }
+
+  // One-time migration: older versions seeded demo products + demo orders. Remove
+  // exactly those (matched by their fixed seed IDs) so the shop reads as freshly
+  // opened — WITHOUT touching the owner's own imported/created products.
+  var DEMO_CLEARED_KEY = "me_demo_cleared_v1";
+  function clearDemoData() {
+    if (localStorage.getItem(DEMO_CLEARED_KEY)) return;
+    try {
+      var demoOrderIds = {};
+      demoOrders().forEach(function (o) { demoOrderIds[o.id] = 1; });
+      var orders = read(KEY.orders, []);
+      var keptOrders = orders.filter(function (o) { return !demoOrderIds[o.id]; });
+      if (keptOrders.length !== orders.length) write(KEY.orders, keptOrders);
+
+      var seedIds = {};
+      SEED_PRODUCTS.forEach(function (p) { seedIds[p.id] = 1; });
+      var prods = read(KEY.products, []);
+      var keptProds = prods.filter(function (p) { return !seedIds[p.id]; });
+      if (keptProds.length !== prods.length) write(KEY.products, keptProds);
+    } catch (e) { /* never block startup on cleanup */ }
+    localStorage.setItem(DEMO_CLEARED_KEY, "1");
   }
 
   // a couple of demo orders so the dashboard isn't empty on first run
