@@ -275,7 +275,7 @@ function flexProductCard(p) {
       type: 'box', layout: 'baseline',
       contents: [
         { type: 'text', text: '💰 ราคาขาย', color: COLOR.gray, size: 'sm', flex: 1 },
-        { type: 'text', text: `${Number(p.price).toLocaleString()} บาท`, color: COLOR.black, weight: 'bold', size: 'md', flex: 0, align: 'end' },
+        { type: 'text', text: `${Number(p.price).toLocaleString()} บาท`, color: COLOR.black, weight: 'bold', size: 'sm', flex: 0, align: 'end' },
       ],
     });
   }
@@ -284,7 +284,7 @@ function flexProductCard(p) {
       type: 'box', layout: 'baseline', margin: 'sm',
       contents: [
         { type: 'text', text: '📅 เช่า/วัน', color: COLOR.gray, size: 'sm', flex: 1 },
-        { type: 'text', text: `${Number(p.rentPerDay).toLocaleString()} บาท`, color: COLOR.black, weight: 'bold', size: 'md', flex: 0, align: 'end' },
+        { type: 'text', text: `${Number(p.rentPerDay).toLocaleString()} บาท`, color: COLOR.black, weight: 'bold', size: 'sm', flex: 0, align: 'end' },
       ],
     });
   }
@@ -298,16 +298,17 @@ function flexProductCard(p) {
       type: 'image',
       url: `${SHOP.website}/api/product-image?id=${encodeURIComponent(p.id)}`,
       size: 'full',
-      aspectRatio: '20:13',
-      aspectMode: 'cover',
+      aspectRatio: '1:1',
+      aspectMode: 'fit',              // เห็นรูปเต็มทั้งชิ้น ไม่ครอป/ไม่ขาด
+      backgroundColor: '#FFFFFF',     // รูปสินค้าพื้นขาวอยู่แล้ว → เนียนไปกับการ์ด
       action: { type: 'uri', label: 'ดูสินค้า', uri: `${SHOP.website}/product.html?id=${p.id}` },
     } } : {}),
     header: flexHeader(`${p.brand || ''} · ${CATEGORY_LABELS[p.category] || ''}`),
     body: {
-      type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '16px',
+      type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '12px',
       contents: [
-        { type: 'text', text: p.name, weight: 'bold', size: 'lg', wrap: true, color: COLOR.black },
-        { type: 'text', text: `รหัสสินค้า: ${p.sku || '-'}`, size: 'xs', color: COLOR.gray },
+        { type: 'text', text: p.name, weight: 'bold', size: 'md', wrap: true, color: COLOR.black },
+        { type: 'text', text: `รหัสสินค้า: ${p.sku || '-'}`, size: 'xxs', color: COLOR.gray },
         { type: 'separator', margin: 'md' },
         ...(specRows.length ? [{ type: 'box', layout: 'vertical', spacing: 'sm', margin: 'md', contents: specRows }] : []),
         { type: 'separator', margin: 'md' },

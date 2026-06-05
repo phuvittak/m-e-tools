@@ -54,7 +54,7 @@
     else if (p.forRent) badge = '<span class="tile-badge rent">ให้เช่า</span>';
     else badge = '<span class="tile-badge sale">ขาย</span>';
     var visual = p.image
-      ? '<span class="tile-img" style="background-image:url(' + JSON.stringify(p.image) + ')"></span>'
+      ? '<span class="tile-img" style="background-image:url(\'' + String(p.image).replace(/'/g, "%27") + '\')"></span>'
       : '<span class="tile-icon">' + iconSvg(p.icon, opts.lg ? 120 : 64) + "</span><span class=\"tile-grid\"></span>";
     return (
       '<div class="tile ' + (opts.lg ? "tile-lg" : "") + (p.image ? " has-img" : "") + '" data-cat="' + p.category + '">' +

@@ -6,6 +6,10 @@
   var S = window.MEStore, U = window.MEUI;
   var page = document.body.getAttribute("data-page");
 
+  // ฝัง URL/รูป (รวม base64) ใน inline style ของ HTML อย่างปลอดภัย — ใช้ single quote
+  // (ถ้าใช้ JSON.stringify จะได้ double quote ซึ่งไปปิด attribute style="..." ก่อนเวลา → รูปไม่ขึ้น)
+  function cssBg(u) { return "background-image:url('" + String(u || "").replace(/'/g, "%27") + "')"; }
+
   // specs อาจเป็น ["ป้าย","ค่า"] (เครื่องเจ้าของ) หรือ {label,value} (โหลดจาก cloud) — รองรับทั้งคู่
   function specKV(s) {
     if (Array.isArray(s)) return [s[0] || "", s[1] || ""];
@@ -772,13 +776,13 @@
     var imgs = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
     var main = imgs[0] || "";
     var img = main
-      ? '<div class="osk-photo" style="background-image:url(' + JSON.stringify(main) + ')"></div>'
+      ? '<div class="osk-photo" style="' + cssBg(main) + '"></div>'
       : '<div class="osk-photo osk-photo-ph">' + U.iconSvg(p.icon || "tool", 52) + "</div>";
     var chip = brand ? '<span class="osk-chip">' + esc(brand) + "</span>" : "";
     var inbox = imgs.slice(1, 6);
     var inboxHtml = inbox.length
       ? '<div class="osk-mini-label">สินค้าภายในกล่อง</div><div class="osk-inbox">' +
-        inbox.map(function (im) { return '<span style="background-image:url(' + JSON.stringify(im) + ')"></span>'; }).join("") + "</div>"
+        inbox.map(function (im) { return '<span style="' + cssBg(im) + '"></span>'; }).join("") + "</div>"
       : "";
     var specs = (p.specs || []).map(specKV).filter(function (kv) { return kv[0] || kv[1]; }).slice(0, 6);
     var specsHtml = specs.length
@@ -1007,8 +1011,8 @@
     // photos
     var photosPanel = imgs.length
       ? '<div class="pdv-panel" data-pdv-panel="photos"' + (first === "photos" ? "" : " hidden") + '>' +
-        '<div class="pd-gallery"><div class="pd-main" data-pd-main role="button" tabindex="0" title="กดเพื่อขยายดูรูป" style="background-image:url(' + JSON.stringify(imgs[0]) + ')"><span class="pd-zoom-hint">🔍 กดเพื่อขยาย</span></div>' +
-        (imgs.length > 1 ? '<div class="pd-thumbs">' + imgs.map(function (im, i) { return '<button type="button" class="pd-thumb' + (i === 0 ? " on" : "") + '" data-pd-thumb="' + i + '" style="background-image:url(' + JSON.stringify(im) + ')"></button>'; }).join("") + "</div>" : "") +
+        '<div class="pd-gallery"><div class="pd-main" data-pd-main role="button" tabindex="0" title="กดเพื่อขยายดูรูป" style="' + cssBg(imgs[0]) + '"><span class="pd-zoom-hint">🔍 กดเพื่อขยาย</span></div>' +
+        (imgs.length > 1 ? '<div class="pd-thumbs">' + imgs.map(function (im, i) { return '<button type="button" class="pd-thumb' + (i === 0 ? " on" : "") + '" data-pd-thumb="' + i + '" style="' + cssBg(im) + '"></button>'; }).join("") + "</div>" : "") +
         "</div></div>"
       : "";
 
@@ -1016,7 +1020,7 @@
     var spinPanel = frames.length
       ? '<div class="pdv-panel" data-pdv-panel="spin"' + (first === "spin" ? "" : " hidden") + '>' +
         '<div class="pd-spin" data-pd-spin>' +
-          '<div class="pd-spin-stage" data-spin-stage style="background-image:url(' + JSON.stringify(frames[0]) + ')">' +
+          '<div class="pd-spin-stage" data-spin-stage style="' + cssBg(frames[0]) + '">' +
             '<span class="pd-spin-badge">360°</span><span class="pd-spin-grab">↔ ลากเพื่อหมุน</span></div>' +
           '<div class="pd-spin-bar">' +
             '<button type="button" class="pd-spin-play" data-spin-play>▶ หมุนอัตโนมัติ</button>' +
@@ -1029,7 +1033,7 @@
     var partsPanel = parts.length
       ? '<div class="pdv-panel" data-pdv-panel="parts"' + (first === "parts" ? "" : " hidden") + '>' +
         '<div class="pd-parts" data-pd-parts>' +
-          '<div class="pd-parts-stage" data-parts-stage' + (baseImg ? ' style="background-image:url(' + JSON.stringify(baseImg) + ')"' : ' data-noimg="1"') + '>' +
+          '<div class="pd-parts-stage" data-parts-stage' + (baseImg ? ' style="' + cssBg(baseImg) + '"' : ' data-noimg="1"') + '>' +
             parts.map(function (pt, i) {
               return '<button type="button" class="pd-hot" data-hot="' + i + '" style="left:' + clampPct(pt.x) + '%;top:' + clampPct(pt.y) + '%" title="' + esc(pt.label || ("อะไหล่ #" + (i + 1))) + '"><span class="pd-hot-num">' + (i + 1) + "</span></button>";
             }).join("") +
@@ -1128,7 +1132,7 @@
       call.style.top = clampPct(pt.y) + "%";
       if (clampPct(pt.x) > 60) call.classList.add("flip");
       call.innerHTML =
-        (pt.image ? '<div class="pd-part-img" style="background-image:url(' + JSON.stringify(pt.image) + ')"></div>' : '<div class="pd-part-img pd-part-img--ph">อะไหล่</div>') +
+        (pt.image ? '<div class="pd-part-img" style="' + cssBg(pt.image) + '"></div>' : '<div class="pd-part-img pd-part-img--ph">อะไหล่</div>') +
         '<div class="pd-part-meta"><div class="pd-part-label">' + esc(pt.label || ("อะไหล่ #" + (i + 1))) + "</div>" +
         (pt.sku ? '<div class="pd-part-sku">รหัส: ' + esc(pt.sku) + "</div>" : "") +
         (pt.note ? '<div class="pd-part-note">' + esc(pt.note) + "</div>" : "") +
@@ -1223,7 +1227,7 @@
     var box = document.querySelector("[data-promo]"); if (!box) return;
     if (!promo || !promo.enabled) { box.innerHTML = ""; return; }
     box.innerHTML = '<section class="me-promo"><div class="wrap"><div class="me-promo-card">' +
-      (promo.image ? '<div class="me-promo-img" style="background-image:url(' + JSON.stringify(promo.image) + ')"></div>' : "") +
+      (promo.image ? '<div class="me-promo-img" style="' + cssBg(promo.image) + '"></div>' : "") +
       '<div class="me-promo-body"><div class="me-promo-tag">โปรโมชั่นพิเศษ</div>' +
       '<h2 class="me-promo-title">' + esc(promo.title || "") + "</h2>" +
       '<p class="me-promo-text">' + esc(promo.text || "") + "</p>" +
