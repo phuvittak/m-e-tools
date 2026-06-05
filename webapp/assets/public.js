@@ -364,7 +364,7 @@
             ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
             : '<span class="me-cat-ic">' + U.iconSvg(c.icon || iconForCat(c.key), 40) + "</span>";
           return (
-            '<a class="me-cat" href="categories.html?cat=' + encodeURIComponent(c.key) + '">' +
+            '<a class="me-cat" href="shop.html?cat=' + encodeURIComponent(c.key) + '">' +
             visual +
             '<span class="me-cat-name">' + esc(c.label) + "</span>" +
             '<span class="me-cat-count">' + n + " รายการ" + (hasKids ? " ›" : "") + "</span></a>"
@@ -421,13 +421,13 @@
       syncToggle();
       toggle.addEventListener("click", function () { grid.classList.toggle("filters-collapsed"); syncToggle(); });
     }
-    // breadcrumb + หัวเรื่องตามหมวดที่เลือก (ไล่ลึกแบบ iToolmart)
+    // breadcrumb + หัวเรื่อง + แถวหมวด (รวมหมวด+สินค้าไว้หน้าเดียว แบบ iToolmart)
     function renderCrumbTitle() {
       var crumb = document.querySelector("[data-shop-crumb]"), title = document.querySelector("[data-shop-title]");
       var curKey = state.cats.length === 1 ? state.cats[0] : "";
       var cur = curKey ? S.getCategory(curKey) : null;
       if (crumb) {
-        var parts = ['<a href="index.html">หน้าแรก</a>', '<a href="categories.html">หมวดหมู่</a>'];
+        var parts = ['<a href="index.html">หน้าแรก</a>', '<a href="shop.html">สินค้าทั้งหมด</a>'];
         if (cur) S.categoryPath(curKey).forEach(function (c, i, arr) {
           parts.push(i === arr.length - 1 ? '<span class="crumb-cur">' + esc(c.label) + "</span>"
             : '<a href="shop.html?cat=' + encodeURIComponent(c.key) + '">' + esc(c.label) + "</a>");
@@ -435,6 +435,21 @@
         crumb.innerHTML = parts.join(' <span class="crumb-sep">›</span> ');
       }
       if (title) title.innerHTML = cur ? esc(cur.label) : 'สินค้า<span class="me-hl">ทั้งหมด</span>';
+      // แถวช่องหมวด (หมวดย่อยของหมวดปัจจุบัน / หมวดบนสุดถ้ายังไม่เลือก) — กดเพื่อแคบลง
+      var catBox = document.querySelector("[data-shop-cats]");
+      if (catBox) {
+        var children = S.getSubcategories(curKey, false);
+        catBox.innerHTML = children.map(function (c) {
+          var hasKids = S.categoryHasChildren(c.key);
+          var visual = c.image
+            ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
+            : '<span class="me-cat-ic">' + U.iconSvg(c.icon || iconForCat(c.key), 40) + "</span>";
+          return '<a class="me-cat" href="shop.html?cat=' + encodeURIComponent(c.key) + '">' + visual +
+            '<span class="me-cat-name">' + esc(c.label) + "</span>" +
+            '<span class="me-cat-count">' + S.productCountInCat(c.key) + " รายการ" + (hasKids ? " ›" : "") + "</span></a>";
+        }).join("");
+        catBox.style.display = children.length ? "" : "none";
+      }
     }
 
     // สร้าง/วาดแถบตัวกรองใหม่จากสินค้าปัจจุบัน (เรียกซ้ำได้เมื่อ cloud มาถึง)

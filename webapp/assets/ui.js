@@ -95,8 +95,7 @@
       '<span class="me-header-loc">ท่ารั้ว · เชียงใหม่</span></a>' +
       '<nav class="me-header-nav">' +
       navLink("index.html", "หน้าแรก", active === "home") +
-      navLink("categories.html", "หมวดหมู่", active === "categories") +
-      navLink("shop.html", 'สินค้า<span data-rent-only> / เช่า-ซื้อ</span>', active === "shop") +
+      navLink("shop.html", "สินค้า / หมวดหมู่", active === "shop" || active === "categories") +
       navLink("catalog.html", "แคตตาล็อก", active === "catalog") +
       navLink("orders.html", "ติดตามคำสั่งซื้อ", active === "orders") +
       "</nav>" +
@@ -149,7 +148,7 @@
           '<div class="me-socials">' + socialBtn(st.facebook, "Facebook", FB) + socialBtn(st.instagram, "Instagram", IG) + socialBtn(st.tiktok, "TikTok", TT) + "</div>" +
         "</div>" +
         '<div class="me-footer-col"><div class="me-footer-h">เมนู</div>' +
-          '<a href="index.html">หน้าแรก</a><a href="categories.html">หมวดหมู่</a><a href="shop.html">สินค้า<span data-rent-only> / เช่า-ซื้อ</span></a>' +
+          '<a href="index.html">หน้าแรก</a><a href="shop.html">สินค้า / หมวดหมู่</a>' +
           '<a href="catalog.html">แคตตาล็อก</a><a href="cart.html">ตะกร้า</a><a href="orders.html">ติดตามคำสั่งซื้อ</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">ช่วยเหลือ</div>' +
           '<a href="index.html#faq">คำถามที่พบบ่อย</a><a href="#" data-open-chat>ติดต่อร้าน (แชท)</a>' +
