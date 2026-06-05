@@ -990,14 +990,49 @@
   function productImages(p) { return (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []); }
   function clampPct(v) { v = parseFloat(v); if (isNaN(v)) return 50; return Math.max(0, Math.min(100, v)); }
 
+  /* 3D model — supports a Sketchfab link/embed OR a direct .glb/.gltf URL.
+     Returns null when no usable model is set, else { type, embed|src }. */
+  function model3dInfo(p) {
+    var url = String((p && p.model3d) || "").trim();
+    if (!url) return null;
+    // Sketchfab share link (…/3d-models/name-UID) or embed link (…/models/UID/embed)
+    var sk = url.match(/sketchfab\.com\/(?:3d-models\/[^\/?#]*-|models\/)([0-9a-f]{12,})/i);
+    if (sk) {
+      return { type: "sketchfab", embed: "https://sketchfab.com/models/" + sk[1] +
+        "/embed?autospin=0.3&autostart=1&preload=1&ui_theme=dark&ui_infos=0&ui_watermark=0&ui_hint=2" };
+    }
+    if (/sketchfab\.com\//i.test(url) && /\/embed/i.test(url)) return { type: "sketchfab", embed: url };
+    // direct 3D file → render with <model-viewer>
+    if (/\.(glb|gltf)(\?|#|$)/i.test(url)) return { type: "glb", src: url };
+    return null;
+  }
+
+  // lazy-load Google's <model-viewer> web component, once, only when a .glb is opened
+  var _mvPromise = null;
+  function loadModelViewer() {
+    if (window.customElements && customElements.get("model-viewer")) return Promise.resolve();
+    if (_mvPromise) return _mvPromise;
+    _mvPromise = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.type = "module";
+      s.src = "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js";
+      s.onload = function () { customElements.whenDefined("model-viewer").then(resolve, resolve); };
+      s.onerror = function () { _mvPromise = null; reject(new Error("model-viewer load failed")); };
+      document.head.appendChild(s);
+    });
+    return _mvPromise;
+  }
+
   function productViewer(p) {
     var imgs = productImages(p);
     var frames = (p.frames360 && p.frames360.length >= 2) ? p.frames360 : [];
     var parts = (p.parts && p.parts.length) ? p.parts : [];
-    if (!imgs.length && !frames.length && !parts.length) return "<div>" + U.productTile(p, { lg: true }) + "</div>";
+    var m3d = model3dInfo(p);
+    if (!imgs.length && !frames.length && !parts.length && !m3d) return "<div>" + U.productTile(p, { lg: true }) + "</div>";
 
     var tabs = [];
     if (imgs.length) tabs.push(["photos", "🖼 รูปภาพ"]);
+    if (m3d) tabs.push(["model3d", "🧊 ดู 3 มิติ"]);
     if (frames.length) tabs.push(["spin", "🔄 หมุน 360°"]);
     if (parts.length) tabs.push(["parts", "🧩 อะไหล่ / แยกชิ้น"]);
     var first = tabs[0][0];
@@ -1013,6 +1048,16 @@
       ? '<div class="pdv-panel" data-pdv-panel="photos"' + (first === "photos" ? "" : " hidden") + '>' +
         '<div class="pd-gallery"><div class="pd-main" data-pd-main role="button" tabindex="0" title="กดเพื่อขยายดูรูป" style="' + cssBg(imgs[0]) + '"><span class="pd-zoom-hint">🔍 กดเพื่อขยาย</span></div>' +
         (imgs.length > 1 ? '<div class="pd-thumbs">' + imgs.map(function (im, i) { return '<button type="button" class="pd-thumb' + (i === 0 ? " on" : "") + '" data-pd-thumb="' + i + '" style="' + cssBg(im) + '"></button>'; }).join("") + "</div>" : "") +
+        "</div></div>"
+      : "";
+
+    // 3D model (Sketchfab embed or .glb via <model-viewer>) — mounted lazily in wireViewer
+    var model3dPanel = m3d
+      ? '<div class="pdv-panel" data-pdv-panel="model3d"' + (first === "model3d" ? "" : " hidden") + '>' +
+        '<div class="pd-3d"><div class="pd-3d-stage" data-pd-3d>' +
+          '<span class="pd-3d-badge">3D</span>' +
+          '<div class="pd-3d-loading"><span class="pd-3d-spinner"></span>กำลังโหลดโมเดล 3 มิติ…</div></div>' +
+          '<div class="pd-3d-cap">🖱️ ลากเพื่อหมุน · สกอลล์/หนีบนิ้วเพื่อซูม · ดูสินค้าจริงรอบทิศ 360°</div>' +
         "</div></div>"
       : "";
 
@@ -1043,7 +1088,7 @@
       : "";
 
     return '<div class="pd-viewer" data-pd-viewer>' + tabBar +
-      '<div class="pdv-panels">' + photosPanel + spinPanel + partsPanel + "</div></div>";
+      '<div class="pdv-panels">' + photosPanel + model3dPanel + spinPanel + partsPanel + "</div></div>";
   }
 
   function wireViewer(scope, p) {
@@ -1069,6 +1114,46 @@
       function curIdx() { var on = scope.querySelector("[data-pd-thumb].on"); return on ? +on.getAttribute("data-pd-thumb") : 0; }
       main.addEventListener("click", function () { openLightbox(imgs, curIdx()); });
       main.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openLightbox(imgs, curIdx()); } });
+    }
+
+    // 3D model — mount only when its tab is first shown (don't load 3D until needed)
+    var el3d = scope.querySelector("[data-pd-3d]");
+    if (el3d) {
+      var info = model3dInfo(p), mounted = false;
+      function mount3d() {
+        if (mounted || !info) return; mounted = true;
+        if (info.type === "sketchfab") {
+          var f = document.createElement("iframe");
+          f.className = "pd-3d-frame";
+          f.title = (p.name || "สินค้า") + " — โมเดล 3 มิติ";
+          f.setAttribute("allow", "autoplay; fullscreen; xr-spatial-tracking");
+          f.setAttribute("allowfullscreen", "");
+          f.setAttribute("loading", "lazy");
+          f.src = info.embed;
+          el3d.appendChild(f);
+        } else {
+          loadModelViewer().then(function () {
+            var mv = document.createElement("model-viewer");
+            mv.className = "pd-3d-mv";
+            mv.setAttribute("src", info.src);
+            mv.setAttribute("alt", p.name || "โมเดล 3 มิติของสินค้า");
+            mv.setAttribute("camera-controls", "");
+            mv.setAttribute("auto-rotate", "");
+            mv.setAttribute("rotation-per-second", "20deg");
+            mv.setAttribute("ar", "");
+            mv.setAttribute("ar-modes", "webxr scene-viewer quick-look");
+            mv.setAttribute("shadow-intensity", "1");
+            mv.setAttribute("exposure", "1.1");
+            mv.setAttribute("touch-action", "pan-y");
+            el3d.appendChild(mv);
+          }).catch(function () {
+            el3d.innerHTML = '<div class="pd-3d-loading">โหลดโมเดล 3 มิติไม่สำเร็จ — ลองรีเฟรชหน้าอีกครั้ง</div>';
+          });
+        }
+      }
+      var panel3d = scope.querySelector('[data-pdv-panel="model3d"]');
+      if (panel3d && !panel3d.hidden) mount3d(); // it's the default tab → mount now
+      scope.querySelectorAll('[data-pdv-tab="model3d"]').forEach(function (t) { t.addEventListener("click", mount3d); });
     }
 
     // 360 spin

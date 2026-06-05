@@ -1346,7 +1346,10 @@
           '<div class="img-hint">ใช้รูปชุดที่ถ่ายรอบสินค้า (เช่น 24–36 เฟรม) — ลูกค้าจะลาก/เลื่อนเพื่อหมุนดูรอบทิศ · เว้นว่างถ้ายังไม่มี</div></div>' +
           '<div class="field"><label>จุดอะไหล่ / แยกชิ้น — 1 จุดต่อบรรทัด รูปแบบ: <code>x,y | ชื่อ | รหัส | URLรูป | หมายเหตุ</code></label>' +
           '<textarea data-f="parts" rows="3" placeholder="50,40 | หัวจับดอกสว่าน | CHK-13 | https://.../chuck.jpg | ถอดเปลี่ยนได้&#10;72,65 | แบตเตอรี่ 20V | BAT-20 |  | กดปลดสลักด้านล่าง">' + esc(partsToText(p.parts || [])) + '</textarea>' +
-          '<div class="img-hint">x,y = ตำแหน่ง % บนรูป (0–100) · ลูกค้าดับเบิลคลิกจุดเพื่อแยกชิ้นส่วนออกมาดูทีละจุด · ช่องไหนไม่มีให้เว้นว่างได้ · เว้นทั้งช่องถ้ายังไม่มี</div></div>'
+          '<div class="img-hint">x,y = ตำแหน่ง % บนรูป (0–100) · ลูกค้าดับเบิลคลิกจุดเพื่อแยกชิ้นส่วนออกมาดูทีละจุด · ช่องไหนไม่มีให้เว้นว่างได้ · เว้นทั้งช่องถ้ายังไม่มี</div></div>' +
+          '<div class="field"><label>โมเดล 3 มิติ — วางลิงก์ Sketchfab หรือ URL ไฟล์ .glb / .gltf (ลูกค้าหมุน/ซูมดูสินค้ารอบทิศ)</label>' +
+          '<input data-f="model3d" value="' + esc(p.model3d || "") + '" placeholder="https://sketchfab.com/3d-models/drill-2bf1fd1c09f8422fbc50333c39f7229c">' +
+          '<div class="img-hint">รองรับลิงก์แชร์จาก Sketchfab (คัดลอกจากแถบที่อยู่ของหน้าโมเดล) หรือลิงก์ไฟล์ <code>.glb</code>/<code>.gltf</code> ที่โฮสต์ไว้ · เว้นว่างถ้ายังไม่มี — แท็บ “ดู 3 มิติ” จะโผล่อัตโนมัติเมื่อกรอก</div></div>'
         : '') +
       '<div class="field"><label>รายละเอียด</label>' +
       '<div style="display:flex;gap:8px;align-items:flex-start">' +
@@ -1380,9 +1383,11 @@
         data.images = pendingImages.slice(); data.image = pendingImages[0] || "";
         data.frames360 = val("frames360").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
         data.parts = textToParts(val("parts"));
+        data.model3d = val("model3d").trim();
       } else {
         data.images = p.images || []; data.image = p.image || "";
         data.frames360 = p.frames360 || []; data.parts = p.parts || [];
+        data.model3d = p.model3d || "";
       }
       try { S.saveProduct(data); }
       catch (e) { U.toast("บันทึกไม่สำเร็จ — รูปอาจใหญ่เกินไป ลองใช้รูปเล็กลง", "err"); return false; }
