@@ -1748,7 +1748,8 @@
     if (brandList) { renderBrands(); root.querySelector("[data-brand-add]").addEventListener("click", function () { syncBrands(); brands.push({ name: "", tag: "", primary: false, hidden: false }); renderBrands(); }); }
 
     // ----- categories editor (rename / icon / image / reorder) -----
-    var CAT_ICONS = ["drill", "driver", "saw", "grinder", "rotary", "battery", "charger", "measure", "wrench", "laser", "compressor", "box", "tool"];
+    var CAT_ICONS = ["drill", "driver", "saw", "grinder", "rotary", "battery", "charger", "measure", "wrench", "laser", "compressor", "box", "tool",
+      "air", "weld", "engine", "agri", "pump", "car", "office", "clean", "ladder", "lift", "hammer", "bolt", "electric", "bearing", "generator", "safety", "gear", "pipe", "paint"];
     var cats = S.getCategories();
     var catList = root.querySelector("[data-catlist]");
     function catPreview(c) {
