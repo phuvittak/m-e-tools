@@ -487,14 +487,31 @@
       });
     }
     // สำรอง: ถ้า list สินค้าทีละ doc ไม่ได้ (เช่น Firestore rules ยังไม่อนุญาต list)
-    // หรือยังไม่มี per-product doc เลย — อ่านเอกสารรวม products/catalog (get เดี่ยว เปิดสาธารณะเสมอ)
-    // ได้รายการสินค้าครบ (แต่ไม่มีรูป) เพื่อไม่ให้หน้าร้านว่างเปล่า
+    // → อ่านเอกสารรวม products/catalog (get เดี่ยว เปิดสาธารณะ) เอา "รายชื่อ id" มา
+    //   แล้วอ่าน per-product doc ทีละชิ้นด้วย GET (กฎ allow get ใช้ได้แม้ list ถูกปิด) เพื่อ "ดึงรูป"
+    //   ถ้าชิ้นไหนยังไม่มี doc (ยังไม่ซิงค์) ใช้ข้อมูลจากเอกสารรวมแทน (ไม่มีรูป)
     function fallbackCatalog() {
       if (out.length) return Promise.resolve();
       return fetch(base + "/catalog").then(function (r) { return r.ok ? r.json() : null; }).then(function (doc) {
         if (!doc || !doc.fields) return;
         var items = unwrapFs(doc.fields.items) || [];
-        items.forEach(function (o) { if (o && o.id) out.push(o); });
+        var results = new Array(items.length);
+        return Promise.all(items.map(function (o, idx) {
+          if (!o || !o.id) { return Promise.resolve(); }
+          return fetch(base + "/" + encodeURIComponent(o.id)).then(function (r) {
+            return r.ok ? r.json() : null;
+          }).then(function (pdoc) {
+            if (pdoc && pdoc.fields) {
+              var full = {}; for (var k in pdoc.fields) full[k] = unwrapFs(pdoc.fields[k]);
+              if (!full.id) full.id = o.id;
+              results[idx] = full;        // มีรูปครบจาก per-product doc
+            } else {
+              results[idx] = o;           // ยังไม่มี doc → ใช้ข้อมูลรวม (ไม่มีรูป)
+            }
+          }).catch(function () { results[idx] = o; });
+        })).then(function () {
+          results.forEach(function (r) { if (r && r.id) out.push(r); });
+        });
       }).catch(function () {});
     }
     return page(null).then(fallbackCatalog).then(function () {
