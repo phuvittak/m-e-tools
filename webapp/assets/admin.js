@@ -1309,6 +1309,20 @@
         return [ (pt.x != null ? pt.x : "") + "," + (pt.y != null ? pt.y : ""), pt.label || "", pt.sku || "", pt.image || "", pt.note || "" ].join(" | ");
       }).join("\n");
     }
+    // 3D parts: ตั้งชื่อ/รหัสให้ชิ้นส่วนในไฟล์ .glb (จับคู่ด้วยชื่อ node)  node | ชื่อ | รหัส | หมายเหตุ
+    function textToParts3d(text) {
+      return String(text || "").split("\n").map(function (line) {
+        line = line.trim(); if (!line) return null;
+        var seg = line.split("|").map(function (s) { return s.trim(); });
+        if (!seg[0]) return null;
+        return { node: seg[0], label: seg[1] || "", sku: seg[2] || "", note: seg[3] || "" };
+      }).filter(Boolean);
+    }
+    function parts3dToText(parts) {
+      return (parts || []).map(function (pt) {
+        return [ pt.node || "", pt.label || "", pt.sku || "", pt.note || "" ].join(" | ");
+      }).join("\n");
+    }
     var body =
       (owner
         ? '<div class="field"><label>รูปสินค้า — เพิ่มได้หลายรูป (รูปแรก = รูปหลัก)</label><div class="gal-edit" data-gallery></div>' +
@@ -1349,7 +1363,10 @@
           '<div class="img-hint">x,y = ตำแหน่ง % บนรูป (0–100) · ลูกค้าดับเบิลคลิกจุดเพื่อแยกชิ้นส่วนออกมาดูทีละจุด · ช่องไหนไม่มีให้เว้นว่างได้ · เว้นทั้งช่องถ้ายังไม่มี</div></div>' +
           '<div class="field"><label>โมเดล 3 มิติ — วางลิงก์ Sketchfab หรือ URL ไฟล์ .glb / .gltf (ลูกค้าหมุน/ซูมดูสินค้ารอบทิศ)</label>' +
           '<input data-f="model3d" value="' + esc(p.model3d || "") + '" placeholder="https://sketchfab.com/3d-models/drill-2bf1fd1c09f8422fbc50333c39f7229c">' +
-          '<div class="img-hint">รองรับลิงก์แชร์จาก Sketchfab (คัดลอกจากแถบที่อยู่ของหน้าโมเดล) หรือลิงก์ไฟล์ <code>.glb</code>/<code>.gltf</code> ที่โฮสต์ไว้ · เว้นว่างถ้ายังไม่มี — แท็บ “ดู 3 มิติ” จะโผล่อัตโนมัติเมื่อกรอก</div></div>'
+          '<div class="img-hint">รองรับลิงก์แชร์จาก Sketchfab (คัดลอกจากแถบที่อยู่ของหน้าโมเดล) หรือลิงก์ไฟล์ <code>.glb</code>/<code>.gltf</code> ที่โฮสต์ไว้ · เว้นว่างถ้ายังไม่มี — แท็บ “ดู 3 มิติ” จะโผล่อัตโนมัติเมื่อกรอก</div></div>' +
+          '<div class="field"><label>ชื่อชิ้นส่วนในโมเดล 3 มิติ (เฉพาะไฟล์ .glb · ไม่จำเป็น) — 1 ชิ้น/บรรทัด: <code>ชื่อ node | ชื่อที่โชว์ | รหัส | หมายเหตุ</code></label>' +
+          '<textarea data-f="parts3d" rows="3" placeholder="chuck | หัวจับดอกสว่าน | CHK-13 | ถอดเปลี่ยนได้&#10;battery | แบตเตอรี่ 20V | BAT-20 | กดปลดสลักด้านล่าง">' + esc(parts3dToText(p.parts3d || [])) + '</textarea>' +
+          '<div class="img-hint">เมื่อลูกค้ากดชิ้นส่วนในโมเดล 3 มิติ จะเด้งป้ายชื่อ/รหัสตามที่ตั้งไว้ · “ชื่อ node” = ชื่อชิ้นที่ตั้งไว้ใน Blender (ดูชื่อได้จากตัวโมเดล) · เว้นว่างได้ ระบบจะใช้ชื่อ node เดิม</div></div>'
         : '') +
       '<div class="field"><label>รายละเอียด</label>' +
       '<div style="display:flex;gap:8px;align-items:flex-start">' +
@@ -1384,10 +1401,11 @@
         data.frames360 = val("frames360").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
         data.parts = textToParts(val("parts"));
         data.model3d = val("model3d").trim();
+        data.parts3d = textToParts3d(val("parts3d"));
       } else {
         data.images = p.images || []; data.image = p.image || "";
         data.frames360 = p.frames360 || []; data.parts = p.parts || [];
-        data.model3d = p.model3d || "";
+        data.model3d = p.model3d || ""; data.parts3d = p.parts3d || [];
       }
       try { S.saveProduct(data); }
       catch (e) { U.toast("บันทึกไม่สำเร็จ — รูปอาจใหญ่เกินไป ลองใช้รูปเล็กลง", "err"); return false; }

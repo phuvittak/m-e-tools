@@ -1002,25 +1002,250 @@
         "/embed?autospin=0.3&autostart=1&preload=1&ui_theme=dark&ui_infos=0&ui_watermark=0&ui_hint=2" };
     }
     if (/sketchfab\.com\//i.test(url) && /\/embed/i.test(url)) return { type: "sketchfab", embed: url };
-    // direct 3D file → render with <model-viewer>
+    // direct 3D file → render with the three.js exploded-parts viewer
     if (/\.(glb|gltf)(\?|#|$)/i.test(url)) return { type: "glb", src: url };
     return null;
   }
 
-  // lazy-load Google's <model-viewer> web component, once, only when a .glb is opened
-  var _mvPromise = null;
-  function loadModelViewer() {
-    if (window.customElements && customElements.get("model-viewer")) return Promise.resolve();
-    if (_mvPromise) return _mvPromise;
-    _mvPromise = new Promise(function (resolve, reject) {
-      var s = document.createElement("script");
-      s.type = "module";
-      s.src = "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js";
-      s.onload = function () { customElements.whenDefined("model-viewer").then(resolve, resolve); };
-      s.onerror = function () { _mvPromise = null; reject(new Error("model-viewer load failed")); };
-      document.head.appendChild(s);
+  // lazy-load three.js (core + OrbitControls + GLTFLoader) once, from a CDN that
+  // resolves the bare "three" specifier so the add-ons share a single instance.
+  var _threePromise = null;
+  function loadThree() {
+    if (_threePromise) return _threePromise;
+    var base = "https://esm.sh/three@0.160.0";
+    _threePromise = Promise.all([
+      import(base),
+      import(base + "/examples/jsm/controls/OrbitControls.js"),
+      import(base + "/examples/jsm/loaders/GLTFLoader.js")
+    ]).then(function (m) {
+      return { THREE: m[0], OrbitControls: m[1].OrbitControls, GLTFLoader: m[2].GLTFLoader };
+    }).catch(function (e) { _threePromise = null; throw e; });
+    return _threePromise;
+  }
+
+  // optional per-part metadata for the 3D model, keyed by mesh/node name (lowercased).
+  // p.parts3d : [{ node, label, sku, note }, ...]
+  function parts3dMap(p) {
+    var map = {};
+    (p && p.parts3d ? p.parts3d : []).forEach(function (pt) {
+      if (pt && pt.node) map[String(pt.node).toLowerCase().trim()] = pt;
     });
-    return _mvPromise;
+    return map;
+  }
+  function prettyName(s) {
+    return String(s || "ชิ้นส่วน").replace(/[_\-]+/g, " ").replace(/\d+$/, "").trim() || "ชิ้นส่วน";
+  }
+
+  // Full 3D exploded-parts viewer. Loads a .glb, auto-detects its parts, and lets
+  // the customer click a part to pop it out (with a label callout), plus an
+  // "explode all" slider and a reset. Degrades to a plain rotatable model if the
+  // .glb has only one mesh.
+  function mountExploded3d(stage, p) {
+    var url = model3dInfo(p);
+    url = url && url.src; if (!url) return;
+    var meta = parts3dMap(p);
+
+    loadThree().then(function (T) {
+      var THREE = T.THREE;
+      var host = document.createElement("div"); host.className = "pd-3d-host";
+      var canvasWrap = document.createElement("div"); canvasWrap.className = "pd-3d-canvas";
+      var callout = document.createElement("div"); callout.className = "pd-3d-callout"; callout.hidden = true;
+      host.appendChild(canvasWrap); host.appendChild(callout);
+
+      var renderer;
+      try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
+      catch (e) { var le = stage.querySelector(".pd-3d-loading"); if (le) le.innerHTML = "อุปกรณ์นี้ไม่รองรับ 3 มิติ (WebGL)"; return; }
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      canvasWrap.appendChild(renderer.domElement);
+
+      var scene = new THREE.Scene();
+      var camera = new THREE.PerspectiveCamera(45, 1, 0.01, 2000);
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x33373d, 1.15));
+      var key = new THREE.DirectionalLight(0xffffff, 2.3); key.position.set(4, 6, 5); scene.add(key);
+      var fill = new THREE.DirectionalLight(0xffffff, 0.8); fill.position.set(-5, 2, -4); scene.add(fill);
+
+      var controls = new T.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true; controls.dampingFactor = 0.08; controls.enablePan = false;
+      controls.minDistance = 0.4; controls.maxDistance = 12;
+
+      var parts = [], SPREAD = 1, selected = null, globalT = 0, autoRotate = true;
+
+      var loader = new T.GLTFLoader();
+      loader.load(url, onLoad, null, onError);
+
+      function hasMesh(o) { var f = false; o.traverse(function (c) { if (c.isMesh) f = true; }); return f; }
+      function detectParts(root) {
+        var node = root;
+        while (node.children.length === 1 && node.children[0].children && node.children[0].children.length) node = node.children[0];
+        var kids = node.children.filter(hasMesh);
+        if (kids.length >= 2) return kids;
+        var meshes = []; root.traverse(function (o) { if (o.isMesh) meshes.push(o); });
+        return meshes.length ? meshes : (kids.length ? kids : [root]);
+      }
+
+      function onLoad(gltf) {
+        var model = gltf.scene || gltf.scenes[0];
+        var container = new THREE.Group(); scene.add(container);
+        parts = detectParts(model);
+        parts.forEach(function (part) { container.attach(part); }); // keep world transform, share one space
+
+        var box = new THREE.Box3().setFromObject(container);
+        var center = box.getCenter(new THREE.Vector3());
+        var size = box.getSize(new THREE.Vector3());
+        var maxDim = Math.max(size.x, size.y, size.z) || 1;
+        SPREAD = maxDim * 0.6;
+
+        parts.forEach(function (part) {
+          part.position.sub(center); // center the whole assembly at the origin
+          // clone materials so highlighting one part never bleeds into another
+          part.traverse(function (o) {
+            if (!o.isMesh || !o.material) return;
+            o.material = Array.isArray(o.material) ? o.material.map(function (m) { return m.clone(); }) : o.material.clone();
+            (Array.isArray(o.material) ? o.material : [o.material]).forEach(function (m) {
+              if (m.emissive) { m.userData = m.userData || {}; m.userData.emiss0 = m.emissive.getHex(); m.userData.ei0 = m.emissiveIntensity; }
+            });
+          });
+          var dir = part.position.clone();
+          if (dir.length() < 1e-4 * maxDim) dir.set(0, 1, 0);
+          part.userData.exDir = dir.normalize();
+          part.userData.home = part.position.clone();
+          part.userData.t = 0; part.userData.tTarget = 0;
+        });
+        container.scale.setScalar(1 / maxDim);
+
+        var rS = size.length() / 2 / maxDim;
+        var dist = rS / Math.sin((45 * Math.PI / 180) / 2) * 1.45;
+        camera.position.set(dist * 0.85, dist * 0.55, dist);
+        camera.near = dist / 200; camera.far = dist * 200; camera.updateProjectionMatrix();
+        controls.target.set(0, 0, 0); controls.update();
+
+        stage.classList.add("ready");
+        var loadingEl = stage.querySelector(".pd-3d-loading"); if (loadingEl) loadingEl.remove();
+        stage.appendChild(host);
+        if (stage.parentNode) stage.parentNode.insertBefore(buildBar(), stage.nextSibling); // bar below the square stage
+        resize(); animate();
+        wirePick();
+      }
+
+      function onError() {
+        var loadingEl = stage.querySelector(".pd-3d-loading");
+        if (loadingEl) loadingEl.innerHTML = "เปิดโมเดล 3 มิติไม่สำเร็จ — ตรวจสอบว่าไฟล์ .glb เปิดได้แบบสาธารณะ";
+      }
+
+      // ---- explode / select ----
+      function applyHighlight(part, on) {
+        part.traverse(function (o) {
+          if (!o.isMesh || !o.material) return;
+          (Array.isArray(o.material) ? o.material : [o.material]).forEach(function (m) {
+            if (!m.emissive || !m.userData) return;
+            if (on) { m.emissive.setHex(0x1c4dff); m.emissiveIntensity = 0.55; }
+            else { m.emissive.setHex(m.userData.emiss0 || 0x000000); m.emissiveIntensity = m.userData.ei0 != null ? m.userData.ei0 : 1; }
+          });
+        });
+      }
+      function select(part) {
+        if (selected === part) { deselect(); return; }
+        if (selected) applyHighlight(selected, false);
+        selected = part; applyHighlight(part, true);
+        part.userData.tTarget = Math.max(globalT, 1.35);
+        showCallout(part); autoRotate = false;
+      }
+      function deselect() {
+        if (selected) { applyHighlight(selected, false); selected.userData.tTarget = globalT; }
+        selected = null; callout.hidden = true;
+      }
+      function setGlobal(t) {
+        globalT = t;
+        parts.forEach(function (part) { if (part !== selected) part.userData.tTarget = t; });
+        if (selected) selected.userData.tTarget = Math.max(t, 1.35);
+      }
+
+      function showCallout(part) {
+        var info = meta[String(part.name || "").toLowerCase()] || {};
+        callout.innerHTML =
+          '<button type="button" class="pd-3d-cl-x" aria-label="ปิด">✕</button>' +
+          '<div class="pd-3d-cl-name">' + esc(info.label || prettyName(part.name)) + "</div>" +
+          (info.sku ? '<div class="pd-3d-cl-sku">รหัส: ' + esc(info.sku) + "</div>" : "") +
+          (info.note ? '<div class="pd-3d-cl-note">' + esc(info.note) + "</div>" : "");
+        callout.hidden = false;
+        callout.querySelector(".pd-3d-cl-x").addEventListener("click", function (e) { e.stopPropagation(); deselect(); });
+      }
+      function updateCallout() {
+        if (!selected || callout.hidden) return;
+        var c = new THREE.Box3().setFromObject(selected).getCenter(new THREE.Vector3());
+        c.project(camera);
+        var r = canvasWrap.getBoundingClientRect();
+        callout.style.left = ((c.x * 0.5 + 0.5) * r.width) + "px";
+        callout.style.top = ((-c.y * 0.5 + 0.5) * r.height) + "px";
+      }
+
+      // ---- controls bar ----
+      function buildBar() {
+        var bar = document.createElement("div"); bar.className = "pd-3d-bar";
+        bar.innerHTML =
+          '<button type="button" class="pd-3d-btn" data-x-toggle>💥 แยกชิ้นทั้งหมด</button>' +
+          '<input type="range" class="pd-3d-range" min="0" max="100" value="0" data-x-range aria-label="ระดับการแยกชิ้น">' +
+          '<button type="button" class="pd-3d-btn ghost" data-x-reset>↺ รวมกลับ</button>';
+        var toggle = bar.querySelector("[data-x-toggle]"), range = bar.querySelector("[data-x-range]");
+        toggle.addEventListener("click", function () {
+          var on = globalT < 0.5; setGlobal(on ? 1 : 0); range.value = on ? 100 : 0;
+          toggle.classList.toggle("on", on); autoRotate = false;
+        });
+        range.addEventListener("input", function () { setGlobal(+range.value / 100); toggle.classList.toggle("on", +range.value > 50); autoRotate = false; });
+        bar.querySelector("[data-x-reset]").addEventListener("click", function () {
+          deselect(); setGlobal(0); range.value = 0; toggle.classList.remove("on"); autoRotate = true;
+        });
+        return bar;
+      }
+
+      // ---- picking ----
+      var ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), down = null;
+      function wirePick() {
+        var el = renderer.domElement;
+        el.addEventListener("pointerdown", function (e) { down = { x: e.clientX, y: e.clientY }; autoRotate = false; });
+        el.addEventListener("pointerup", function (e) {
+          if (!down) return;
+          var moved = Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y); down = null;
+          if (moved > 6) return; // was a drag-rotate, not a tap
+          var r = el.getBoundingClientRect();
+          ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+          ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+          ray.setFromCamera(ptr, camera);
+          var hits = ray.intersectObjects(parts, true);
+          if (!hits.length) { deselect(); return; }
+          var o = hits[0].object; while (o && parts.indexOf(o) < 0) o = o.parent;
+          if (o) select(o);
+        });
+        el.style.cursor = "grab";
+      }
+
+      // ---- loop ----
+      function resize() {
+        var w = stage.clientWidth || 480, h = stage.clientHeight || w;
+        renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+      }
+      if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
+      else window.addEventListener("resize", resize);
+
+      var raf = 0;
+      function animate() {
+        raf = requestAnimationFrame(animate);
+        if (stage.offsetParent === null) return; // paused while the 3D tab is hidden
+        parts.forEach(function (part) {
+          var u = part.userData; u.t += (u.tTarget - u.t) * 0.16;
+          part.position.copy(u.home).add(u.exDir.clone().multiplyScalar(u.t * SPREAD));
+        });
+        if (autoRotate && !selected) scene.rotation.y += 0.0035;
+        controls.update(); updateCallout();
+        renderer.render(scene, camera);
+      }
+    }).catch(function () {
+      var loadingEl = stage.querySelector(".pd-3d-loading");
+      if (loadingEl) loadingEl.innerHTML = "โหลดเครื่องมือ 3 มิติไม่สำเร็จ — ลองรีเฟรชหน้าอีกครั้ง";
+    });
   }
 
   function productViewer(p) {
@@ -1051,13 +1276,13 @@
         "</div></div>"
       : "";
 
-    // 3D model (Sketchfab embed or .glb via <model-viewer>) — mounted lazily in wireViewer
+    // 3D model (Sketchfab embed or .glb exploded viewer) — mounted lazily in wireViewer
     var model3dPanel = m3d
       ? '<div class="pdv-panel" data-pdv-panel="model3d"' + (first === "model3d" ? "" : " hidden") + '>' +
         '<div class="pd-3d"><div class="pd-3d-stage" data-pd-3d>' +
           '<span class="pd-3d-badge">3D</span>' +
           '<div class="pd-3d-loading"><span class="pd-3d-spinner"></span>กำลังโหลดโมเดล 3 มิติ…</div></div>' +
-          '<div class="pd-3d-cap">🖱️ ลากเพื่อหมุน · สกอลล์/หนีบนิ้วเพื่อซูม · ดูสินค้าจริงรอบทิศ 360°</div>' +
+          '<div class="pd-3d-cap">🖱️ ลากเพื่อหมุน · สกอลล์/หนีบนิ้วเพื่อซูม · แตะที่ชิ้นส่วนเพื่อแยกดูทีละชิ้น</div>' +
         "</div></div>"
       : "";
 
@@ -1132,23 +1357,7 @@
           f.src = info.embed;
           el3d.appendChild(f);
         } else {
-          loadModelViewer().then(function () {
-            var mv = document.createElement("model-viewer");
-            mv.className = "pd-3d-mv";
-            mv.setAttribute("src", info.src);
-            mv.setAttribute("alt", p.name || "โมเดล 3 มิติของสินค้า");
-            mv.setAttribute("camera-controls", "");
-            mv.setAttribute("auto-rotate", "");
-            mv.setAttribute("rotation-per-second", "20deg");
-            mv.setAttribute("ar", "");
-            mv.setAttribute("ar-modes", "webxr scene-viewer quick-look");
-            mv.setAttribute("shadow-intensity", "1");
-            mv.setAttribute("exposure", "1.1");
-            mv.setAttribute("touch-action", "pan-y");
-            el3d.appendChild(mv);
-          }).catch(function () {
-            el3d.innerHTML = '<div class="pd-3d-loading">โหลดโมเดล 3 มิติไม่สำเร็จ — ลองรีเฟรชหน้าอีกครั้ง</div>';
-          });
+          mountExploded3d(el3d, p); // .glb → interactive exploded-parts viewer (three.js)
         }
       }
       var panel3d = scope.querySelector('[data-pdv-panel="model3d"]');
