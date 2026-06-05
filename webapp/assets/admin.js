@@ -153,6 +153,33 @@
           '<td class="num">' + S.money((o.revenue || 0) - (o.cost || 0)) + "</td>" +
           "<td>" + adminStatusBadges(o) + "</td></tr>";
       }).join("") + "</tbody>";
+
+    // ขายดี + คะแนนรีวิว — รวมยอดขายต่อสินค้าจากออเดอร์ (ไม่นับที่ยกเลิก) คู่กับดาวเฉลี่ย
+    var bsBox = document.querySelector("[data-bestsellers]");
+    if (bsBox) {
+      var sold = {};
+      S.getOrders().forEach(function (o) {
+        if (o.status === "cancelled") return;
+        (o.items || []).forEach(function (it) {
+          if (!it.productId) return;
+          var s = sold[it.productId] || (sold[it.productId] = { qty: 0, rev: 0 });
+          s.qty += it.qty || 0; s.rev += (it.unitPrice || 0) * (it.qty || 0) * (it.days || 1);
+        });
+      });
+      var rows = S.getProducts().map(function (p) {
+        var s = sold[p.id] || { qty: 0, rev: 0 }, r = S.productRating(p);
+        return { p: p, qty: s.qty, rev: s.rev, avg: r.avg, cnt: r.count };
+      }).sort(function (a, b) { return b.qty - a.qty || b.rev - a.rev; });
+      bsBox.innerHTML =
+        "<thead><tr><th>สินค้า</th><th class=num>ขายไป</th><th class=num>ยอดขาย</th><th>คะแนนรีวิว</th></tr></thead><tbody>" +
+        (rows.length ? rows.map(function (x) {
+          var stars = ""; var f = Math.round(x.avg); for (var i = 1; i <= 5; i++) stars += '<span style="color:' + (i <= f ? "#F5A623" : "#ccc") + '">★</span>';
+          return "<tr><td><b>" + esc(x.p.name) + "</b><br><span class=prod-sku>" + esc(S.categoryLabel(x.p.category)) + "</span></td>" +
+            '<td class="num">' + x.qty + " ชิ้น</td>" +
+            '<td class="num">' + S.money(x.rev) + "</td>" +
+            "<td>" + stars + " " + (x.cnt ? '<span class="prod-sku">' + x.avg.toFixed(1) + " (" + x.cnt + ")</span>" : '<span class="prod-sku">ยังไม่มีรีวิว</span>') + "</td></tr>";
+        }).join("") : '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--fg-2)">ยังไม่มีข้อมูล</td></tr>') + "</tbody>";
+    }
   }
   function kpi(cls, k, v, sub) {
     return '<div class="kpi ' + cls + '"><div class="kpi-k">' + k + '</div><div class="kpi-v">' + v + '</div><div class="kpi-sub">' + (sub || "") + "</div></div>";

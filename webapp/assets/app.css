@@ -138,6 +138,28 @@ img { max-width: 100%; display: block; }
 .order-rate-label { font-family: var(--font-body); font-size: 13px; color: var(--fg-2); }
 .order-rate .me-star-btn { font-size: 24px; }
 
+/* ---------- รีวิวในหน้าสินค้า ---------- */
+.pd-reviews { margin-top: 40px; border-top: 3px solid var(--ink); padding-top: 22px; }
+.pd-rev-summary { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.pd-rev-avg { font-family: var(--font-display-th); font-style: italic; font-weight: 900; font-size: 40px; line-height: 1; }
+.pd-rev-cnt { font-family: var(--font-body); color: var(--fg-2); }
+.pd-rev-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.rv-empty { font-family: var(--font-body); color: var(--fg-3); padding: 14px 0; }
+.rv-item { border: 2px solid var(--border-3); border-radius: 8px; padding: 12px 14px; background: #fff; }
+.rv-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rv-name { font-family: var(--font-body); font-weight: 700; }
+.rv-comment { font-family: var(--font-body); margin: 6px 0; color: var(--fg-1); white-space: pre-wrap; }
+.rv-imgs { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.rv-img { width: 84px; height: 84px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-3); }
+.rv-date { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); }
+.rv-form { border: 2px dashed var(--dw-yellow-deep, #E8A800); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--dw-yellow-pale, #FFF1C4); }
+.rv-form-title { font-family: var(--font-body); font-weight: 700; font-size: 16px; }
+.rv-pick { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.rv-pick-hint { font-family: var(--font-body); font-size: 13px; color: var(--fg-2); margin-left: 8px; }
+.rv-input { font-family: var(--font-body); font-size: 15px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 6px; width: 100%; }
+.rv-photos { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.rv-preview { display: flex; gap: 8px; flex-wrap: wrap; }
+
 /* breadcrumb หมวดหมู่ */
 .cat-crumb { font-family: var(--font-body); font-size: 14px; color: var(--fg-2); margin: 4px 0 14px; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
 .cat-crumb a { color: var(--fg-2); text-decoration: none; }

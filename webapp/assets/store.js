@@ -478,7 +478,7 @@
         if (!data) return;
         (data.documents || []).forEach(function (doc) {
           var id = (doc.name || "").split("/").pop();
-          if (id === "catalog") return;
+          if (id === "catalog" || /_reviews$/.test(id)) return; // ข้าม doc รวม + doc รีวิว
           var obj = {}, f = doc.fields || {};
           for (var k in f) obj[k] = unwrapFs(f[k]);
           if (!obj.id) obj.id = id;
@@ -754,6 +754,43 @@
         ratingSum: fs.increment(deltaSum), ratingCount: fs.increment(deltaCount),
       }, { merge: true });
     }).catch(function (err) { console.warn("[rate]", productId, err && err.message); });
+  }
+
+  /* ---------- Reviews (ดาว + ความเห็น + รูป) ----------------------- */
+  // เก็บที่ doc products/{id}_reviews (กฎเดิมรองรับ: read public, write ต้อง auth)
+  // ใช้ arrayUnion ต่อท้ายแบบ atomic → รีวิวพร้อมกันไม่หาย
+  function loadReviews(productId) {
+    var cfg = parseFbConfig(firebaseCfg());
+    if (!cfg || !cfg.projectId || !productId) return Promise.resolve([]);
+    var url = "https://firestore.googleapis.com/v1/projects/" + cfg.projectId +
+      "/databases/default/documents/products/" + encodeURIComponent(productId + "_reviews");
+    return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (doc) {
+      if (!doc || !doc.fields) return [];
+      var items = unwrapFs(doc.fields.items) || [];
+      // เก็บรีวิวล่าสุดต่อ 1 ผู้ใช้ (uid) แล้วเรียงใหม่→เก่า
+      var byUid = {};
+      items.forEach(function (rv) { if (!rv) return; var k = rv.uid || ("x" + Math.random()); if (!byUid[k] || (rv.at || 0) > (byUid[k].at || 0)) byUid[k] = rv; });
+      return Object.keys(byUid).map(function (k) { return byUid[k]; }).sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    }).catch(function () { return []; });
+  }
+  // ส่งรีวิว: อัปเดตคะแนนเฉลี่ย (rateProduct) + ต่อท้ายรีวิวใน _reviews doc
+  function submitReview(productId, data) {
+    data = data || {};
+    var stars = Math.max(1, Math.min(5, Math.round(data.stars || 0)));
+    if (!productId || !stars) return Promise.reject(new Error("กรุณาเลือกดาว"));
+    rateProduct(productId, stars); // ค่าเฉลี่ย (กันนับซ้ำด้วย me_ratings)
+    return loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      var uid = (m.auth && m.auth.currentUser && m.auth.currentUser.uid) || ("anon" + Date.now());
+      var review = {
+        uid: uid, name: String(data.name || "ลูกค้า").slice(0, 40), stars: stars,
+        comment: String(data.comment || "").slice(0, 1000),
+        images: (data.images || []).slice(0, 3), at: Date.now(),
+      };
+      return fs.setDoc(fs.doc(m.db, "products", String(productId) + "_reviews"),
+        { productId: String(productId), items: fs.arrayUnion(review), updatedAt: new Date().toISOString() },
+        { merge: true });
+    });
   }
 
   function saveProduct(p) {
@@ -1456,6 +1493,7 @@
     getCategory: getCategory, getSubcategories: getSubcategories, categoryHasChildren: categoryHasChildren,
     catDescendants: catDescendants, categoryPath: categoryPath, productCountInCat: productCountInCat,
     getMyRating: getMyRating, productRating: productRating, rateProduct: rateProduct,
+    loadReviews: loadReviews, submitReview: submitReview,
     typeLabel: typeLabel, statusLabel: statusLabel, fulfillmentLabel: fulfillmentLabel,
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
     getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,

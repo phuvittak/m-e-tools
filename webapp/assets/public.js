@@ -51,6 +51,73 @@
     });
   }
 
+  /* ---------- รีวิว (ดาว + ความเห็น + รูป) ---------- */
+  function compressImage(file, cb) {
+    var max = 1000, fr = new FileReader();
+    fr.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var s = Math.min(1, max / Math.max(img.width, img.height));
+        var w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+        var c = document.createElement("canvas"); c.width = w; c.height = h;
+        try { c.getContext("2d").drawImage(img, 0, 0, w, h); cb(c.toDataURL("image/jpeg", 0.7)); } catch (e) { cb(fr.result); }
+      };
+      img.onerror = function () { cb(fr.result); };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  }
+  function reviewStars(n) { var s = ""; for (var i = 1; i <= 5; i++) s += '<span class="me-star' + (i <= n ? " on" : "") + '">★</span>'; return s; }
+  function reviewsHtml(list) {
+    if (!list || !list.length) return '<div class="rv-empty">ยังไม่มีรีวิว — เป็นคนแรกที่รีวิวสินค้านี้!</div>';
+    return list.map(function (rv) {
+      var imgs = (rv.images || []).map(function (im) { return '<img class="rv-img" src="' + esc(im) + '" alt="รูปรีวิว" loading="lazy">'; }).join("");
+      return '<div class="rv-item"><div class="rv-head"><span class="rv-name">' + esc(rv.name || "ลูกค้า") + "</span>" +
+        '<span class="me-stars">' + reviewStars(rv.stars || 0) + "</span></div>" +
+        (rv.comment ? '<div class="rv-comment">' + esc(rv.comment) + "</div>" : "") +
+        (imgs ? '<div class="rv-imgs">' + imgs + "</div>" : "") +
+        '<div class="rv-date">' + (rv.at ? new Date(rv.at).toLocaleDateString("th-TH") : "") + "</div></div>";
+    }).join("");
+  }
+  function reviewFormHtml() {
+    return '<form class="rv-form" data-rv-form>' +
+      '<div class="rv-form-title">เขียนรีวิวสินค้านี้</div>' +
+      '<div class="rv-pick" data-rv-pick>' +
+        [1, 2, 3, 4, 5].map(function (i) { return '<button type="button" class="me-star-btn" data-rv-star="' + i + '">★</button>'; }).join("") +
+        '<span class="rv-pick-hint" data-rv-pick-hint>แตะเลือกดาว</span></div>' +
+      '<input class="rv-input" data-rv-name maxlength="40" placeholder="ชื่อของคุณ (เช่น ช่างโอ๋)">' +
+      '<textarea class="rv-input" data-rv-comment maxlength="1000" rows="3" placeholder="เล่าประสบการณ์ใช้งาน คุณภาพ ความคุ้มค่า…"></textarea>' +
+      '<div class="rv-photos"><label class="me-btn me-btn-sm me-btn-ghost">📷 เพิ่มรูป (สูงสุด 3)<input type="file" accept="image/*" multiple data-rv-img hidden></label>' +
+        '<div class="rv-preview" data-rv-preview></div></div>' +
+      '<button type="submit" class="me-btn" data-rv-submit>ส่งรีวิว</button></form>';
+  }
+  function wireReviewForm(scope, productId, onDone) {
+    var form = scope.querySelector("[data-rv-form]"); if (!form) return;
+    var picked = 0, photos = [];
+    var hint = form.querySelector("[data-rv-pick-hint]");
+    form.querySelectorAll("[data-rv-star]").forEach(function (b) {
+      b.addEventListener("click", function () { picked = +b.dataset.rvStar; form.querySelectorAll("[data-rv-star]").forEach(function (x) { x.classList.toggle("on", +x.dataset.rvStar <= picked); }); if (hint) hint.textContent = picked + " ดาว"; });
+      b.addEventListener("mouseenter", function () { var n = +b.dataset.rvStar; form.querySelectorAll("[data-rv-star]").forEach(function (x) { x.classList.toggle("hover", +x.dataset.rvStar <= n); }); });
+    });
+    var pick = form.querySelector("[data-rv-pick]");
+    pick.addEventListener("mouseleave", function () { form.querySelectorAll("[data-rv-star]").forEach(function (x) { x.classList.remove("hover"); }); });
+    var preview = form.querySelector("[data-rv-preview]");
+    form.querySelector("[data-rv-img]").addEventListener("change", function (e) {
+      Array.prototype.slice.call(e.target.files || []).forEach(function (f) {
+        compressImage(f, function (d) { if (photos.length >= 3) return; photos.push(d); preview.insertAdjacentHTML("beforeend", '<img class="rv-img" src="' + d + '">'); });
+      });
+      e.target.value = "";
+    });
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (!picked) { U.toast("กรุณาเลือกจำนวนดาว", "err"); return; }
+      var btn = form.querySelector("[data-rv-submit]"); btn.disabled = true; btn.textContent = "กำลังส่ง…";
+      S.submitReview(productId, { stars: picked, name: form.querySelector("[data-rv-name]").value.trim(), comment: form.querySelector("[data-rv-comment]").value.trim(), images: photos })
+        .then(function () { U.toast("ขอบคุณสำหรับรีวิว! 🙏", "ok"); if (onDone) onDone(); })
+        .catch(function (err) { U.toast("ส่งรีวิวไม่สำเร็จ: " + (err && err.message || err), "err"); btn.disabled = false; btn.textContent = "ส่งรีวิว"; });
+    });
+  }
+
   U.mountChrome(page === "home" ? "home" : page === "categories" ? "categories" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : "");
 
   // เมื่อแคตตาล็อกจาก cloud มาถึง (ลูกค้า) → วาดส่วนที่ขึ้นกับสินค้าใหม่
@@ -470,10 +537,28 @@
             (p.motorType && p.motorType !== "—" ? "<tr><th>ระบบมอเตอร์</th><td>" + p.motorType + "</td></tr>" : "") +
             (p.shipSize ? "<tr><th>ขนาด/น้ำหนักสำหรับจัดส่ง</th><td>" + p.shipSize + "</td></tr>" : "") +
             (p.specs || []).map(function (s) { var kv = specKV(s); return "<tr><th>" + kv[0] + "</th><td>" + kv[1] + "</td></tr>"; }).join("") +
-          "</tbody></table></div></div>";
+          "</tbody></table></div></div>" +
+      '<section class="pd-reviews" id="reviews"><h2 class="me-section-h">รีวิว<span class="me-hl">จากลูกค้า</span></h2>' +
+        '<div class="pd-rev-summary" data-rev-summary></div>' +
+        '<div class="pd-rev-list" data-rev-list><div class="rv-empty">กำลังโหลดรีวิว…</div></div>' +
+        reviewFormHtml() + "</section>";
 
     wireViewer(root, p);
     wireRating(root);
+    function loadAndRenderReviews() {
+      S.loadReviews(p.id).then(function (list) {
+        var listBox = root.querySelector("[data-rev-list]"); if (listBox) listBox.innerHTML = reviewsHtml(list);
+        var sum = root.querySelector("[data-rev-summary]");
+        if (sum) {
+          var fresh = S.getProduct(p.id) || p, r = S.productRating(fresh);
+          sum.innerHTML = r.count
+            ? '<span class="pd-rev-avg">' + r.avg.toFixed(1) + '</span><span class="me-stars">' + reviewStars(Math.round(r.avg)) + "</span><span class=\"pd-rev-cnt\">จาก " + r.count + " รีวิว</span>"
+            : "";
+        }
+      });
+    }
+    wireReviewForm(root, p.id, loadAndRenderReviews);
+    loadAndRenderReviews();
 
     var bb = root.querySelector("[data-buybox]");
     function drawBuybox() {
