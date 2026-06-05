@@ -219,7 +219,7 @@
               '<button class="btn btn-sm btn-ghost" data-edit="' + p.id + '">แก้ไข</button>' +
               '<button class="btn btn-sm btn-ghost" data-hideprod="' + p.id + '">' + (p.hidden ? "แสดง" : "ซ่อน") + "</button>" +
               '<button class="btn btn-sm" data-restock="' + p.id + '">+สต็อก</button>' +
-              '<button class="btn btn-sm btn-danger" data-del="' + p.id + '">ลบ</button>' +
+              (S.hasPerm("inventory_delete") ? '<button class="btn btn-sm btn-danger" data-del="' + p.id + '">ลบ</button>' : "") +
             "</div></td></tr>";
         }).join("") + "</tbody>";
 
@@ -1573,7 +1573,7 @@
             "<td>" + adminStatusBadges(o) + (o.staffMessage ? '<br><span class="prod-sku">📩 ' + esc(o.staffMessage) + "</span>" : "") + "</td>" +
             '<td><div class="ord-act">' + (opts ? '<select class="statussel" data-os="' + o.id + '">' + opts + "</select>" : '<span class="prod-sku">—</span>') +
               '<div class="ord-msg"><input data-msg="' + o.id + '" value="' + esc(o.staffMessage || "") + '" placeholder="ตอบลูกค้า เช่น ของถึงใน 2 วัน"><button class="btn btn-sm" data-sendmsg="' + o.id + '">ส่ง</button></div>' +
-              (S.isOwner() ? '<button class="btn btn-sm btn-danger" data-delorder="' + o.id + '">ลบคำสั่งซื้อ</button>' : "") +
+              (S.hasPerm("orders_delete") ? '<button class="btn btn-sm btn-danger" data-delorder="' + o.id + '">ลบคำสั่งซื้อ</button>' : "") +
             "</div></td></tr>";
         }).join("") + "</tbody>";
 
@@ -2014,7 +2014,22 @@
   /* ===================== STAFF MANAGEMENT (owner) ===================== */
   function initStaff() {
     var root = document.querySelector("[data-staffroot]");
-    var permLabels = { dashboard: "แดชบอร์ด", inventory: "คลัง/สต็อก", orders: "คำสั่งซื้อ", erp: "ERP/บัญชี", settings: "ตั้งค่าเว็บไซต์" };
+    var groupLabels = { access: "เข้าถึง / ใช้งานหน้า", danger: "สิทธิ์ลบข้อมูลถาวร (เปิดเฉพาะคนที่ไว้ใจ)" };
+    // สร้างชุด checkbox สิทธิ์ แบ่งตามกลุ่มจาก S.PERM_DEFS
+    //   attr = ชื่อ data-attribute ของ input, idAttr = แอตทริบิวต์เสริม (เช่น data-id="..")
+    //   checkedFn(key) → true/false ว่าติ๊กไว้ไหม
+    function permChecks(attr, idAttr, checkedFn) {
+      var groups = {};
+      S.PERM_DEFS.forEach(function (d) { (groups[d.group] = groups[d.group] || []).push(d); });
+      return Object.keys(groups).map(function (g) {
+        return '<div class="perm-group' + (g === "danger" ? " perm-danger" : "") + '">' +
+          '<div class="perm-group-title">' + (groupLabels[g] || g) + "</div>" +
+          '<div class="perm-grid">' + groups[g].map(function (d) {
+            return '<label class="f-check"><input type="checkbox" ' + attr + '="' + d.key + '"' + idAttr +
+              (checkedFn(d.key) ? " checked" : "") + "> " + d.label + "</label>";
+          }).join("") + "</div></div>";
+      }).join("");
+    }
     function render() {
       var staff = S.getStaff();
       root.innerHTML = staff.map(function (m) {
@@ -2025,15 +2040,15 @@
           '<div class="field"><label>อีเมล (ใช้เข้าสู่ระบบ)</label><input data-f="email" data-id="' + m.id + '" value="' + esc(m.email) + '"></div></div>' +
           '<div class="field"><label>รหัสผ่าน</label><input data-f="password" data-id="' + m.id + '" value="' + esc(m.password) + '"></div>' +
           (owner ? '<div class="img-hint">แอดมินมีสิทธิ์ใช้งานทุกระบบโดยอัตโนมัติ</div>'
-            : '<div class="field"><label>สิทธิ์การใช้ระบบหลังร้าน</label><div class="perm-grid">' +
-              S.PERM_KEYS.map(function (k) { return '<label class="f-check"><input type="checkbox" data-perm="' + k + '" data-id="' + m.id + '"' + (m.perms && m.perms[k] ? " checked" : "") + "> " + permLabels[k] + "</label>"; }).join("") + "</div></div>") +
+            : '<div class="field"><label>สิทธิ์การใช้ระบบหลังร้าน</label>' +
+              permChecks("data-perm", ' data-id="' + m.id + '"', function (k) { return m.perms && m.perms[k]; }) + "</div>") +
           '<button class="btn" data-save="' + m.id + '">บันทึก</button></div>';
       }).join("") +
       '<div class="panel"><div class="panel-head"><h2>+ เพิ่มพนักงานใหม่</h2></div>' +
         '<div class="f2"><div class="field"><label>ชื่อ</label><input data-new="name"></div>' +
         '<div class="field"><label>อีเมล</label><input data-new="email"></div></div>' +
         '<div class="field"><label>รหัสผ่าน</label><input data-new="password"></div>' +
-        '<div class="field"><label>สิทธิ์</label><div class="perm-grid">' + S.PERM_KEYS.map(function (k) { return '<label class="f-check"><input type="checkbox" data-newperm="' + k + '"' + (k === "dashboard" ? " checked" : "") + "> " + permLabels[k] + "</label>"; }).join("") + "</div></div>" +
+        '<div class="field"><label>สิทธิ์</label>' + permChecks("data-newperm", "", function (k) { return k === "dashboard"; }) + "</div>" +
         '<button class="btn" data-add-staff>เพิ่มพนักงาน</button></div>';
 
       root.querySelectorAll("[data-save]").forEach(function (b) {

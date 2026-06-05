@@ -239,7 +239,19 @@
   };
 
   // Staff accounts. The OWNER manages employees + permissions. Customers register themselves.
-  var PERM_KEYS = ["dashboard", "inventory", "orders", "erp", "settings"];
+  // สิทธิ์การใช้งานหลังร้าน เจ้าของร้านตั้งให้พนักงานทีละคนได้
+  //   group "access" = เข้าถึง/ใช้งานหน้านั้น ๆ
+  //   group "danger" = การลบข้อมูลถาวร (ค่าเริ่มต้นปิด — เปิดเฉพาะคนที่ไว้ใจ)
+  var PERM_DEFS = [
+    { key: "dashboard", label: "แดชบอร์ด", group: "access" },
+    { key: "inventory", label: "คลัง/สต็อก", group: "access" },
+    { key: "orders", label: "คำสั่งซื้อ", group: "access" },
+    { key: "erp", label: "ERP/บัญชี", group: "access" },
+    { key: "settings", label: "ตั้งค่าเว็บไซต์", group: "access" },
+    { key: "inventory_delete", label: "ลบสินค้าออกจากคลัง", group: "danger" },
+    { key: "orders_delete", label: "ลบคำสั่งซื้อ", group: "danger" },
+  ];
+  var PERM_KEYS = PERM_DEFS.map(function (d) { return d.key; });
   var DEFAULT_STAFF = [
     { id: "owner", name: "เจ้าของร้าน", email: "owner@metools.co.th", password: "owner123", role: "owner",
       perms: { dashboard: true, inventory: true, orders: true, erp: true, settings: true } },
@@ -656,13 +668,17 @@
       if (!found) { list.push(p); saved = p; }
     }
     write(KEY.products, list);
-    // auto-sync ขึ้น cloud — เฉพาะเครื่องเจ้าของ (ลูกค้าเขียน cloud ไม่ได้ + ไม่ควรเขียน)
-    if (isOwner()) { cloudPushProduct(saved); scheduleCatalogSync(); }
+    // auto-sync ขึ้น cloud — ใครก็ตามที่มีสิทธิ์ "คลัง/สต็อก" (เจ้าของ + พนักงานที่ได้รับสิทธิ์)
+    // ลูกค้า/คนไม่มีสิทธิ์ไม่เข้าเงื่อนไขนี้ จึงไม่เขียนทับแคตตาล็อกบน cloud
+    if (hasPerm("inventory")) { cloudPushProduct(saved); scheduleCatalogSync(); }
     return saved;
   }
   function deleteProduct(id) {
+    // กันลบโดยไม่มีสิทธิ์ — ป้องกันเชิงลึกเผื่อปุ่มบน UI หลุด (เจ้าของผ่านเสมอ)
+    if (!hasPerm("inventory_delete")) return false;
     write(KEY.products, getLocalProducts().filter(function (p) { return p.id !== id; }));
-    if (isOwner()) { cloudDeleteProductDoc(id); scheduleCatalogSync(); }
+    if (hasPerm("inventory")) { cloudDeleteProductDoc(id); scheduleCatalogSync(); }
+    return true;
   }
   // adjust physical stock by delta (+ receive, - shrink/sell off the books)
   function adjustStock(id, delta) {
@@ -864,7 +880,7 @@
     for (var i = 0; i < orders.length; i++) if (orders[i].id === orderId) { orders[i].staffMessage = msg; orders[i].staffMessageAt = Date.now(); break; }
     write(KEY.orders, orders); dispatch();
   }
-  function deleteOrder(id) { write(KEY.orders, read(KEY.orders, []).filter(function (o) { return o.id !== id; })); dispatch(); }
+  function deleteOrder(id) { if (!hasPerm("orders_delete")) return false; write(KEY.orders, read(KEY.orders, []).filter(function (o) { return o.id !== id; })); dispatch(); return true; }
   function deletePurchase(id) { write(KEY.purchases, read(KEY.purchases, []).filter(function (p) { return p.id !== id; })); dispatch(); }
   function checkPin(pin) { return String(pin) === String(getSettings().deletePin || "1234"); }
 
@@ -1286,7 +1302,7 @@
     cloudLoadAdminData: cloudLoadAdminData, cloudPushAdminData: cloudPushAdminData,
     cloudLoadPublicSettings: cloudLoadPublicSettings,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
-    session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS,
+    session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS, PERM_DEFS: PERM_DEFS,
     logout: logout, requirePerm: requirePerm, checkPin: checkPin,
     deleteOrder: deleteOrder, deletePurchase: deletePurchase,
     getLedger: getLedger, saveLedgerEntry: saveLedgerEntry, deleteLedgerEntry: deleteLedgerEntry,

@@ -159,6 +159,11 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
 .row-edit.is-hidden, .faq-edit.is-hidden { opacity: .55; }
 .perm-grid { display: flex; gap: 16px 22px; flex-wrap: wrap; padding: 4px 0; }
 .perm-grid .f-check { font-size: 14px; }
+.perm-group { padding: 8px 0; }
+.perm-group + .perm-group { border-top: 1px dashed var(--line, #d9d3c4); margin-top: 4px; }
+.perm-group-title { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-2, #8a8472); font-family: var(--font-body); margin-bottom: 2px; }
+.perm-group.perm-danger { background: rgba(192, 57, 43, .05); border-left: 3px solid #c0392b; padding-left: 10px; border-radius: 4px; }
+.perm-group.perm-danger .perm-group-title { color: #c0392b; }
 
 /* ---------- chat inbox (LINE-OA style) ---------- */
 .chat-admin { display: grid; grid-template-columns: 280px 1fr; min-height: 440px; }
