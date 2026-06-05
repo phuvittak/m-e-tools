@@ -118,6 +118,13 @@ img { max-width: 100%; display: block; }
 
 /* ---------- categories strip ---------- */
 .me-cats { padding: 72px 0 8px; }
+/* breadcrumb หมวดหมู่ */
+.cat-crumb { font-family: var(--font-body); font-size: 14px; color: var(--fg-2); margin: 4px 0 14px; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.cat-crumb a { color: var(--fg-2); text-decoration: none; }
+.cat-crumb a:hover { color: var(--ink); background: var(--dw-yellow); }
+.cat-crumb .crumb-cur { color: var(--ink); font-weight: 700; }
+.cat-crumb .crumb-sep { color: var(--fg-3); }
+
 /* category grid — สไตล์ช่องหมวด (iToolmart-like): ไอคอนกลาง + ชื่อใต้ภาพ */
 .me-cats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 28px; }
 .me-cat {

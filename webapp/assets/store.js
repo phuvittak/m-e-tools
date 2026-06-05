@@ -644,14 +644,43 @@
     return { drill: "drill", saw: "saw", grinder: "grinder", battery: "battery", measure: "measure", hand: "wrench", power: "compressor" }[key] || "tool";
   }
   // editable categories from settings; falls back to hardcoded defaults
+  // parent = key ของหมวดแม่ ("" = หมวดบนสุด) → รองรับหมวดซ้อนหลายชั้น
   function getCategories() {
     var st = getSettings();
     if (st && st.categories && st.categories.length) {
       return st.categories.map(function (c) {
-        return { key: c.key, label: c.label, icon: c.icon || defaultCatIcon(c.key), image: c.image || "", hidden: !!c.hidden };
+        return { key: c.key, label: c.label, icon: c.icon || defaultCatIcon(c.key), image: c.image || "", hidden: !!c.hidden, parent: c.parent || "" };
       });
     }
-    return CATEGORIES.map(function (c) { return { key: c.key, label: c.label, icon: defaultCatIcon(c.key), image: "", hidden: false }; });
+    return CATEGORIES.map(function (c) { return { key: c.key, label: c.label, icon: defaultCatIcon(c.key), image: "", hidden: false, parent: "" }; });
+  }
+  function getCategory(key) { var cats = getCategories(); for (var i = 0; i < cats.length; i++) if (cats[i].key === key) return cats[i]; return null; }
+  // ลูกหมวดตรงของ parentKey ("" = หมวดบนสุด). includeHidden=true เพื่อใช้ในหลังร้าน
+  function getSubcategories(parentKey, includeHidden) {
+    parentKey = parentKey || "";
+    return getCategories().filter(function (c) { return (c.parent || "") === parentKey && (includeHidden || !c.hidden); });
+  }
+  function categoryHasChildren(key) { return getCategories().some(function (c) { return (c.parent || "") === key && !c.hidden; }); }
+  // เซ็ตของ key = ตัวมันเอง + ลูกหลานทุกชั้น (ไว้กรองสินค้าในซับทรี)
+  function catDescendants(key) {
+    var all = getCategories(), out = {}, queue = [key]; out[key] = 1;
+    var guard = 0;
+    while (queue.length && guard++ < 999) {
+      var k = queue.shift();
+      all.forEach(function (c) { if ((c.parent || "") === k && !out[c.key]) { out[c.key] = 1; queue.push(c.key); } });
+    }
+    return out;
+  }
+  // เส้นทาง breadcrumb [หมวดบนสุด, ..., หมวดปัจจุบัน]
+  function categoryPath(key) {
+    var path = [], guard = 0, c = getCategory(key);
+    while (c && guard++ < 30) { path.unshift(c); c = c.parent ? getCategory(c.parent) : null; }
+    return path;
+  }
+  // นับสินค้าในหมวด (รวมหมวดย่อยทุกชั้น)
+  function productCountInCat(key) {
+    var set = catDescendants(key);
+    return getProducts().filter(function (p) { return !p.hidden && set[p.category]; }).length;
   }
   function categoryLabel(key) {
     var cats = getCategories();
@@ -1388,6 +1417,8 @@
   global.MEStore = {
     KEY: KEY,
     CATEGORIES: CATEGORIES, categoryLabel: categoryLabel, getCategories: getCategories,
+    getCategory: getCategory, getSubcategories: getSubcategories, categoryHasChildren: categoryHasChildren,
+    catDescendants: catDescendants, categoryPath: categoryPath, productCountInCat: productCountInCat,
     typeLabel: typeLabel, statusLabel: statusLabel, fulfillmentLabel: fulfillmentLabel,
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
     getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,

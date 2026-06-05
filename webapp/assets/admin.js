@@ -1318,7 +1318,7 @@
       '<div class="f2"><div class="field"><label>แบรนด์</label><input data-f="brand" value="' + esc(p.brand) + '"></div>' +
       '<div class="field"><label>รหัส SKU</label><input data-f="sku" value="' + esc(p.sku) + '"></div></div>' +
       '<div class="f2"><div class="field"><label>หมวดหมู่</label><select data-f="category">' +
-        S.getCategories().map(function (c) { return '<option value="' + c.key + '"' + (p.category === c.key ? " selected" : "") + ">" + c.label + "</option>"; }).join("") + "</select></div>" +
+        S.getCategories().map(function (c) { var path = S.categoryPath(c.key).map(function (x) { return x.label; }).join(" › "); return '<option value="' + c.key + '"' + (p.category === c.key ? " selected" : "") + ">" + esc(path || c.label) + "</option>"; }).join("") + "</select></div>" +
       '<div class="field"><label>ไอคอน</label><select data-f="icon">' +
         icons.map(function (i) { return '<option value="' + i + '"' + (p.icon === i ? " selected" : "") + ">" + i + "</option>"; }).join("") + "</select></div></div>" +
       '<div class="field"><label>ที่จัดเก็บในคลัง (เห็นเฉพาะหลังร้าน · ลูกค้าไม่เห็น)</label><input data-f="location" value="' + esc(p.location) + '" placeholder="เช่น โซน A-1 · ชั้น 2"></div>' +
@@ -1766,7 +1766,14 @@
       if (!catList) return;
       catList.querySelectorAll("[data-cn]").forEach(function (i) { cats[+i.dataset.cn].label = i.value; });
       catList.querySelectorAll("[data-ci]").forEach(function (i) { var c = cats[+i.dataset.ci]; if (!c.image) c.icon = i.value; });
+      catList.querySelectorAll("[data-cp]").forEach(function (i) { cats[+i.dataset.cp].parent = i.value; });
       catList.querySelectorAll("[data-ch]").forEach(function (i) { cats[+i.dataset.ch].hidden = i.checked; });
+    }
+    // เซ็ตลูกหลานของ key (จาก cats ปัจจุบัน) — กันเลือกหมวดแม่เป็นตัวเอง/ลูกตัวเอง (วน loop)
+    function catDescLocal(key) {
+      var out = {}, q = [key], g = 0; out[key] = 1;
+      while (q.length && g++ < 999) { var k = q.shift(); cats.forEach(function (c) { if ((c.parent || "") === k && !out[c.key]) { out[c.key] = 1; q.push(c.key); } }); }
+      return out;
     }
     var _catDragIdx = null;
     function renderCats() {
@@ -1776,6 +1783,14 @@
           '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 4px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
           '<span style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:var(--bg-1,#f5f5f5);border-radius:6px">' + catPreview(c) + "</span>" +
           '<input data-cn="' + i + '" value="' + esc(c.label) + '" placeholder="ชื่อหมวด" style="flex:1;min-width:110px">' +
+          (function () {
+            var forbidden = catDescLocal(c.key);
+            return '<select data-cp="' + i + '" title="หมวดแม่ (เว้นว่าง = หมวดบนสุด)" style="flex:0 0 140px">' +
+              '<option value="">— หมวดบนสุด —</option>' +
+              cats.filter(function (x) { return !forbidden[x.key]; }).map(function (x) {
+                return '<option value="' + x.key + '"' + ((c.parent || "") === x.key ? " selected" : "") + ">" + esc(x.label || x.key) + "</option>";
+              }).join("") + "</select>";
+          })() +
           '<select data-ci="' + i + '"' + (c.image ? " disabled" : "") + ' style="flex:0 0 120px">' +
             CAT_ICONS.map(function (ic) { return '<option value="' + ic + '"' + ((c.icon || "tool") === ic ? " selected" : "") + ">" + ic + "</option>"; }).join("") + "</select>" +
           '<label class="btn btn-sm" style="cursor:pointer;white-space:nowrap">⬆ รูป<input type="file" accept="image/*" data-cimg="' + i + '" style="display:none"></label>' +
@@ -1786,6 +1801,7 @@
       catList.querySelectorAll("[data-cdel]").forEach(function (b) { b.onclick = function () { syncCats(); cats.splice(+b.dataset.cdel, 1); renderCats(); }; });
       catList.querySelectorAll("[data-cimgclr]").forEach(function (b) { b.onclick = function () { syncCats(); cats[+b.dataset.cimgclr].image = ""; renderCats(); }; });
       catList.querySelectorAll("[data-ci]").forEach(function (sel) { sel.addEventListener("change", function () { syncCats(); renderCats(); }); });
+      catList.querySelectorAll("[data-cp]").forEach(function (sel) { sel.addEventListener("change", function () { syncCats(); renderCats(); }); });
       catList.querySelectorAll("[data-ch]").forEach(function (chk) { chk.addEventListener("change", function () { syncCats(); renderCats(); }); });
       catList.querySelectorAll("[data-cimg]").forEach(function (inp) {
         inp.addEventListener("change", function (e) {
@@ -1810,7 +1826,7 @@
         });
       });
     }
-    if (catList) { renderCats(); var catAddBtn = root.querySelector("[data-cat-add]"); if (catAddBtn) catAddBtn.addEventListener("click", function () { syncCats(); cats.push({ key: "c" + Date.now().toString(36), label: "", icon: "tool", image: "", hidden: false }); renderCats(); }); }
+    if (catList) { renderCats(); var catAddBtn = root.querySelector("[data-cat-add]"); if (catAddBtn) catAddBtn.addEventListener("click", function () { syncCats(); cats.push({ key: "c" + Date.now().toString(36), label: "", icon: "tool", image: "", hidden: false, parent: "" }); renderCats(); }); }
 
     // ----- Promo banner -----
     var promo = Object.assign({ enabled: false, title: "", text: "", image: "" }, st.promo || {});
@@ -1862,7 +1878,7 @@
       var patch = {};
       simpleKeys.forEach(function (k) { var el = root.querySelector('[data-set="' + k + '"]'); patch[k] = el ? el.value : st[k]; });
       patch.phone = phones.map(function (p) { return p.trim(); }).filter(Boolean).join(", ");
-      patch.categories = cats.filter(function (c) { return (c.label || "").trim(); }).map(function (c) { return { key: c.key, label: c.label.trim(), icon: c.icon || "tool", image: c.image || "", hidden: !!c.hidden }; });
+      patch.categories = cats.filter(function (c) { return (c.label || "").trim(); }).map(function (c) { return { key: c.key, label: c.label.trim(), icon: c.icon || "tool", image: c.image || "", hidden: !!c.hidden, parent: c.parent || "" }; });
       if (openSunEl) patch.openSun = openSunEl.checked;
       patch.specialDays = sdays.filter(function (d) { return d.date; });
       patch.heroPhrases = phrasesEl.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
