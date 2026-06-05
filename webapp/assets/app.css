@@ -118,6 +118,26 @@ img { max-width: 100%; display: block; }
 
 /* ---------- categories strip ---------- */
 .me-cats { padding: 72px 0 8px; }
+/* ---------- ดาวรีวิว (rating) ---------- */
+.me-stars { letter-spacing: 1px; font-size: 15px; line-height: 1; }
+.me-star { color: var(--concrete-300, #BFBDB8); }
+.me-star.on { color: #F5A623; }
+.me-rate-count { font-family: var(--font-mono); font-size: 12px; color: var(--fg-2); margin-left: 6px; }
+.me-rate-none { font-family: var(--font-body); font-size: 12px; color: var(--fg-3); }
+.card-rate { margin: 2px 0 4px; }
+.pd-rate { margin: 2px 0 8px; }
+.me-rate-widget { display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.me-star-btn { background: none; border: none; cursor: pointer; font-size: 30px; line-height: 1; padding: 0 2px; color: var(--concrete-300, #BFBDB8); transition: color 80ms, transform 80ms; }
+.me-star-btn.on { color: #F5A623; }
+.me-star-btn.hover { color: #FFCC4D; }
+.me-star-btn:hover { transform: scale(1.15); }
+.me-rate-hint { font-family: var(--font-body); font-size: 13px; color: var(--fg-2); margin-left: 8px; }
+.pd-rate-give { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 14px 0; padding: 12px 14px; background: var(--dw-yellow-pale, #FFF1C4); border: 2px solid var(--dw-yellow-deep, #E8A800); border-radius: 8px; }
+.pd-rate-give-label { font-family: var(--font-body); font-weight: 700; }
+.order-rate { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 2px 0 8px; }
+.order-rate-label { font-family: var(--font-body); font-size: 13px; color: var(--fg-2); }
+.order-rate .me-star-btn { font-size: 24px; }
+
 /* breadcrumb หมวดหมู่ */
 .cat-crumb { font-family: var(--font-body); font-size: 14px; color: var(--fg-2); margin: 4px 0 14px; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
 .cat-crumb a { color: var(--fg-2); text-decoration: none; }

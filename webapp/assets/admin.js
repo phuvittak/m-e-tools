@@ -1775,20 +1775,29 @@
       while (q.length && g++ < 999) { var k = q.shift(); cats.forEach(function (c) { if ((c.parent || "") === k && !out[c.key]) { out[c.key] = 1; q.push(c.key); } }); }
       return out;
     }
+    function catByKey(key) { for (var i = 0; i < cats.length; i++) if (cats[i].key === key) return cats[i]; return null; }
+    function catDepth(key) { var d = 0, g = 0, c = catByKey(key); while (c && c.parent && g++ < 30) { d++; c = catByKey(c.parent); } return d; }
+    function catPathLocal(key) { var labels = [], g = 0, c = catByKey(key); while (c && g++ < 30) { labels.unshift(c.label || c.key); c = c.parent ? catByKey(c.parent) : null; } return labels.join(" › "); }
     var _catDragIdx = null;
     function renderCats() {
       if (!catList) return;
       catList.innerHTML = cats.map(function (c, i) {
-        return '<div class="row-edit' + (c.hidden ? " is-hidden" : "") + '" draggable="true" data-crow="' + i + '" style="cursor:grab;align-items:center">' +
+        var depth = catDepth(c.key);
+        var lineage = depth === 0
+          ? '⭐ หมวดหลัก (ชั้นบนสุด)'
+          : 'ชั้นที่ ' + (depth + 1) + ' · ' + (depth === 1 ? 'หมวดรองของ' : 'หมวดย่อยของ') + ' ▸ ' + esc(catPathLocal(c.parent));
+        return '<div class="row-edit' + (c.hidden ? " is-hidden" : "") + '" draggable="true" data-crow="' + i + '" style="cursor:grab;align-items:center;padding-left:' + (8 + depth * 20) + 'px;' + (depth ? "border-left:3px solid var(--dw-yellow-deep,#E8A800);" : "") + '">' +
+          '<div style="flex:1 1 100%;font-family:var(--font-mono);font-size:11px;color:' + (depth ? "var(--fg-2)" : "var(--price-red,#D7261E)") + ';margin-bottom:2px">' + lineage + '</div>' +
           '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 4px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
+          '<span class="cat-lvl" title="ชั้นที่ ' + (depth + 1) + '" style="flex:0 0 auto;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--ink);min-width:26px">L' + (depth + 1) + '</span>' +
           '<span style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:var(--bg-1,#f5f5f5);border-radius:6px">' + catPreview(c) + "</span>" +
           '<input data-cn="' + i + '" value="' + esc(c.label) + '" placeholder="ชื่อหมวด" style="flex:1;min-width:110px">' +
           (function () {
             var forbidden = catDescLocal(c.key);
-            return '<select data-cp="' + i + '" title="หมวดแม่ (เว้นว่าง = หมวดบนสุด)" style="flex:0 0 140px">' +
-              '<option value="">— หมวดบนสุด —</option>' +
+            return '<select data-cp="' + i + '" title="หมวดแม่ (เว้นว่าง = หมวดบนสุด) — เลือกหมวดลึกเท่าไรก็ได้" style="flex:0 0 180px">' +
+              '<option value="">— หมวดบนสุด (ชั้น 1) —</option>' +
               cats.filter(function (x) { return !forbidden[x.key]; }).map(function (x) {
-                return '<option value="' + x.key + '"' + ((c.parent || "") === x.key ? " selected" : "") + ">" + esc(x.label || x.key) + "</option>";
+                return '<option value="' + x.key + '"' + ((c.parent || "") === x.key ? " selected" : "") + ">" + esc(catPathLocal(x.key)) + "</option>";
               }).join("") + "</select>";
           })() +
           '<select data-ci="' + i + '"' + (c.image ? " disabled" : "") + ' style="flex:0 0 120px">' +

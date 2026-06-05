@@ -22,6 +22,7 @@
     seeded: "me_seeded_v2",
     cloudProducts: "me_cloud_products", // catalog pulled from Firestore (customers only)
     deletedOrders: "me_deleted_orders", // tombstones: order ids ที่ลบแล้ว (กัน cloud snapshot ดูดกลับ)
+    ratings: "me_ratings",              // ดาวที่เบราว์เซอร์นี้ให้ไว้ { productId: stars }
   };
 
   // ===== Firebase web config for REAL online chat (shared by ALL visitors) =====
@@ -719,6 +720,41 @@
     return getProducts().filter(function (p) { return p.id === id; })[0] || null;
   }
   function available(p) { return Math.max(0, (p.stock || 0) - (p.rented || 0)); }
+
+  /* ---------- Ratings (ดาวรีวิวสินค้า) ----------------------------- */
+  // เก็บคะแนนรวมไว้ที่ doc สินค้าเอง (ratingSum, ratingCount) → เฉลี่ย = sum/count
+  // กันโหวตซ้ำต่อเบราว์เซอร์ด้วย me_ratings (ให้ดาวใหม่ = ปรับคะแนนเดิม ไม่เพิ่ม count)
+  function getMyRating(productId) { return (read(KEY.ratings, {}) || {})[productId] || 0; }
+  function productRating(p) { var c = (p && p.ratingCount) || 0; return { avg: c ? ((p.ratingSum || 0) / c) : 0, count: c }; }
+  function rateProduct(productId, stars) {
+    stars = Math.max(1, Math.min(5, Math.round(stars || 0)));
+    if (!productId) return 0;
+    var mine = read(KEY.ratings, {}) || {};
+    var prev = mine[productId] || 0;
+    if (prev === stars) return stars;
+    mine[productId] = stars; write(KEY.ratings, mine, { skipCloud: true });
+    var deltaSum = stars - prev, deltaCount = prev ? 0 : 1;
+    applyRatingLocal(productId, deltaSum, deltaCount);  // อัปเดตสำเนาในเครื่องให้เห็นทันที
+    cloudRateProduct(productId, deltaSum, deltaCount);   // เพิ่มแบบ atomic บน cloud
+    dispatch();
+    return stars;
+  }
+  function applyRatingLocal(productId, deltaSum, deltaCount) {
+    [KEY.products, KEY.cloudProducts].forEach(function (key) {
+      var list = read(key, null); if (!list || !list.length) return;
+      var changed = false;
+      list.forEach(function (p) { if (p.id === productId) { p.ratingSum = (p.ratingSum || 0) + deltaSum; p.ratingCount = (p.ratingCount || 0) + deltaCount; changed = true; } });
+      if (changed) write(key, list, { skipCloud: true });
+    });
+  }
+  function cloudRateProduct(productId, deltaSum, deltaCount) {
+    loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      return fs.setDoc(fs.doc(m.db, "products", String(productId)), {
+        ratingSum: fs.increment(deltaSum), ratingCount: fs.increment(deltaCount),
+      }, { merge: true });
+    }).catch(function (err) { console.warn("[rate]", productId, err && err.message); });
+  }
 
   function saveProduct(p) {
     var list = getLocalProducts();
@@ -1419,6 +1455,7 @@
     CATEGORIES: CATEGORIES, categoryLabel: categoryLabel, getCategories: getCategories,
     getCategory: getCategory, getSubcategories: getSubcategories, categoryHasChildren: categoryHasChildren,
     catDescendants: catDescendants, categoryPath: categoryPath, productCountInCat: productCountInCat,
+    getMyRating: getMyRating, productRating: productRating, rateProduct: rateProduct,
     typeLabel: typeLabel, statusLabel: statusLabel, fulfillmentLabel: fulfillmentLabel,
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
     getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,

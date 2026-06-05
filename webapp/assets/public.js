@@ -17,6 +17,40 @@
     return ["", s || ""];
   }
 
+  /* ---------- ดาวรีวิวสินค้า (rating) ---------- */
+  // โชว์คะแนนเฉลี่ย (อ่านอย่างเดียว)
+  function starsDisplay(p) {
+    var r = S.productRating(p);
+    if (!r.count) return '<span class="me-rate-none">ยังไม่มีรีวิว</span>';
+    var full = Math.round(r.avg), s = "";
+    for (var i = 1; i <= 5; i++) s += '<span class="me-star' + (i <= full ? " on" : "") + '">★</span>';
+    return '<span class="me-stars" title="' + r.avg.toFixed(1) + ' จาก 5">' + s + "</span>" +
+      '<span class="me-rate-count">' + r.avg.toFixed(1) + " (" + r.count + ")</span>";
+  }
+  // วิดเจ็ตกดให้ดาว (โต้ตอบได้)
+  function ratingWidget(productId) {
+    var mine = S.getMyRating(productId), s = "";
+    for (var i = 1; i <= 5; i++) s += '<button type="button" class="me-star-btn' + (i <= mine ? " on" : "") + '" data-rate="' + i + '" aria-label="' + i + ' ดาว">★</button>';
+    return '<div class="me-rate-widget" data-rate-widget="' + esc(String(productId)) + '">' + s +
+      '<span class="me-rate-hint">' + (mine ? "คุณให้ " + mine + " ดาว ✓" : "แตะดาวเพื่อให้คะแนน") + "</span></div>";
+  }
+  function wireRating(scope) {
+    (scope || document).querySelectorAll("[data-rate-widget]").forEach(function (w) {
+      if (w._wired) return; w._wired = true;
+      var pid = w.getAttribute("data-rate-widget");
+      w.querySelectorAll("[data-rate]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var n = +b.dataset.rate; S.rateProduct(pid, n);
+          w.querySelectorAll("[data-rate]").forEach(function (x) { x.classList.toggle("on", +x.dataset.rate <= n); });
+          var h = w.querySelector(".me-rate-hint"); if (h) h.textContent = "คุณให้ " + n + " ดาว ✓";
+          if (U.toast) U.toast("ขอบคุณสำหรับ " + n + " ดาว!", "ok");
+        });
+        b.addEventListener("mouseenter", function () { var n = +b.dataset.rate; w.querySelectorAll("[data-rate]").forEach(function (x) { x.classList.toggle("hover", +x.dataset.rate <= n); }); });
+      });
+      w.addEventListener("mouseleave", function () { w.querySelectorAll("[data-rate]").forEach(function (x) { x.classList.remove("hover"); }); });
+    });
+  }
+
   U.mountChrome(page === "home" ? "home" : page === "categories" ? "categories" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : "");
 
   // เมื่อแคตตาล็อกจาก cloud มาถึง (ลูกค้า) → วาดส่วนที่ขึ้นกับสินค้าใหม่
@@ -422,6 +456,7 @@
       '<div class="pd-grid"><div>' + productViewer(p) + "</div>" +
         '<div class="pd-info"><span class="pd-brand">' + p.brand + "</span>" +
           '<h1 class="pd-name">' + p.name + "</h1>" +
+          '<div class="pd-rate">' + starsDisplay(p) + "</div>" +
           '<span class="' + (avail > 0 ? "stockpill in" : "stockpill out") + '">' +
             (avail > 0 ? "มีของพร้อมส่ง · เหลือ " + avail + " ชิ้น" : "สินค้าหมดชั่วคราว") + " · " + S.categoryLabel(p.category) + "</span>" +
           '<p class="pd-desc">' + p.desc + "</p>" +
@@ -429,6 +464,7 @@
             (p.forSale ? '<div class="pd-price-box"><div class="k">ราคาขาย</div><div class="v">' + S.money(p.price) + "</div></div>" : "") +
             (p.forRent ? '<div class="pd-price-box" data-rent-only><div class="k">ค่าเช่า / วัน</div><div class="v rent">' + S.money(p.rentPerDay) + "</div></div>" : "") +
           "</div><div class=\"buybox\" data-buybox></div>" +
+          '<div class="pd-rate-give"><span class="pd-rate-give-label">⭐ ให้คะแนนสินค้านี้</span>' + ratingWidget(p.id) + "</div>" +
           "<table class=specs><tbody><tr><th>รหัสสินค้า (SKU)</th><td>" + p.sku + "</td></tr>" +
             "<tr><th>การรับประกัน</th><td>" + (p.warrantyYears ? "ศูนย์ " + p.warrantyYears + " ปี" : "ตามเงื่อนไขร้าน") + "</td></tr>" +
             (p.motorType && p.motorType !== "—" ? "<tr><th>ระบบมอเตอร์</th><td>" + p.motorType + "</td></tr>" : "") +
@@ -437,6 +473,7 @@
           "</tbody></table></div></div>";
 
     wireViewer(root, p);
+    wireRating(root);
 
     var bb = root.querySelector("[data-buybox]");
     function drawBuybox() {
@@ -749,7 +786,7 @@
               (o.type === "rent" ? " · เช่า " + o.days + " วัน (" + o.rentStart + " ถึง " + o.rentEnd + ")" : "") +
               (o.fulfillment === "delivery" && o.address ? "<br>จัดส่ง: " + o.address.text : "") + "</div></div>" +
             '<div style="text-align:right"><div class="order-meta">ยอดชำระ</div><div class="ci-total">' + S.money(o.total) + "</div></div></div>" +
-          o.items.map(function (it) { return '<div class="order-line"><span>' + it.name + " × " + it.qty + (it.days ? " (" + it.days + " วัน)" : "") + "</span><span>" + S.money(it.unitPrice * it.qty * (it.days || 1)) + "</span></div>"; }).join("") +
+          o.items.map(function (it) { return '<div class="order-line"><span>' + it.name + " × " + it.qty + (it.days ? " (" + it.days + " วัน)" : "") + "</span><span>" + S.money(it.unitPrice * it.qty * (it.days || 1)) + "</span></div>" + (it.productId ? '<div class="order-rate"><span class="order-rate-label">ให้คะแนนสินค้านี้:</span>' + ratingWidget(it.productId) + "</div>" : ""); }).join("") +
           (o.deposit ? '<div class="order-line" style="color:var(--fg-2)"><span>เงินมัดจำ (คืนเมื่อส่งคืน)</span><span>' + S.money(o.deposit) + "</span></div>" : "") +
           (o.staffMessage ? '<div class="order-msg">📩 ข้อความจากร้าน: ' + esc(o.staffMessage) + "</div>" : "") +
           (o.status === "cancelled" ? '<div class="order-cancelled">ยกเลิกแล้ว · คืนเงิน ' + S.money(o.total) + " เรียบร้อย" + (o.cancelReason ? " · เหตุผล: " + esc(o.cancelReason) : "") + "</div>" : "") +
@@ -760,6 +797,7 @@
       root.querySelectorAll("[data-cancel-order]").forEach(function (b) {
         b.addEventListener("click", function () { openCancelModal(b.getAttribute("data-cancel-order"), render); });
       });
+      wireRating(root);
     }
     render();
   }
@@ -1015,6 +1053,7 @@
       '<div class="card"><a class="tilelink" href="product.html?id=' + p.id + '">' + U.productTile(p) + "</a>" +
       '<div class="card-body"><span class="card-cat">' + S.categoryLabel(p.category) + " · " + p.brand + "</span>" +
         '<a class="card-name" href="product.html?id=' + p.id + '">' + p.name + "</a>" +
+        '<div class="card-rate">' + starsDisplay(p) + "</div>" +
         '<div class="card-price">' +
           (p.forSale ? '<span class="price-buy">' + S.money(p.price) + "</span>" : "") +
           (p.forRent ? '<span class="price-rent" data-rent-only>เช่า ' + S.money(p.rentPerDay) + "/วัน</span>" : "") + "</div>" +
