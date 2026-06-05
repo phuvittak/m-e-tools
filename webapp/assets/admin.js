@@ -19,6 +19,9 @@
   // ดึงข้อมูล admin จาก cloud ก่อนเริ่ม (settings/staff/ledger/etc.) — ทำเงียบ ๆ
   // ถ้า cloud ใหม่กว่า localStorage จะอัปเดต local แล้ว dispatch ให้ทุกหน้า re-render
   if (S.cloudLoadAdminData) S.cloudLoadAdminData();
+  // โหลดแคตตาล็อกสินค้าจาก cloud → เจ้าของ/พนักงานเห็นสินค้าครบบนทุกอุปกรณ์ (แม้เครื่องนี้ยังไม่มี master)
+  if (S.cloudLoadProducts) S.cloudLoadProducts();
+  window.addEventListener("me-products-loaded", function () { if (window.__invRender) { try { window.__invRender(); } catch (e) {} } });
   // ลงทะเบียนเครื่องนี้เป็น admin แล้ว subscribe ออเดอร์จาก cloud (ทุกหน้าหลังร้าน) → ดูดลง local
   // ให้ทุกหน้า (แดชบอร์ด/คำสั่งซื้อ/ERP) เห็นออเดอร์ครบเหมือนกันทุกเครื่อง ผ่าน getOrders()
   if (S.ensureAdminRegistered) S.ensureAdminRegistered().then(function (uid) { if (uid) subscribeOrdersGlobal(); });
