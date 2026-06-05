@@ -137,9 +137,6 @@
       var cur = curKey ? S.getCategory(curKey) : null;
       var children = S.getSubcategories(curKey, false);
 
-      // ถ้าเป็นหมวดปลายทาง (ไม่มีลูก) → เด้งไปหน้าสินค้าในหมวดนั้นเลย
-      if (curKey && !children.length) { window.location.replace("shop.html?cat=" + encodeURIComponent(curKey)); return; }
-
       // breadcrumb
       var crumbBox = document.querySelector("[data-cat-crumb]");
       if (crumbBox) {
@@ -154,19 +151,27 @@
       var titleBox = document.querySelector("[data-cat-title]");
       if (titleBox) titleBox.innerHTML = cur ? esc(cur.label) : 'หมวด<span class="me-hl">สินค้า</span>';
 
-      var empty = document.querySelector("[data-cats-empty]");
-      if (empty) empty.hidden = children.length > 0;
+      // ช่องหมวดย่อย (กดเพื่อแคบลง — อยู่ในหน้าหมวดเดิม จะเห็นสินค้าของหมวดนั้นต่อ)
       box.innerHTML = children.map(function (c) {
         var hasKids = S.categoryHasChildren(c.key);
         var n = S.productCountInCat(c.key);
         var visual = c.image
           ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
           : '<span class="me-cat-ic">' + U.iconSvg(c.icon || iconForCat(c.key), 48) + "</span>";
-        var href = (hasKids ? "categories.html?cat=" : "shop.html?cat=") + encodeURIComponent(c.key);
-        return '<a class="me-cat" href="' + href + '">' + visual +
+        return '<a class="me-cat" href="categories.html?cat=' + encodeURIComponent(c.key) + '">' + visual +
           '<span class="me-cat-name">' + esc(c.label) + "</span>" +
           '<span class="me-cat-count">' + n + " รายการ" + (hasKids ? " ›" : "") + "</span></a>";
       }).join("");
+
+      // สินค้าในหมวดนี้ (รวมหมวดย่อยทุกชั้น) — ทุกหมวดมีสินค้าโชว์ แค่แคบลงเมื่อลงลึก
+      var prods = S.getProducts().filter(function (p) { return !p.hidden; });
+      if (curKey) { var set = S.catDescendants(curKey); prods = prods.filter(function (p) { return set[p.category]; }); }
+      var prodBox = document.querySelector("[data-cat-products]");
+      var prodHead = document.querySelector("[data-cat-prodhead]");
+      if (prodHead) prodHead.hidden = !prods.length;
+      if (prodBox) { prodBox.innerHTML = prods.length ? prods.map(cardHtml).join("") : ""; wireCards(prodBox); }
+      var empty = document.querySelector("[data-cats-empty]");
+      if (empty) empty.hidden = children.length > 0 || prods.length > 0;
     }
     paint();
     pageRefresh = paint; // วาดใหม่เมื่อแคตตาล็อก/หมวดจาก cloud มาถึง
@@ -358,9 +363,8 @@
           var visual = c.image
             ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
             : '<span class="me-cat-ic">' + U.iconSvg(c.icon || iconForCat(c.key), 40) + "</span>";
-          var href = (hasKids ? "categories.html?cat=" : "shop.html?cat=") + encodeURIComponent(c.key);
           return (
-            '<a class="me-cat" href="' + href + '">' +
+            '<a class="me-cat" href="categories.html?cat=' + encodeURIComponent(c.key) + '">' +
             visual +
             '<span class="me-cat-name">' + esc(c.label) + "</span>" +
             '<span class="me-cat-count">' + n + " รายการ" + (hasKids ? " ›" : "") + "</span></a>"
