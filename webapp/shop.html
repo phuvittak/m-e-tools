@@ -22,14 +22,16 @@
 
   <main class="shop wrap">
     <div class="shop-head">
+      <nav class="cat-crumb" data-shop-crumb></nav>
       <div class="me-overline"><span class="me-overline-bar"></span>เช่า & ซื้อเครื่องมือช่าง</div>
-      <h1 class="me-section-h">สินค้า<span class="me-hl">ทั้งหมด</span></h1>
+      <h1 class="me-section-h" data-shop-title>สินค้า<span class="me-hl">ทั้งหมด</span></h1>
     </div>
 
     <div class="shop-grid">
       <aside class="filters" data-filters></aside>
       <section>
         <div class="search-row">
+          <button type="button" class="filter-toggle" data-filter-toggle aria-expanded="false">⚙ ตัวกรอง</button>
           <input class="inp" data-q type="text" placeholder="ค้นหาด้วยชื่อ / แบรนด์ / รหัสสินค้า…">
           <select class="inp" data-sort style="max-width:200px">
             <option value="default">เรียง: แนะนำ</option>
