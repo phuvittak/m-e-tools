@@ -249,4 +249,21 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
   .thread-name { font-size: 13px; }
   .thread-id { display: none; } /* บนจอเล็กซ่อน ID เต็ม เหลือแต่ชื่อ */
 }
+/* ---------- responsive enhancements: ใช้กับทุกหน้าหลังร้านอัตโนมัติ ---------- */
+@media (max-width: 720px) {
+  /* ทุกตารางในหลังร้าน (คำสั่งซื้อ/คลัง/ลูกค้า/ERP/ทีมงาน) เลื่อนแนวนอนได้ ไม่ล้นจอ */
+  table.data { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .f2 { grid-template-columns: 1fr; }          /* ฟอร์ม 2 คอลัมน์ → เรียงเดี่ยวให้กรอกง่าย */
+  .panel { padding: 16px; }
+  .panel-head { gap: 8px; }
+  /* แถวปุ่มในหัวพาเนล/ท็อปบาร์ จัดเต็มความกว้าง กดง่าย */
+  .topbar { align-items: stretch; }
+}
+@media (max-width: 420px) {
+  .topbar h1 { font-size: 22px; }
+  .panel { padding: 13px; }
+  .login-card { padding: 26px 20px; }
+  /* ปุ่มหลักในฟอร์มยืดเต็มความกว้างบนจอเล็กมาก กดง่ายด้วยนิ้วเดียว */
+  .panel > .btn:last-child { width: 100%; }
+}
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation: none !important; transition: none !important; } }

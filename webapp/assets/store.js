@@ -21,6 +21,7 @@
     chats: "me_chats",
     seeded: "me_seeded_v2",
     cloudProducts: "me_cloud_products", // catalog pulled from Firestore (customers only)
+    deletedOrders: "me_deleted_orders", // tombstones: order ids ที่ลบแล้ว (กัน cloud snapshot ดูดกลับ)
   };
 
   // ===== Firebase web config for REAL online chat (shared by ALL visitors) =====
@@ -927,11 +928,13 @@
   // (แดชบอร์ด/ERP/คำสั่งซื้อ) เห็นออเดอร์ครบเหมือนกัน ผ่าน getOrders() ปกติ
   function absorbCloudOrders(cloudList) {
     if (!cloudList || !cloudList.length) return;
+    var tomb = read(KEY.deletedOrders, []);
     var local = read(KEY.orders, []), byId = {}, order = [];
     local.forEach(function (o) { byId[o.id] = o; order.push(o.id); });
     var changed = false;
     cloudList.forEach(function (c) {
       if (!c || !c.id) return;
+      if (tomb.indexOf(c.id) >= 0) return; // เคยลบไปแล้ว — อย่าดูดกลับ
       var cur = byId[c.id];
       var merged = Object.assign({}, cur, c);
       if (cur && !c.staffMessage && cur.staffMessage) merged.staffMessage = cur.staffMessage; // กันข้อความ admin ใน local หาย
@@ -942,7 +945,23 @@
       dispatch();
     }
   }
-  function deleteOrder(id) { if (!hasPerm("orders_delete")) return false; write(KEY.orders, read(KEY.orders, []).filter(function (o) { return o.id !== id; })); dispatch(); return true; }
+  function deleteOrder(id) {
+    if (!hasPerm("orders_delete")) return false;
+    // tombstone: จำ id ที่ลบไว้ เพื่อไม่ให้ snapshot จาก cloud ดูดกลับเข้ามาระหว่างรอ cloud ลบเสร็จ
+    var tomb = read(KEY.deletedOrders, []);
+    if (tomb.indexOf(id) < 0) { tomb.push(id); write(KEY.deletedOrders, tomb, { skipCloud: true }); }
+    write(KEY.orders, read(KEY.orders, []).filter(function (o) { return o.id !== id; }));
+    cloudDeleteOrder(id); // ลบ doc บน Firestore (rule: admin เท่านั้น) → เครื่องอื่นจะหายตามเมื่อ refresh
+    dispatch();
+    return true;
+  }
+  // ลบ orders/{id} บน Firestore ในฐานะ admin (แอป "admin" ที่ลงทะเบียนไว้)
+  function cloudDeleteOrder(id) {
+    if (!id) return;
+    loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      return m.fsMod.deleteDoc(m.fsMod.doc(m.db, "orders", String(id)));
+    }).catch(function (err) { console.warn("[order delete]", id, err && err.message); });
+  }
   function deletePurchase(id) { write(KEY.purchases, read(KEY.purchases, []).filter(function (p) { return p.id !== id; })); dispatch(); }
   function checkPin(pin) { return String(pin) === String(getSettings().deletePin || "1234"); }
 
@@ -1328,7 +1347,7 @@
 
   /* ---------- danger zone: reset demo data ------------------------ */
   function resetAll() {
-    [KEY.products, KEY.orders, KEY.cart, KEY.ship, KEY.settings, KEY.staff, KEY.ledger, KEY.suppliers, KEY.purchases, KEY.seeded]
+    [KEY.products, KEY.orders, KEY.cart, KEY.ship, KEY.settings, KEY.staff, KEY.ledger, KEY.suppliers, KEY.purchases, KEY.seeded, KEY.deletedOrders]
       .forEach(function (k) { localStorage.removeItem(k); });
     seed();
   }
