@@ -241,6 +241,17 @@ img { max-width: 100%; display: block; }
 .pd-zoom-hint { position: absolute; bottom: 8px; right: 8px; font-family: var(--font-mono); font-size: 11px; background: var(--ink); color: var(--dw-yellow); padding: 3px 8px; pointer-events: none; opacity: 0; transition: opacity 120ms; }
 .pd-main:hover .pd-zoom-hint, .pd-main:focus .pd-zoom-hint { opacity: 1; }
 
+/* 3D model viewer */
+.pd-3d { display: flex; flex-direction: column; gap: 12px; }
+.pd-3d-stage { position: relative; aspect-ratio: 1/1; border: 3px solid var(--ink); box-shadow: 6px 6px 0 0 var(--ink); background: var(--concrete-100); overflow: hidden; }
+.pd-3d-frame, .pd-3d-mv { display: block; width: 100%; height: 100%; border: 0; background: var(--concrete-100); }
+.pd-3d-mv { --poster-color: transparent; }
+.pd-3d-badge { position: absolute; top: 8px; left: 8px; z-index: 2; font-family: var(--font-display-en); font-style: italic; font-weight: 800; font-size: 13px; background: var(--workboot-blue); color: #fff; padding: 3px 9px; letter-spacing: .04em; pointer-events: none; }
+.pd-3d-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px; flex-direction: column; font-family: var(--font-mono); font-size: 12px; color: var(--ink); text-align: center; padding: 16px; }
+.pd-3d-spinner { width: 30px; height: 30px; border: 3px solid var(--ink); border-top-color: transparent; border-radius: 50%; animation: pd3dspin .8s linear infinite; }
+@keyframes pd3dspin { to { transform: rotate(360deg); } }
+.pd-3d-cap { font-family: var(--font-mono); font-size: 11px; color: var(--concrete-600, #555); background: var(--concrete-100); border-left: 3px solid var(--ink); padding: 8px 10px; }
+
 /* 360 spin */
 .pd-spin { display: flex; flex-direction: column; gap: 12px; }
 .pd-spin-stage { position: relative; aspect-ratio: 1/1; border: 3px solid var(--ink); box-shadow: 6px 6px 0 0 var(--ink); background-size: cover; background-position: center; background-color: var(--concrete-100); cursor: grab; touch-action: pan-y; user-select: none; }

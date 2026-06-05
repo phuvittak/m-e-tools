@@ -411,7 +411,7 @@
   // เอกสารรวมสำหรับบอท LINE (ตัดรูป/มีเดียออก ให้เล็ก)
   function buildCatalogItems() {
     var items = getLocalProducts().filter(function (p) { return !p.hidden; }).map(function (p) {
-      var clean = {}, skip = { images: 1, image: 1, frames360: 1, parts: 1, partsBase: 1 };
+      var clean = {}, skip = { images: 1, image: 1, frames360: 1, parts: 1, partsBase: 1, model3d: 1 };
       for (var k in p) if (Object.prototype.hasOwnProperty.call(p, k) && !skip[k]) clean[k] = p[k];
       clean.available = available(p);
       if (Array.isArray(clean.specs)) clean.specs = clean.specs.map(specToObj);
