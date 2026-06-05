@@ -654,11 +654,18 @@
   //   ถ้ายังไม่มา (เปิดครั้งแรก/ออฟไลน์) ใช้ local เป็น fallback แล้ว re-render เมื่อ cloud มา
   // เหตุผล: ห้ามให้ cloud มาทับ me_products ของเจ้าของ (อาจมีของที่ยังไม่ได้ซิงค์)
   function getProducts() {
+    var local = read(KEY.products, []);
     if (!isOwner()) {
       var cloud = read(KEY.cloudProducts, null);
       if (cloud && cloud.length) return cloud;
+      return local;
     }
-    return read(KEY.products, []);
+    // เจ้าของ = master ในเครื่อง (เห็นการแก้ล่าสุดทันที) — แต่ถ้าเครื่องนี้ยังว่าง
+    // (เพิ่งล็อกอินบนอุปกรณ์ใหม่ ของจริงอยู่ใน cloud) ให้ดึงแคตตาล็อก cloud มาแสดงแทน ไม่ให้เห็นร้านว่าง
+    if (local.length) return local;
+    var ownerCloud = read(KEY.cloudProducts, null);
+    if (ownerCloud && ownerCloud.length) return ownerCloud;
+    return local;
   }
   // เฉพาะข้อมูลในเครื่องเจ้าของ (ไม่สน cloud) — ใช้ตอนซิงค์ขึ้น cloud
   function getLocalProducts() { return read(KEY.products, []); }
