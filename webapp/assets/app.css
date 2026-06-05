@@ -118,18 +118,21 @@ img { max-width: 100%; display: block; }
 
 /* ---------- categories strip ---------- */
 .me-cats { padding: 72px 0 8px; }
-.me-cats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-top: 28px; }
+/* category grid — สไตล์ช่องหมวด (iToolmart-like): ไอคอนกลาง + ชื่อใต้ภาพ */
+.me-cats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 28px; }
 .me-cat {
-  background: #fff; border: 3px solid var(--ink); box-shadow: 4px 4px 0 0 var(--ink);
-  padding: 22px 18px; text-decoration: none; color: var(--ink); display: flex; flex-direction: column; gap: 10px;
-  transition: all 120ms cubic-bezier(.2,.8,.2,1);
+  background: var(--concrete-100, #ECEAE4); border: 2px solid transparent; border-radius: 10px;
+  padding: 16px 8px; text-decoration: none; color: var(--ink);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px;
+  min-height: 132px;
+  transition: transform 140ms var(--ease-snap), background 140ms, border-color 140ms, box-shadow 140ms;
 }
-.me-cat:hover { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 0 var(--ink); background: var(--dw-yellow-pale); }
-.me-cat-ic { color: var(--ink); }
-.me-cat-ic svg { stroke: var(--ink); }
-.me-cat-img { width: 40px; height: 40px; object-fit: contain; display: block; }
-.me-cat-name { font-family: var(--font-display-th); font-style: italic; font-weight: 800; font-size: 19px; text-transform: uppercase; }
-.me-cat-count { font-family: var(--font-mono); font-size: 12px; color: var(--fg-3); }
+.me-cat:hover { background: var(--dw-yellow); border-color: var(--ink); transform: translateY(-3px); box-shadow: 0 8px 16px -7px rgba(0,0,0,.35); }
+.me-cat-ic { color: var(--ink); display: flex; align-items: center; justify-content: center; height: 54px; }
+.me-cat-ic svg { stroke: var(--ink); width: 48px; height: 48px; }
+.me-cat-img { width: 58px; height: 58px; object-fit: contain; display: block; }
+.me-cat-name { font-family: var(--font-body); font-weight: 700; font-size: 14px; line-height: 1.25; }
+.me-cat-count { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); }
 
 /* ---------- how it works ---------- */
 .me-how { padding: 72px 0; }
@@ -580,7 +583,7 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1024px) {
-  .me-cats-grid { grid-template-columns: repeat(2,1fr); }
+  .me-cats-grid { grid-template-columns: repeat(3,1fr); }
   .me-vp-grid, .me-how-grid { grid-template-columns: 1fr; }
   .me-brands-strip { grid-template-columns: repeat(3,1fr); }
   .cards { grid-template-columns: repeat(2,1fr); }
@@ -608,7 +611,10 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 @media (max-width: 520px) {
   .me-brands-strip { grid-template-columns: repeat(2,1fr); }
   .cards { grid-template-columns: 1fr; }
-  .me-cats-grid { grid-template-columns: 1fr; }
+  .me-cats-grid { grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .me-cat { min-height: 112px; padding: 12px 6px; }
+  .me-cat-ic svg, .me-cat-img { width: 40px; height: 40px; }
+  .me-cat-name { font-size: 12px; }
   .pd-prices { gap: 16px; }
   /* chat widget + LINE FAB ขยับสั้นลง + ปุ่มเล็กลงเพื่อไม่บัง content */
   .me-chat-fab { font-size: 12px; padding: 10px 14px; }

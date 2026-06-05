@@ -39,6 +39,26 @@
     compressor: '<rect x="3" y="8" width="14" height="9" rx="4"/><path d="M17 11h3v4h-3"/><path d="M6 17v3M14 17v3"/>',
     box: '<path d="M3 8l9-4 9 4-9 4z"/><path d="M3 8v8l9 4 9-4V8"/><path d="M12 12v8"/>',
     tool: '<path d="M14.7 6.3a4 4 0 0 0-5 5l-7 7 2 2 7-7a4 4 0 0 0 5-5l-2.3 2.3-2-2z"/>',
+    // ---- หมวดเครื่องมือเพิ่มเติม (สไตล์เส้น สำหรับกริดหมวดหมู่) ----
+    air: '<rect x="3" y="9" width="13" height="9" rx="4"/><path d="M16 12h3l2 2v2h-5"/><path d="M6 18v3M13 18v3"/>',
+    weld: '<path d="M4 20l8-8"/><path d="M12 12l4-4"/><path d="M15 5l4 4-3 3-4-4z"/><path d="M16 14l4 5"/>',
+    engine: '<rect x="3" y="10" width="11" height="7" rx="1"/><path d="M6 10V7h4v3"/><path d="M14 12h3l3 2v2h-6"/><path d="M4 17v2M13 17v2"/><path d="M8 7V5h3"/>',
+    agri: '<path d="M12 21c0-6 2.5-9.5 9-10.5C20 17 16.5 20.5 12 21z"/><path d="M12 21c0-5-2.2-7.7-8-8.7C5 17.5 8 20.2 12 21z"/><path d="M12 21v-8"/>',
+    pump: '<rect x="4" y="11" width="9" height="8" rx="1"/><path d="M8 11V6h6l4 4"/><path d="M13 15h6"/><path d="M10 6V4"/>',
+    car: '<path d="M3 13l2.2-5.2A2 2 0 0 1 7 6.6h10a2 2 0 0 1 1.8 1.2L21 13"/><path d="M3 13h18v4a1 1 0 0 1-1 1h-1M5 18H4a1 1 0 0 1-1-1v-4"/><circle cx="7.5" cy="17.5" r="1.6"/><circle cx="16.5" cy="17.5" r="1.6"/>',
+    office: '<rect x="5" y="12" width="14" height="6" rx="1"/><path d="M7 12V4h10v8"/><path d="M8 18v2M16 18v2"/><path d="M9 15h6"/>',
+    clean: '<path d="M9 9h5l1.5 3v8H9z"/><path d="M9 9V4h3v5"/><path d="M16 6h4M16 9h3M16 12h4"/>',
+    ladder: '<path d="M7 3v18M17 3v18"/><path d="M7 7h10M7 11h10M7 15h10"/>',
+    lift: '<path d="M3 5v11h10"/><path d="M14 16V9h4l3 4v3"/><circle cx="6.5" cy="18.5" r="1.6"/><circle cx="16.5" cy="18.5" r="1.6"/>',
+    hammer: '<path d="M14 3l7 7-3 3-7-7z"/><path d="M11 8L3 16v4h4l8-8"/>',
+    bolt: '<path d="M12 2l3.5 2v4L12 10 8.5 8V4z"/><path d="M12 10v12"/>',
+    electric: '<path d="M13 2 4 14h6l-1 8 9-12h-6z"/>',
+    bearing: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><circle cx="12" cy="4.4" r="1"/><circle cx="12" cy="19.6" r="1"/><circle cx="4.4" cy="12" r="1"/><circle cx="19.6" cy="12" r="1"/>',
+    generator: '<rect x="3" y="8" width="18" height="10" rx="2"/><path d="M7 8V6h10v2"/><path d="M9 13h2l1.5-2 1 4 1.5-2H18"/>',
+    safety: '<path d="M3 16a9 9 0 0 1 18 0"/><path d="M2.5 16h19v2h-19z"/><path d="M10 7.2V4h4v3.2"/><path d="M12 7a4.5 4.5 0 0 1 4.4 4.6"/>',
+    gear: '<circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/>',
+    pipe: '<path d="M4 8h7v8H4z"/><path d="M11 10h4V6h5v12h-5v-4h-4"/><path d="M4 6V4M8 6V4"/>',
+    paint: '<rect x="9" y="8" width="6" height="12" rx="1"/><path d="M9 8V4h4v4"/><path d="M15 10l4-1.5M15 13h4M15 16l4 1.5"/>',
   };
   function iconSvg(key, size) {
     size = size || 48;
@@ -75,6 +95,7 @@
       '<span class="me-header-loc">ท่ารั้ว · เชียงใหม่</span></a>' +
       '<nav class="me-header-nav">' +
       navLink("index.html", "หน้าแรก", active === "home") +
+      navLink("categories.html", "หมวดหมู่", active === "categories") +
       navLink("shop.html", 'สินค้า<span data-rent-only> / เช่า-ซื้อ</span>', active === "shop") +
       navLink("catalog.html", "แคตตาล็อก", active === "catalog") +
       navLink("orders.html", "ติดตามคำสั่งซื้อ", active === "orders") +
@@ -128,7 +149,7 @@
           '<div class="me-socials">' + socialBtn(st.facebook, "Facebook", FB) + socialBtn(st.instagram, "Instagram", IG) + socialBtn(st.tiktok, "TikTok", TT) + "</div>" +
         "</div>" +
         '<div class="me-footer-col"><div class="me-footer-h">เมนู</div>' +
-          '<a href="index.html">หน้าแรก</a><a href="shop.html">สินค้า<span data-rent-only> / เช่า-ซื้อ</span></a>' +
+          '<a href="index.html">หน้าแรก</a><a href="categories.html">หมวดหมู่</a><a href="shop.html">สินค้า<span data-rent-only> / เช่า-ซื้อ</span></a>' +
           '<a href="catalog.html">แคตตาล็อก</a><a href="cart.html">ตะกร้า</a><a href="orders.html">ติดตามคำสั่งซื้อ</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">ช่วยเหลือ</div>' +
           '<a href="index.html#faq">คำถามที่พบบ่อย</a><a href="#" data-open-chat>ติดต่อร้าน (แชท)</a>' +

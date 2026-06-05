@@ -17,14 +17,37 @@
     return ["", s || ""];
   }
 
-  U.mountChrome(page === "home" ? "home" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : "");
+  U.mountChrome(page === "home" ? "home" : page === "categories" ? "categories" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : "");
 
   // เมื่อแคตตาล็อกจาก cloud มาถึง (ลูกค้า) → วาดส่วนที่ขึ้นกับสินค้าใหม่
   // ต้องประกาศ + ผูก listener "ก่อน" เรียก route เพราะ route จะตั้งค่า pageRefresh เอง
   var pageRefresh = null;
   window.addEventListener("me-products-loaded", function () { if (pageRefresh) try { pageRefresh(); } catch (e) {} });
 
-  var routes = { home: initHome, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog };
+  var routes = { home: initHome, categories: initCategories, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog };
+
+  // หน้า "หมวดหมู่" — กริดช่องหมวดทั้งหมด (เหมือน iToolmart) กดเข้าไปดูสินค้าในหมวดนั้น
+  function initCategories() {
+    var box = document.querySelector("[data-cats]");
+    if (!box) return;
+    function paint() {
+      var products = S.getProducts().filter(function (p) { return !p.hidden; });
+      var cats = S.getCategories().filter(function (c) { return !c.hidden; });
+      var empty = document.querySelector("[data-cats-empty]");
+      if (empty) empty.hidden = cats.length > 0;
+      box.innerHTML = cats.map(function (c) {
+        var n = products.filter(function (p) { return p.category === c.key; }).length;
+        var visual = c.image
+          ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
+          : '<span class="me-cat-ic">' + U.iconSvg(c.icon || iconForCat(c.key), 48) + "</span>";
+        return '<a class="me-cat" href="shop.html?cat=' + encodeURIComponent(c.key) + '">' + visual +
+          '<span class="me-cat-name">' + esc(c.label) + "</span>" +
+          '<span class="me-cat-count">' + n + " รายการ</span></a>";
+      }).join("");
+    }
+    paint();
+    pageRefresh = paint; // วาดใหม่เมื่อแคตตาล็อก/หมวดจาก cloud มาถึง
+  }
   if (routes[page]) routes[page]();
 
   /* ===================== AUTH ===================== */
