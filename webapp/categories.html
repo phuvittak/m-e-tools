@@ -3,35 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>หมวดหมู่สินค้า — M.E.Tools ท่ารั้ว เชียงใหม่</title>
-  <meta name="description" content="เลือกซื้อเครื่องมือช่างตามหมวดหมู่ — เครื่องมือไฟฟ้า ปั๊มลม อุปกรณ์เชื่อม เครื่องมือวัด เครื่องมือช่างทั่วไป และอื่นๆ">
-  <link rel="canonical" href="https://metoolsshop.vercel.app/categories.html">
-  <meta property="og:title" content="หมวดหมู่สินค้า — M.E.Tools">
-  <meta property="og:image" content="https://metoolsshop.vercel.app/assets/mascot-on-yellow.png">
-  <link rel="preconnect" href="https://firestore.googleapis.com">
-  <link rel="dns-prefetch" href="https://firestore.googleapis.com">
-  <link rel="stylesheet" href="assets/app.css">
+  <title>หมวดหมู่สินค้า — M.E.Tools</title>
+  <!-- หน้าหมวดหมู่ถูกรวมเข้ากับหน้าสินค้าแล้ว → ส่งต่อไป shop.html (คงพารามิเตอร์ ?cat ไว้) -->
+  <script>location.replace("shop.html" + location.search);</script>
+  <link rel="canonical" href="https://metoolsshop.vercel.app/shop.html">
 </head>
-<body data-page="categories">
-  <div data-header></div>
-
-  <main class="wrap" style="padding-top:24px;padding-bottom:48px">
-    <nav class="cat-crumb" data-cat-crumb></nav>
-    <div class="shop-head">
-      <div class="me-overline"><span class="me-overline-bar"></span>เลือกตามหมวดหมู่</div>
-      <h1 class="me-section-h" data-cat-title>หมวด<span class="me-hl">สินค้า</span></h1>
-    </div>
-    <div class="me-cats-grid" data-cats></div>
-    <div class="catalog-empty" data-cats-empty hidden>ยังไม่มีหมวดหมู่ — เพิ่มได้ในระบบหลังร้าน → ตั้งค่าเว็บไซต์ → หมวดหมู่</div>
-
-    <h2 class="me-section-h cat-prod-head" data-cat-prodhead hidden style="margin-top:28px">สินค้าในหมวดนี้</h2>
-    <div class="cards" data-cat-products></div>
-  </main>
-
-  <div data-footer></div>
-  <script src="assets/thai-geo.js"></script>
-  <script src="assets/store.js"></script>
-  <script src="assets/ui.js"></script>
-  <script src="assets/public.js"></script>
+<body>
+  <noscript><a href="shop.html">ไปที่หน้าสินค้า / หมวดหมู่</a></noscript>
 </body>
 </html>

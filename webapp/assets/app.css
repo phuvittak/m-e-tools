@@ -369,6 +369,7 @@ img { max-width: 100%; display: block; }
 .filter-toggle:hover, .filter-toggle.on { background: var(--dw-yellow); }
 .shop-grid.filters-collapsed { grid-template-columns: 1fr; }
 .shop-grid.filters-collapsed .filters { display: none; }
+.shop-cats { margin: 0 0 20px; }
 .filters { background: #fff; border: 3px solid var(--ink); box-shadow: 4px 4px 0 0 var(--ink); padding: 20px; display: flex; flex-direction: column; gap: 18px; }
 .filters h3 { font-family: var(--font-display-th); font-style: italic; text-transform: uppercase; font-size: 18px; margin: 0; }
 .filter-group { display: flex; flex-direction: column; gap: 8px; }
