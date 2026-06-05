@@ -292,6 +292,16 @@ function flexProductCard(p) {
   return {
     type: 'bubble',
     size: 'mega',
+    // รูปสินค้าด้านบนการ์ด — ดึงผ่าน /api/product-image (แปลง base64 ใน Firestore เป็น URL จริง)
+    // ถ้าสินค้าไม่มีรูป endpoint จะส่งโลโก้ร้านแทน จึงไม่มีรูปแตก
+    ...(p.id ? { hero: {
+      type: 'image',
+      url: `${SHOP.website}/api/product-image?id=${encodeURIComponent(p.id)}`,
+      size: 'full',
+      aspectRatio: '20:13',
+      aspectMode: 'cover',
+      action: { type: 'uri', label: 'ดูสินค้า', uri: `${SHOP.website}/product.html?id=${p.id}` },
+    } } : {}),
     header: flexHeader(`${p.brand || ''} · ${CATEGORY_LABELS[p.category] || ''}`),
     body: {
       type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '16px',
