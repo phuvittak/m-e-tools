@@ -6,6 +6,13 @@
   var S = window.MEStore, U = window.MEUI;
   var page = document.body.getAttribute("data-page");
 
+  // specs อาจเป็น ["ป้าย","ค่า"] (เครื่องเจ้าของ) หรือ {label,value} (โหลดจาก cloud) — รองรับทั้งคู่
+  function specKV(s) {
+    if (Array.isArray(s)) return [s[0] || "", s[1] || ""];
+    if (s && typeof s === "object") return [s.label || s.k || "", s.value || s.v || ""];
+    return ["", s || ""];
+  }
+
   U.mountChrome(page === "home" ? "home" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : "");
 
   // เมื่อแคตตาล็อกจาก cloud มาถึง (ลูกค้า) → วาดส่วนที่ขึ้นกับสินค้าใหม่
@@ -372,7 +379,7 @@
             "<tr><th>การรับประกัน</th><td>" + (p.warrantyYears ? "ศูนย์ " + p.warrantyYears + " ปี" : "ตามเงื่อนไขร้าน") + "</td></tr>" +
             (p.motorType && p.motorType !== "—" ? "<tr><th>ระบบมอเตอร์</th><td>" + p.motorType + "</td></tr>" : "") +
             (p.shipSize ? "<tr><th>ขนาด/น้ำหนักสำหรับจัดส่ง</th><td>" + p.shipSize + "</td></tr>" : "") +
-            p.specs.map(function (s) { return "<tr><th>" + s[0] + "</th><td>" + s[1] + "</td></tr>"; }).join("") +
+            (p.specs || []).map(function (s) { var kv = specKV(s); return "<tr><th>" + kv[0] + "</th><td>" + kv[1] + "</td></tr>"; }).join("") +
           "</tbody></table></div></div>";
 
     wireViewer(root, p);
@@ -773,10 +780,10 @@
       ? '<div class="osk-mini-label">สินค้าภายในกล่อง</div><div class="osk-inbox">' +
         inbox.map(function (im) { return '<span style="background-image:url(' + JSON.stringify(im) + ')"></span>'; }).join("") + "</div>"
       : "";
-    var specs = (p.specs || []).filter(function (s) { return s && (s[0] || s[1]); }).slice(0, 6);
+    var specs = (p.specs || []).map(specKV).filter(function (kv) { return kv[0] || kv[1]; }).slice(0, 6);
     var specsHtml = specs.length
       ? '<div class="osk-mini-label">รายละเอียดสินค้า</div><ul class="osk-bul">' +
-        specs.map(function (s) { return "<li>" + esc(s[0]) + (s[1] ? " : " + esc(s[1]) : "") + "</li>"; }).join("") + "</ul>"
+        specs.map(function (kv) { return "<li>" + esc(kv[0]) + (kv[1] ? " : " + esc(kv[1]) : "") + "</li>"; }).join("") + "</ul>"
       : "";
     var hl = (p.highlights || []).filter(Boolean).slice(0, 3);
     var hlHtml = hl.length

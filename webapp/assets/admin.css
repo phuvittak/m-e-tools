@@ -159,6 +159,11 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
 .row-edit.is-hidden, .faq-edit.is-hidden { opacity: .55; }
 .perm-grid { display: flex; gap: 16px 22px; flex-wrap: wrap; padding: 4px 0; }
 .perm-grid .f-check { font-size: 14px; }
+.perm-group { padding: 8px 0; }
+.perm-group + .perm-group { border-top: 1px dashed var(--line, #d9d3c4); margin-top: 4px; }
+.perm-group-title { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-2, #8a8472); font-family: var(--font-body); margin-bottom: 2px; }
+.perm-group.perm-danger { background: rgba(192, 57, 43, .05); border-left: 3px solid #c0392b; padding-left: 10px; border-radius: 4px; }
+.perm-group.perm-danger .perm-group-title { color: #c0392b; }
 
 /* ---------- chat inbox (LINE-OA style) ---------- */
 .chat-admin { display: grid; grid-template-columns: 280px 1fr; min-height: 440px; }
@@ -243,5 +248,22 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
   .conv-actions button { font-size: 10px; padding: 2px 8px; }
   .thread-name { font-size: 13px; }
   .thread-id { display: none; } /* บนจอเล็กซ่อน ID เต็ม เหลือแต่ชื่อ */
+}
+/* ---------- responsive enhancements: ใช้กับทุกหน้าหลังร้านอัตโนมัติ ---------- */
+@media (max-width: 720px) {
+  /* ทุกตารางในหลังร้าน (คำสั่งซื้อ/คลัง/ลูกค้า/ERP/ทีมงาน) เลื่อนแนวนอนได้ ไม่ล้นจอ */
+  table.data { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .f2 { grid-template-columns: 1fr; }          /* ฟอร์ม 2 คอลัมน์ → เรียงเดี่ยวให้กรอกง่าย */
+  .panel { padding: 16px; }
+  .panel-head { gap: 8px; }
+  /* แถวปุ่มในหัวพาเนล/ท็อปบาร์ จัดเต็มความกว้าง กดง่าย */
+  .topbar { align-items: stretch; }
+}
+@media (max-width: 420px) {
+  .topbar h1 { font-size: 22px; }
+  .panel { padding: 13px; }
+  .login-card { padding: 26px 20px; }
+  /* ปุ่มหลักในฟอร์มยืดเต็มความกว้างบนจอเล็กมาก กดง่ายด้วยนิ้วเดียว */
+  .panel > .btn:last-child { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation: none !important; transition: none !important; } }

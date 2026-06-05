@@ -292,3 +292,17 @@ hr {
 .frame-stamp {
   box-shadow: var(--shadow-stamp);
 }
+
+/* ============================================================
+   RESPONSIVE SAFETY — พอดีทุกหน้าจอ ไม่ล้นแนวนอน อ่านง่ายบนมือถือ
+   ============================================================ */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* รูป/มีเดีย/ตาราง ไม่ทะลุกรอบจอเล็ก */
+img, svg, video, canvas { max-width: 100%; }
+img, video { height: auto; }
+table { max-width: 100%; }
+/* ปุ่ม/ช่องกรอก สืบทอดฟอนต์ + กดสะดวกบนทัชสกรีน */
+button, input, select, textarea { font-family: inherit; }
+@media (pointer: coarse) {
+  button, .btn, a.btn { min-height: 40px; }
+}

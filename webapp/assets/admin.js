@@ -19,7 +19,27 @@
   // ดึงข้อมูล admin จาก cloud ก่อนเริ่ม (settings/staff/ledger/etc.) — ทำเงียบ ๆ
   // ถ้า cloud ใหม่กว่า localStorage จะอัปเดต local แล้ว dispatch ให้ทุกหน้า re-render
   if (S.cloudLoadAdminData) S.cloudLoadAdminData();
+  // ลงทะเบียนเครื่องนี้เป็น admin แล้ว subscribe ออเดอร์จาก cloud (ทุกหน้าหลังร้าน) → ดูดลง local
+  // ให้ทุกหน้า (แดชบอร์ด/คำสั่งซื้อ/ERP) เห็นออเดอร์ครบเหมือนกันทุกเครื่อง ผ่าน getOrders()
+  if (S.ensureAdminRegistered) S.ensureAdminRegistered().then(function (uid) { if (uid) subscribeOrdersGlobal(); });
   ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, import: function(){} }[view] || function () {})();
+
+  // subscribe orders/{id} จาก Firestore แบบเรียลไทม์ → S.absorbCloudOrders() เขียนลง local me_orders
+  function subscribeOrdersGlobal() {
+    if (!S.loadFirebaseAuthAndDb || !S.absorbCloudOrders) return;
+    S.loadFirebaseAuthAndDb("admin").then(function (m) {
+      var fs = m.fsMod;
+      fs.onSnapshot(fs.collection(m.db, "orders"), function (snap) {
+        var list = snap.docs.map(function (d) {
+          var data = d.data() || {};
+          if (data.createdAtTs && data.createdAtTs.toDate) data.createdAt = data.createdAtTs.toDate().getTime();
+          delete data.createdAtTs; delete data.updatedAtTs; // ไม่เก็บ Timestamp object ลง localStorage
+          return data;
+        });
+        S.absorbCloudOrders(list);
+      }, function (err) { console.warn("[orders global listener]", err && err.message); });
+    }).catch(function () {});
+  }
 
   /* ---------- shell / sidebar ---------- */
   function mountShell(active) {
@@ -219,7 +239,7 @@
               '<button class="btn btn-sm btn-ghost" data-edit="' + p.id + '">แก้ไข</button>' +
               '<button class="btn btn-sm btn-ghost" data-hideprod="' + p.id + '">' + (p.hidden ? "แสดง" : "ซ่อน") + "</button>" +
               '<button class="btn btn-sm" data-restock="' + p.id + '">+สต็อก</button>' +
-              '<button class="btn btn-sm btn-danger" data-del="' + p.id + '">ลบ</button>' +
+              (S.hasPerm("inventory_delete") ? '<button class="btn btn-sm btn-danger" data-del="' + p.id + '">ลบ</button>' : "") +
             "</div></td></tr>";
         }).join("") + "</tbody>";
 
@@ -1496,7 +1516,7 @@
 
   /* ===================== ORDERS ===================== */
   function initOrders() {
-    var state = { status: "", type: "", q: "", cloudOrders: [] };
+    var state = { status: "", type: "", q: "" };
     var ss = document.querySelector("[data-statusfilter]");
     var ts = document.querySelector("[data-typefilter]");
     var cs = document.querySelector("[data-customer]");
@@ -1505,43 +1525,12 @@
     cs.addEventListener("input", function () { state.q = cs.value.trim().toLowerCase(); render(); });
     document.querySelector("[data-shipcfg]").addEventListener("click", openShipEditor);
 
-    // Phase E: subscribe orders/{id} จาก Firestore — order ของลูกค้าที่ login Firebase Auth
-    subscribeCloudOrders();
-
-    function subscribeCloudOrders() {
-      if (!S.loadFirebaseAuthAndDb) return;
-      S.loadFirebaseAuthAndDb("admin").then(function (m) {
-        var fs = m.fsMod;
-        var col = fs.collection(m.db, "orders");
-        fs.onSnapshot(col, function (snap) {
-          state.cloudOrders = snap.docs.map(function (d) {
-            var data = d.data() || {};
-            // ทำ at เป็น number (ms) ให้ตรงกับ local order
-            if (data.createdAtTs && data.createdAtTs.toDate) data.createdAt = data.createdAtTs.toDate().getTime();
-            data._cloud = true;
-            return data;
-          });
-          render();
-        }, function (err) { console.warn("[orders listener]", err && err.message); });
-      }).catch(function (err) { console.warn("[orders init firestore]", err && err.message); });
-    }
-
-    function mergedOrders() {
-      // merge local + cloud — cloud ชนะถ้า id ตรงกัน (cloud คือ source of truth สำหรับ order ที่ลูกค้าสร้าง)
-      // local ยังครองสำหรับ order ที่ไม่มี userId (สร้างก่อน Phase E)
-      var byId = {};
-      S.getOrders().forEach(function (o) { byId[o.id] = o; });
-      state.cloudOrders.forEach(function (o) {
-        // เก็บ staffMessage ของ local ถ้า cloud ยังไม่มี (รักษาข้อมูลที่ admin ใส่ไว้ใน local เดิม)
-        var local = byId[o.id];
-        if (local && !o.staffMessage && local.staffMessage) o.staffMessage = local.staffMessage;
-        byId[o.id] = o;
-      });
-      return Object.values(byId).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
-    }
+    // ออเดอร์จาก cloud ถูกดูดลง local me_orders โดย subscribeOrdersGlobal() แล้ว (ทำงานทุกหน้าหลังร้าน)
+    // จึงอ่านจาก S.getOrders() ได้เลย และ re-render เมื่อมีข้อมูลใหม่เข้ามา (dispatch จาก absorbCloudOrders)
+    S.onChange(render);
 
     function render() {
-      var orders = mergedOrders().filter(function (o) {
+      var orders = S.getOrders().filter(function (o) {
         if (state.status && o.status !== state.status) return false;
         if (state.type && o.type !== state.type) return false;
         if (state.q) {
@@ -1573,7 +1562,7 @@
             "<td>" + adminStatusBadges(o) + (o.staffMessage ? '<br><span class="prod-sku">📩 ' + esc(o.staffMessage) + "</span>" : "") + "</td>" +
             '<td><div class="ord-act">' + (opts ? '<select class="statussel" data-os="' + o.id + '">' + opts + "</select>" : '<span class="prod-sku">—</span>') +
               '<div class="ord-msg"><input data-msg="' + o.id + '" value="' + esc(o.staffMessage || "") + '" placeholder="ตอบลูกค้า เช่น ของถึงใน 2 วัน"><button class="btn btn-sm" data-sendmsg="' + o.id + '">ส่ง</button></div>' +
-              (S.isOwner() ? '<button class="btn btn-sm btn-danger" data-delorder="' + o.id + '">ลบคำสั่งซื้อ</button>' : "") +
+              (S.hasPerm("orders_delete") ? '<button class="btn btn-sm btn-danger" data-delorder="' + o.id + '">ลบคำสั่งซื้อ</button>' : "") +
             "</div></td></tr>";
         }).join("") + "</tbody>";
 
@@ -2014,7 +2003,22 @@
   /* ===================== STAFF MANAGEMENT (owner) ===================== */
   function initStaff() {
     var root = document.querySelector("[data-staffroot]");
-    var permLabels = { dashboard: "แดชบอร์ด", inventory: "คลัง/สต็อก", orders: "คำสั่งซื้อ", erp: "ERP/บัญชี", settings: "ตั้งค่าเว็บไซต์" };
+    var groupLabels = { access: "เข้าถึง / ใช้งานหน้า", danger: "สิทธิ์ลบข้อมูลถาวร (เปิดเฉพาะคนที่ไว้ใจ)" };
+    // สร้างชุด checkbox สิทธิ์ แบ่งตามกลุ่มจาก S.PERM_DEFS
+    //   attr = ชื่อ data-attribute ของ input, idAttr = แอตทริบิวต์เสริม (เช่น data-id="..")
+    //   checkedFn(key) → true/false ว่าติ๊กไว้ไหม
+    function permChecks(attr, idAttr, checkedFn) {
+      var groups = {};
+      S.PERM_DEFS.forEach(function (d) { (groups[d.group] = groups[d.group] || []).push(d); });
+      return Object.keys(groups).map(function (g) {
+        return '<div class="perm-group' + (g === "danger" ? " perm-danger" : "") + '">' +
+          '<div class="perm-group-title">' + (groupLabels[g] || g) + "</div>" +
+          '<div class="perm-grid">' + groups[g].map(function (d) {
+            return '<label class="f-check"><input type="checkbox" ' + attr + '="' + d.key + '"' + idAttr +
+              (checkedFn(d.key) ? " checked" : "") + "> " + d.label + "</label>";
+          }).join("") + "</div></div>";
+      }).join("");
+    }
     function render() {
       var staff = S.getStaff();
       root.innerHTML = staff.map(function (m) {
@@ -2025,15 +2029,15 @@
           '<div class="field"><label>อีเมล (ใช้เข้าสู่ระบบ)</label><input data-f="email" data-id="' + m.id + '" value="' + esc(m.email) + '"></div></div>' +
           '<div class="field"><label>รหัสผ่าน</label><input data-f="password" data-id="' + m.id + '" value="' + esc(m.password) + '"></div>' +
           (owner ? '<div class="img-hint">แอดมินมีสิทธิ์ใช้งานทุกระบบโดยอัตโนมัติ</div>'
-            : '<div class="field"><label>สิทธิ์การใช้ระบบหลังร้าน</label><div class="perm-grid">' +
-              S.PERM_KEYS.map(function (k) { return '<label class="f-check"><input type="checkbox" data-perm="' + k + '" data-id="' + m.id + '"' + (m.perms && m.perms[k] ? " checked" : "") + "> " + permLabels[k] + "</label>"; }).join("") + "</div></div>") +
+            : '<div class="field"><label>สิทธิ์การใช้ระบบหลังร้าน</label>' +
+              permChecks("data-perm", ' data-id="' + m.id + '"', function (k) { return m.perms && m.perms[k]; }) + "</div>") +
           '<button class="btn" data-save="' + m.id + '">บันทึก</button></div>';
       }).join("") +
       '<div class="panel"><div class="panel-head"><h2>+ เพิ่มพนักงานใหม่</h2></div>' +
         '<div class="f2"><div class="field"><label>ชื่อ</label><input data-new="name"></div>' +
         '<div class="field"><label>อีเมล</label><input data-new="email"></div></div>' +
         '<div class="field"><label>รหัสผ่าน</label><input data-new="password"></div>' +
-        '<div class="field"><label>สิทธิ์</label><div class="perm-grid">' + S.PERM_KEYS.map(function (k) { return '<label class="f-check"><input type="checkbox" data-newperm="' + k + '"' + (k === "dashboard" ? " checked" : "") + "> " + permLabels[k] + "</label>"; }).join("") + "</div></div>" +
+        '<div class="field"><label>สิทธิ์</label>' + permChecks("data-newperm", "", function (k) { return k === "dashboard"; }) + "</div>" +
         '<button class="btn" data-add-staff>เพิ่มพนักงาน</button></div>';
 
       root.querySelectorAll("[data-save]").forEach(function (b) {
