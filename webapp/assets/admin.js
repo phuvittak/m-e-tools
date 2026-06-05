@@ -2132,7 +2132,7 @@
 
   /* ---------- helpers ---------- */
   function miniVisual(p) {
-    if (p.image) return '<div class="prod-mini" style="background-image:url(' + JSON.stringify(p.image) + ');background-size:cover;background-position:center"></div>';
+    if (p.image) return '<div class="prod-mini" style="background-image:url(\'' + String(p.image).replace(/'/g, "%27") + '\');background-size:cover;background-position:center"></div>';
     return '<div class="prod-mini">' + U.iconSvg(p.icon, 24) + "</div>";
   }
   function statusTh(s) { return { new: "ใหม่", paid: "ชำระแล้ว", fulfilled: "ส่งมอบแล้ว", returned: "คืนแล้ว", cancelled: "ยกเลิก" }[s] || s; }
