@@ -19,7 +19,27 @@
   // ดึงข้อมูล admin จาก cloud ก่อนเริ่ม (settings/staff/ledger/etc.) — ทำเงียบ ๆ
   // ถ้า cloud ใหม่กว่า localStorage จะอัปเดต local แล้ว dispatch ให้ทุกหน้า re-render
   if (S.cloudLoadAdminData) S.cloudLoadAdminData();
+  // ลงทะเบียนเครื่องนี้เป็น admin แล้ว subscribe ออเดอร์จาก cloud (ทุกหน้าหลังร้าน) → ดูดลง local
+  // ให้ทุกหน้า (แดชบอร์ด/คำสั่งซื้อ/ERP) เห็นออเดอร์ครบเหมือนกันทุกเครื่อง ผ่าน getOrders()
+  if (S.ensureAdminRegistered) S.ensureAdminRegistered().then(function (uid) { if (uid) subscribeOrdersGlobal(); });
   ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, import: function(){} }[view] || function () {})();
+
+  // subscribe orders/{id} จาก Firestore แบบเรียลไทม์ → S.absorbCloudOrders() เขียนลง local me_orders
+  function subscribeOrdersGlobal() {
+    if (!S.loadFirebaseAuthAndDb || !S.absorbCloudOrders) return;
+    S.loadFirebaseAuthAndDb("admin").then(function (m) {
+      var fs = m.fsMod;
+      fs.onSnapshot(fs.collection(m.db, "orders"), function (snap) {
+        var list = snap.docs.map(function (d) {
+          var data = d.data() || {};
+          if (data.createdAtTs && data.createdAtTs.toDate) data.createdAt = data.createdAtTs.toDate().getTime();
+          delete data.createdAtTs; delete data.updatedAtTs; // ไม่เก็บ Timestamp object ลง localStorage
+          return data;
+        });
+        S.absorbCloudOrders(list);
+      }, function (err) { console.warn("[orders global listener]", err && err.message); });
+    }).catch(function () {});
+  }
 
   /* ---------- shell / sidebar ---------- */
   function mountShell(active) {
@@ -1496,7 +1516,7 @@
 
   /* ===================== ORDERS ===================== */
   function initOrders() {
-    var state = { status: "", type: "", q: "", cloudOrders: [] };
+    var state = { status: "", type: "", q: "" };
     var ss = document.querySelector("[data-statusfilter]");
     var ts = document.querySelector("[data-typefilter]");
     var cs = document.querySelector("[data-customer]");
@@ -1505,43 +1525,12 @@
     cs.addEventListener("input", function () { state.q = cs.value.trim().toLowerCase(); render(); });
     document.querySelector("[data-shipcfg]").addEventListener("click", openShipEditor);
 
-    // Phase E: subscribe orders/{id} จาก Firestore — order ของลูกค้าที่ login Firebase Auth
-    subscribeCloudOrders();
-
-    function subscribeCloudOrders() {
-      if (!S.loadFirebaseAuthAndDb) return;
-      S.loadFirebaseAuthAndDb("admin").then(function (m) {
-        var fs = m.fsMod;
-        var col = fs.collection(m.db, "orders");
-        fs.onSnapshot(col, function (snap) {
-          state.cloudOrders = snap.docs.map(function (d) {
-            var data = d.data() || {};
-            // ทำ at เป็น number (ms) ให้ตรงกับ local order
-            if (data.createdAtTs && data.createdAtTs.toDate) data.createdAt = data.createdAtTs.toDate().getTime();
-            data._cloud = true;
-            return data;
-          });
-          render();
-        }, function (err) { console.warn("[orders listener]", err && err.message); });
-      }).catch(function (err) { console.warn("[orders init firestore]", err && err.message); });
-    }
-
-    function mergedOrders() {
-      // merge local + cloud — cloud ชนะถ้า id ตรงกัน (cloud คือ source of truth สำหรับ order ที่ลูกค้าสร้าง)
-      // local ยังครองสำหรับ order ที่ไม่มี userId (สร้างก่อน Phase E)
-      var byId = {};
-      S.getOrders().forEach(function (o) { byId[o.id] = o; });
-      state.cloudOrders.forEach(function (o) {
-        // เก็บ staffMessage ของ local ถ้า cloud ยังไม่มี (รักษาข้อมูลที่ admin ใส่ไว้ใน local เดิม)
-        var local = byId[o.id];
-        if (local && !o.staffMessage && local.staffMessage) o.staffMessage = local.staffMessage;
-        byId[o.id] = o;
-      });
-      return Object.values(byId).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
-    }
+    // ออเดอร์จาก cloud ถูกดูดลง local me_orders โดย subscribeOrdersGlobal() แล้ว (ทำงานทุกหน้าหลังร้าน)
+    // จึงอ่านจาก S.getOrders() ได้เลย และ re-render เมื่อมีข้อมูลใหม่เข้ามา (dispatch จาก absorbCloudOrders)
+    S.onChange(render);
 
     function render() {
-      var orders = mergedOrders().filter(function (o) {
+      var orders = S.getOrders().filter(function (o) {
         if (state.status && o.status !== state.status) return false;
         if (state.type && o.type !== state.type) return false;
         if (state.q) {

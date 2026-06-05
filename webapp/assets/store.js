@@ -813,26 +813,35 @@
     write(KEY.orders, orders);
     clearCart();
     // Phase E: sync ขึ้น Firestore — fire-and-forget เพื่อไม่บล็อก UI
-    // ใช้เฉพาะลูกค้าที่ login ผ่าน Firebase Auth (มี uid) — ถ้าไม่มีก็เก็บแค่ localStorage
-    if (sess && sess.uid) syncOrdersToCloud(created, sess);
+    // ซิงค์ "ทุก" ออเดอร์ (รวมลูกค้าที่ไม่ได้ล็อกอิน — ใช้ anonymous auth) เพื่อให้
+    // เจ้าของเห็นออเดอร์ครบทุกเครื่อง ไม่ใช่แค่เครื่องที่กดสั่ง
+    syncOrdersToCloud(created, sess || {});
     return created;
   }
 
   // เขียน orders/{id} ใน Firestore — owner admin/orders.html จะ subscribe แล้วเห็นแบบเรียลไทม์
+  // ถ้าลูกค้าไม่ได้ล็อกอิน Firebase จะ sign-in anonymous ให้ก่อน (rule create ต้องการ userId == auth.uid)
   function syncOrdersToCloud(orders, sess) {
     if (!orders || !orders.length) return;
-    loadFirebaseAuthAndDb().then(function (m) {
+    loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
       var fs = m.fsMod;
+      var uid = (m.auth && m.auth.currentUser && m.auth.currentUser.uid) || (sess && sess.uid);
+      if (!uid) return; // ไม่มี auth จริง ๆ (เช่น Firebase ใช้ไม่ได้) — เก็บแค่ local
+      // ติด userId กลับไปที่ออเดอร์ใน local ด้วย เพื่อให้ setOrderStatus ซิงค์การเปลี่ยนสถานะได้ภายหลัง
+      var local = read(KEY.orders, []), changed = false;
       orders.forEach(function (o) {
+        o.userId = uid;
+        for (var i = 0; i < local.length; i++) if (local[i].id === o.id && !local[i].userId) { local[i].userId = uid; changed = true; }
         var payload = Object.assign({}, o, {
-          userId: sess.uid,
-          userEmail: sess.email || "",
+          userId: uid,
+          userEmail: (sess && sess.email) || o.userEmail || "",
           createdAtTs: fs.serverTimestamp(),
           updatedAtTs: fs.serverTimestamp(),
         });
         fs.setDoc(fs.doc(m.db, "orders", o.id), payload)
           .catch(function (err) { console.error("[order sync]", o.id, err && err.message); });
       });
+      if (changed) write(KEY.orders, local, { skipCloud: true });
     }).catch(function (err) { console.warn("[order sync init]", err && err.message); });
   }
 
@@ -873,7 +882,10 @@
 
   function syncOrderStatusToCloud(o) {
     if (!o || !o.userId) return; // order ที่ไม่มี userId = local-only (ก่อน Phase E)
-    loadFirebaseAuthAndDb().then(function (m) {
+    // เจ้าของ/พนักงานอัปเดตในฐานะ admin (แอป "admin" ที่ลงทะเบียนไว้) — rule update ผ่านด้วย isAdmin()
+    // ลูกค้ายกเลิกออเดอร์ของตัวเอง อัปเดตในฐานะเจ้าของ userId (แอป "customer")
+    var appName = isStaff() ? "admin" : undefined;
+    loadFirebaseAuthAndDb(appName).then(ensureCloudAuth).then(function (m) {
       var fs = m.fsMod;
       fs.setDoc(fs.doc(m.db, "orders", o.id), {
         status: o.status,
@@ -892,6 +904,43 @@
     var orders = read(KEY.orders, []);
     for (var i = 0; i < orders.length; i++) if (orders[i].id === orderId) { orders[i].staffMessage = msg; orders[i].staffMessageAt = Date.now(); break; }
     write(KEY.orders, orders); dispatch();
+  }
+  // ลงทะเบียนเครื่องหลังร้านเครื่องนี้เป็น admin (เขียน admins/{uid}) เพื่อให้ "อ่านออเดอร์ทั้งหมด"
+  // จาก Firestore ได้ (rule list ต้องการ isAdmin()). ใช้แอป "admin" → uid คงที่ข้ามหน้าหลังร้าน
+  // idempotent: เช็คก่อน ถ้ามีแล้วไม่เขียนซ้ำ. คืน Promise<uid|null>
+  var _adminRegPromise = null;
+  function ensureAdminRegistered() {
+    if (!isStaff()) return Promise.resolve(null); // เฉพาะเครื่องที่ล็อกอินหลังร้าน
+    if (_adminRegPromise) return _adminRegPromise;
+    _adminRegPromise = loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod, uid = m.auth && m.auth.currentUser && m.auth.currentUser.uid;
+      if (!uid) return null;
+      var ref = fs.doc(m.db, "admins", uid);
+      return fs.getDoc(ref).then(function (snap) {
+        if (snap && snap.exists && snap.exists()) return uid;
+        return fs.setDoc(ref, { addedAt: fs.serverTimestamp(), via: "back-office-auto" }).then(function () { return uid; });
+      });
+    }).catch(function (err) { _adminRegPromise = null; console.warn("[admin register]", err && err.message); return null; });
+    return _adminRegPromise;
+  }
+  // รวมออเดอร์จาก cloud ลง local me_orders (cloud ชนะถ้า id ตรงกัน) เพื่อให้ทุกหน้าหลังร้าน
+  // (แดชบอร์ด/ERP/คำสั่งซื้อ) เห็นออเดอร์ครบเหมือนกัน ผ่าน getOrders() ปกติ
+  function absorbCloudOrders(cloudList) {
+    if (!cloudList || !cloudList.length) return;
+    var local = read(KEY.orders, []), byId = {}, order = [];
+    local.forEach(function (o) { byId[o.id] = o; order.push(o.id); });
+    var changed = false;
+    cloudList.forEach(function (c) {
+      if (!c || !c.id) return;
+      var cur = byId[c.id];
+      var merged = Object.assign({}, cur, c);
+      if (cur && !c.staffMessage && cur.staffMessage) merged.staffMessage = cur.staffMessage; // กันข้อความ admin ใน local หาย
+      if (JSON.stringify(cur) !== JSON.stringify(merged)) { byId[c.id] = merged; changed = true; if (!cur) order.push(c.id); }
+    });
+    if (changed) {
+      write(KEY.orders, order.map(function (id) { return byId[id]; }), { skipCloud: true });
+      dispatch();
+    }
   }
   function deleteOrder(id) { if (!hasPerm("orders_delete")) return false; write(KEY.orders, read(KEY.orders, []).filter(function (o) { return o.id !== id; })); dispatch(); return true; }
   function deletePurchase(id) { write(KEY.purchases, read(KEY.purchases, []).filter(function (p) { return p.id !== id; })); dispatch(); }
@@ -1317,6 +1366,7 @@
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
     session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS, PERM_DEFS: PERM_DEFS,
     logout: logout, requirePerm: requirePerm, checkPin: checkPin,
+    ensureAdminRegistered: ensureAdminRegistered, absorbCloudOrders: absorbCloudOrders,
     deleteOrder: deleteOrder, deletePurchase: deletePurchase,
     getLedger: getLedger, saveLedgerEntry: saveLedgerEntry, deleteLedgerEntry: deleteLedgerEntry,
     getSuppliers: getSuppliers, saveSupplier: saveSupplier, deleteSupplier: deleteSupplier,
