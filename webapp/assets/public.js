@@ -408,6 +408,31 @@
     var sinput = document.querySelector("[data-q]");
     var sortSel = document.querySelector("[data-sort]");
 
+    // ปุ่มเปิด/ปิดตัวกรอง — บนมือถือซ่อนไว้ก่อน (ลูกค้าหลายคนไม่ได้ใช้ตัวกรอง)
+    var grid = document.querySelector(".shop-grid");
+    var toggle = document.querySelector("[data-filter-toggle]");
+    if (toggle && grid) {
+      if (window.innerWidth < 860) grid.classList.add("filters-collapsed");
+      function syncToggle() { var open = !grid.classList.contains("filters-collapsed"); toggle.setAttribute("aria-expanded", open ? "true" : "false"); toggle.classList.toggle("on", open); }
+      syncToggle();
+      toggle.addEventListener("click", function () { grid.classList.toggle("filters-collapsed"); syncToggle(); });
+    }
+    // breadcrumb + หัวเรื่องตามหมวดที่เลือก (ไล่ลึกแบบ iToolmart)
+    function renderCrumbTitle() {
+      var crumb = document.querySelector("[data-shop-crumb]"), title = document.querySelector("[data-shop-title]");
+      var curKey = state.cats.length === 1 ? state.cats[0] : "";
+      var cur = curKey ? S.getCategory(curKey) : null;
+      if (crumb) {
+        var parts = ['<a href="index.html">หน้าแรก</a>', '<a href="categories.html">หมวดหมู่</a>'];
+        if (cur) S.categoryPath(curKey).forEach(function (c, i, arr) {
+          parts.push(i === arr.length - 1 ? '<span class="crumb-cur">' + esc(c.label) + "</span>"
+            : '<a href="shop.html?cat=' + encodeURIComponent(c.key) + '">' + esc(c.label) + "</a>");
+        });
+        crumb.innerHTML = parts.join(' <span class="crumb-sep">›</span> ');
+      }
+      if (title) title.innerHTML = cur ? esc(cur.label) : 'สินค้า<span class="me-hl">ทั้งหมด</span>';
+    }
+
     // สร้าง/วาดแถบตัวกรองใหม่จากสินค้าปัจจุบัน (เรียกซ้ำได้เมื่อ cloud มาถึง)
     function buildSidebar() {
       var products = S.getProducts().filter(function (p) { return !p.hidden; });
@@ -432,8 +457,9 @@
         '<label class="check"><input type="checkbox" data-f="instock"' + (state.inStock ? " checked" : "") + '> เฉพาะมีสต็อก</label></div>' +
         '<div class="filter-group"><span class="lbl">ประเภทสินค้า</span>' +
         S.getCategories().filter(function (c) { return !c.hidden; }).map(function (c) {
-          var n = catCounts[c.key] || 0;
-          return '<label class="check"><input type="checkbox" data-f="cat" value="' + c.key + '"' + (state.cats.indexOf(c.key) >= 0 ? " checked" : "") + '> ' + esc(c.label) + ' <span class="filter-count">(' + n + ')</span></label>';
+          var n = S.productCountInCat(c.key); // รวมหมวดย่อย
+          var depth = S.categoryPath(c.key).length - 1;
+          return '<label class="check" style="padding-left:' + (depth * 16) + 'px">' + (depth ? '<span class="cat-sub-mark">└</span>' : "") + '<input type="checkbox" data-f="cat" value="' + c.key + '"' + (state.cats.indexOf(c.key) >= 0 ? " checked" : "") + "> " + esc(c.label) + ' <span class="filter-count">(' + n + ')</span></label>';
         }).join("") + "</div>" +
         '<div class="filter-group"><span class="lbl">แบรนด์</span>' +
         allBrands.map(function (b) { return '<label class="check"><input type="checkbox" data-f="brand" value="' + b + '"' + (state.brands.indexOf(b) >= 0 ? " checked" : "") + '> ' + b + '</label>'; }).join("") + "</div>" +
@@ -471,6 +497,7 @@
     });
 
     function render() {
+      renderCrumbTitle();
       // หมวดที่กรอง = หมวดที่เลือก + หมวดย่อยทุกชั้นใต้มัน (กดหมวดแม่เห็นสินค้าทั้งซับทรี)
       var acceptCats = null;
       if (state.cats.length) { acceptCats = {}; state.cats.forEach(function (k) { var d = S.catDescendants(k); for (var x in d) acceptCats[x] = 1; }); }
