@@ -1,6 +1,6 @@
 /* M.E.Tools service worker — offline app shell + runtime cache.
    Scope = the folder this file lives in (the app root). */
-var CACHE = "metools-v3";
+var CACHE = "metools-v4";
 var CORE = [
   "./", "index.html", "categories.html", "shop.html", "product.html", "cart.html", "orders.html",
   "login.html", "register.html", "manifest.webmanifest",
@@ -31,10 +31,10 @@ self.addEventListener("fetch", function (e) {
   var url = new URL(req.url);
   // let cross-origin (e.g. jsdelivr address dataset) go straight to network
   if (url.origin !== self.location.origin) return;
-  // network-first for everything same-origin: always fresh when online,
-  // fall back to cache (offline). Avoids serving stale JS/CSS after updates.
+  // network-first + bypass HTTP/CDN cache ({cache:"reload"}) → ได้ไฟล์ใหม่เสมอเมื่อออนไลน์
+  // ไม่งั้น JS/CSS อาจค้างเวอร์ชันเก่าจาก cache ของเบราว์เซอร์/CDN. ออฟไลน์ค่อย fallback cache
   e.respondWith(
-    fetch(req).then(function (res) {
+    fetch(req, { cache: "reload" }).then(function (res) {
       var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); return res;
     }).catch(function () {
       return caches.match(req).then(function (m) { return m || (req.mode === "navigate" ? caches.match("index.html") : m); });
