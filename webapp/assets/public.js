@@ -26,23 +26,45 @@
 
   var routes = { home: initHome, categories: initCategories, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog };
 
-  // หน้า "หมวดหมู่" — กริดช่องหมวดทั้งหมด (เหมือน iToolmart) กดเข้าไปดูสินค้าในหมวดนั้น
+  // หน้า "หมวดหมู่" — กริดช่องหมวดแบบซ้อนหลายชั้น (เหมือน iToolmart)
+  //   ?cat=<key> = ดูหมวดย่อยภายใต้หมวดนั้น. กดหมวดที่มีลูก → ลงลึกต่อ, กดหมวดที่ไม่มีลูก → ดูสินค้า
   function initCategories() {
     var box = document.querySelector("[data-cats]");
     if (!box) return;
     function paint() {
-      var products = S.getProducts().filter(function (p) { return !p.hidden; });
-      var cats = S.getCategories().filter(function (c) { return !c.hidden; });
+      var curKey = U.qp("cat") || "";
+      var cur = curKey ? S.getCategory(curKey) : null;
+      var children = S.getSubcategories(curKey, false);
+
+      // ถ้าเป็นหมวดปลายทาง (ไม่มีลูก) → เด้งไปหน้าสินค้าในหมวดนั้นเลย
+      if (curKey && !children.length) { window.location.replace("shop.html?cat=" + encodeURIComponent(curKey)); return; }
+
+      // breadcrumb
+      var crumbBox = document.querySelector("[data-cat-crumb]");
+      if (crumbBox) {
+        var crumbs = ['<a href="categories.html">หมวดหมู่</a>'];
+        if (cur) S.categoryPath(curKey).forEach(function (c, i, arr) {
+          crumbs.push(i === arr.length - 1
+            ? '<span class="crumb-cur">' + esc(c.label) + "</span>"
+            : '<a href="categories.html?cat=' + encodeURIComponent(c.key) + '">' + esc(c.label) + "</a>");
+        });
+        crumbBox.innerHTML = crumbs.join(' <span class="crumb-sep">›</span> ');
+      }
+      var titleBox = document.querySelector("[data-cat-title]");
+      if (titleBox) titleBox.innerHTML = cur ? esc(cur.label) : 'หมวด<span class="me-hl">สินค้า</span>';
+
       var empty = document.querySelector("[data-cats-empty]");
-      if (empty) empty.hidden = cats.length > 0;
-      box.innerHTML = cats.map(function (c) {
-        var n = products.filter(function (p) { return p.category === c.key; }).length;
+      if (empty) empty.hidden = children.length > 0;
+      box.innerHTML = children.map(function (c) {
+        var hasKids = S.categoryHasChildren(c.key);
+        var n = S.productCountInCat(c.key);
         var visual = c.image
           ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
           : '<span class="me-cat-ic">' + U.iconSvg(c.icon || iconForCat(c.key), 48) + "</span>";
-        return '<a class="me-cat" href="shop.html?cat=' + encodeURIComponent(c.key) + '">' + visual +
+        var href = (hasKids ? "categories.html?cat=" : "shop.html?cat=") + encodeURIComponent(c.key);
+        return '<a class="me-cat" href="' + href + '">' + visual +
           '<span class="me-cat-name">' + esc(c.label) + "</span>" +
-          '<span class="me-cat-count">' + n + " รายการ</span></a>";
+          '<span class="me-cat-count">' + n + " รายการ" + (hasKids ? " ›" : "") + "</span></a>";
       }).join("");
     }
     paint();
@@ -228,17 +250,19 @@
     function paintHomeProducts() {
       var box = document.querySelector("[data-cats]");
       if (box) {
-        var products = S.getProducts().filter(function (p) { return !p.hidden; });
-        box.innerHTML = S.getCategories().filter(function (c) { return !c.hidden; }).map(function (c) {
-          var n = products.filter(function (p) { return p.category === c.key; }).length;
+        // หน้าแรกแสดงเฉพาะ "หมวดบนสุด" — กดเข้าไปจะไล่หมวดย่อยต่อ
+        box.innerHTML = S.getSubcategories("", false).map(function (c) {
+          var hasKids = S.categoryHasChildren(c.key);
+          var n = S.productCountInCat(c.key);
           var visual = c.image
             ? '<span class="me-cat-ic"><img src="' + esc(c.image) + '" alt="" class="me-cat-img"></span>'
             : '<span class="me-cat-ic">' + U.iconSvg(c.icon || iconForCat(c.key), 40) + "</span>";
+          var href = (hasKids ? "categories.html?cat=" : "shop.html?cat=") + encodeURIComponent(c.key);
           return (
-            '<a class="me-cat" href="shop.html?cat=' + c.key + '">' +
+            '<a class="me-cat" href="' + href + '">' +
             visual +
             '<span class="me-cat-name">' + esc(c.label) + "</span>" +
-            '<span class="me-cat-count">' + n + " รายการ</span></a>"
+            '<span class="me-cat-count">' + n + " รายการ" + (hasKids ? " ›" : "") + "</span></a>"
           );
         }).join("");
       }
@@ -346,10 +370,13 @@
     });
 
     function render() {
+      // หมวดที่กรอง = หมวดที่เลือก + หมวดย่อยทุกชั้นใต้มัน (กดหมวดแม่เห็นสินค้าทั้งซับทรี)
+      var acceptCats = null;
+      if (state.cats.length) { acceptCats = {}; state.cats.forEach(function (k) { var d = S.catDescendants(k); for (var x in d) acceptCats[x] = 1; }); }
       var list = S.getProducts().filter(function (p) {
         if (p.hidden) return false;
         if (state.q) { var hay = (p.name + " " + p.brand + " " + p.sku + " " + S.categoryLabel(p.category)).toLowerCase(); if (hay.indexOf(state.q.toLowerCase()) < 0) return false; }
-        if (state.cats.length && state.cats.indexOf(p.category) < 0) return false;
+        if (acceptCats && !acceptCats[p.category]) return false;
         if (state.brands.length && state.brands.indexOf(p.brand) < 0) return false;
         if (state.mode === "buy" && !p.forSale) return false;
         if (state.mode === "rent" && !p.forRent) return false;
