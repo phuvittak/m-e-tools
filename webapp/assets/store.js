@@ -389,9 +389,17 @@
     if (m.auth && m.auth.currentUser) return Promise.resolve(m);
     return m.authMod.signInAnonymously(m.auth).then(function () { return m; }).catch(function () { return m; });
   }
-  // เตรียม doc สินค้า 1 ตัว — ตัด undefined + กันขนาดเกินลิมิต Firestore (~1MB)
+  // specs ภายในเก็บเป็น [["ป้าย","ค่า"], ...] (array ซ้อน array) ซึ่ง Firestore "เขียนไม่ได้"
+  // จึงต้องแปลงเป็น [{label,value}, ...] ก่อนทุกครั้งที่เขียนขึ้น cloud (per-product doc + อันรวม)
+  function specToObj(s) {
+    if (Array.isArray(s)) return { label: String(s[0] || ""), value: String(s[1] || "") };
+    if (s && typeof s === "object") return { label: String(s.label || s.k || ""), value: String(s.value || s.v || "") };
+    return { label: "", value: String(s || "") };
+  }
+  // เตรียม doc สินค้า 1 ตัว — ตัด undefined + แปลง specs ให้ Firestore รับได้ + กันขนาดเกินลิมิต (~1MB)
   function cleanProductDoc(p) {
     var clean = JSON.parse(JSON.stringify(p)); // ตัด undefined/ฟังก์ชัน
+    if (Array.isArray(clean.specs)) clean.specs = clean.specs.map(specToObj); // กัน nested array ที่ทำให้ setDoc ล้มเงียบ ๆ
     function size() { try { return JSON.stringify(clean).length; } catch (e) { return 0; } }
     if (size() > 950000 && clean.images && clean.images.length > 1) clean.images = [clean.images[0]];
     if (size() > 950000) { clean.images = []; clean.image = ""; } // รูปใหญ่เกิน — เก็บแค่ข้อความ
@@ -405,13 +413,7 @@
       var clean = {}, skip = { images: 1, image: 1, frames360: 1, parts: 1, partsBase: 1 };
       for (var k in p) if (Object.prototype.hasOwnProperty.call(p, k) && !skip[k]) clean[k] = p[k];
       clean.available = available(p);
-      if (Array.isArray(clean.specs)) {
-        clean.specs = clean.specs.map(function (s) {
-          if (Array.isArray(s)) return { label: String(s[0] || ""), value: String(s[1] || "") };
-          if (s && typeof s === "object") return { label: String(s.label || ""), value: String(s.value || "") };
-          return { label: "", value: String(s || "") };
-        });
-      }
+      if (Array.isArray(clean.specs)) clean.specs = clean.specs.map(specToObj);
       return clean;
     });
     return JSON.parse(JSON.stringify(items));
@@ -483,7 +485,18 @@
         if (data.nextPageToken) return page(data.nextPageToken);
       });
     }
-    return page(null).then(function () {
+    // สำรอง: ถ้า list สินค้าทีละ doc ไม่ได้ (เช่น Firestore rules ยังไม่อนุญาต list)
+    // หรือยังไม่มี per-product doc เลย — อ่านเอกสารรวม products/catalog (get เดี่ยว เปิดสาธารณะเสมอ)
+    // ได้รายการสินค้าครบ (แต่ไม่มีรูป) เพื่อไม่ให้หน้าร้านว่างเปล่า
+    function fallbackCatalog() {
+      if (out.length) return Promise.resolve();
+      return fetch(base + "/catalog").then(function (r) { return r.ok ? r.json() : null; }).then(function (doc) {
+        if (!doc || !doc.fields) return;
+        var items = unwrapFs(doc.fields.items) || [];
+        items.forEach(function (o) { if (o && o.id) out.push(o); });
+      }).catch(function () {});
+    }
+    return page(null).then(fallbackCatalog).then(function () {
       try { localStorage.setItem(KEY.cloudProducts, JSON.stringify(out)); } catch (e) {}
       dispatch();
       try { global.dispatchEvent(new CustomEvent("me-products-loaded")); } catch (e) {}
