@@ -366,18 +366,19 @@
     // flatten: paired (text + reply) → 2 bubbles, flat (role) → 1 bubble
     var bubbles = [];
     msgs.forEach(function (m) {
-      if (m.role === "user") bubbles.push({ side: "me", text: m.text, image: m.image });
-      else if (m.role === "admin") bubbles.push({ side: "shop", text: m.text, image: m.image, who: "ร้าน" });
+      if (m.role === "user") bubbles.push({ side: "me", text: m.text, image: m.image, video: m.video });
+      else if (m.role === "admin") bubbles.push({ side: "shop", text: m.text, image: m.image, video: m.video, who: "ร้าน" });
       else if (m.role === "bot") bubbles.push({ side: "bot", text: m.text });
       else {
-        if (m.text || m.image) bubbles.push({ side: "me", text: m.text, image: m.image });
+        if (m.text || m.image || m.video) bubbles.push({ side: "me", text: m.text, image: m.image, video: m.video });
         if (m.reply) bubbles.push({ side: "bot", text: m.reply });
       }
     });
     body.innerHTML = bubbles.map(function (b) {
-      var isPlaceholder = b.image && (b.text === "[ลูกค้าส่งรูป]" || b.text === "[รูปภาพ]");
+      var isPlaceholder = (b.image || b.video) && (b.text === "[ลูกค้าส่งรูป]" || b.text === "[รูปภาพ]");
       return '<div class="me-chat-msg ' + b.side + '">' +
         (b.who ? '<span class="chat-who">' + esc(b.who) + '</span>' : "") +
+        (b.video ? '<video src="' + esc(b.video) + '" controls preload="metadata" playsinline style="max-width:200px;max-height:220px;border-radius:8px;display:block"></video>' : "") +
         (b.image ? '<a href="' + esc(b.image) + '" target="_blank" rel="noopener"><img src="' + esc(b.image) + '" alt="รูป" style="max-width:170px;max-height:190px;border-radius:8px;display:block"></a>' : "") +
         (b.text && !isPlaceholder ? esc(b.text) : "") + '</div>';
     }).join("");

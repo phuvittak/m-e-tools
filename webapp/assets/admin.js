@@ -665,6 +665,7 @@
                 text: f.text || "",
                 reply: f.reply || "",
                 image: f.image || "",
+                video: f.video || "",
                 source: f.source || "line",
                 at: atStr
               };
@@ -867,9 +868,9 @@
       var bubbles = [];
       pairs.forEach(function (m) {
         if (m.role) {
-          bubbles.push({ side: m.role === "user" ? "left" : "right", role: m.role, text: m.text || "", image: m.image || "", at: m.at });
+          bubbles.push({ side: m.role === "user" ? "left" : "right", role: m.role, text: m.text || "", image: m.image || "", video: m.video || "", at: m.at });
         } else {
-          if (m.text || m.image) bubbles.push({ side: "left", role: "user", text: m.text || "", image: m.image || "", at: m.at });
+          if (m.text || m.image || m.video) bubbles.push({ side: "left", role: "user", text: m.text || "", image: m.image || "", video: m.video || "", at: m.at });
           if (m.reply) bubbles.push({ side: "right", role: "bot", text: m.reply, at: m.at });
         }
       });
@@ -887,7 +888,8 @@
         '<div class="thread-body">' +
           bubbles.map(function (b) {
             var bubbleClass = b.role === "bot" ? "bot" : b.side;
-            var inner = (b.image ? '<a href="' + esc(b.image) + '" target="_blank" rel="noopener"><img class="bubble-img" src="' + esc(b.image) + '" alt="รูป" loading="lazy"></a>' : "") +
+            var inner = (b.video ? '<video class="bubble-img" src="' + esc(b.video) + '" controls preload="metadata" playsinline></video>' : "") +
+              (b.image ? '<a href="' + esc(b.image) + '" target="_blank" rel="noopener"><img class="bubble-img" src="' + esc(b.image) + '" alt="รูป" loading="lazy"></a>' : "") +
               (b.text ? '<div>' + esc(b.text) + "</div>" : "");
             return '<div class="bubble-row ' + b.side + '">' +
               '<div class="bubble-col">' +
