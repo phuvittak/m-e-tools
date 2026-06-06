@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>กล่องข้อความออนไลน์ — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260605f">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260606a">
   <style>
     .botinbox-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px }
     .botinbox-kpi { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:14px 16px }
@@ -19,6 +19,8 @@
     .conv-tab { flex:1; padding:9px 8px; border:2px solid var(--ink); background:#fff; border-radius:8px; cursor:pointer; font-family:var(--font-body); font-weight:700; font-size:13px; color:var(--ink) }
     .conv-tab.on { background:var(--dw-yellow,#FEBD17) }
     .conv-row.reengaged { outline:2px solid var(--price-red,#D7261E); outline-offset:-2px }
+    .bubble-img { max-width:220px; max-height:240px; border-radius:8px; display:block; cursor:pointer }
+    .bubble.has-img { padding:4px }
     .conv-list { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; overflow:auto; max-height:70vh; padding:6px }
     .conv-section { margin-bottom:10px }
     .conv-section:last-child { margin-bottom:0 }
@@ -122,6 +124,7 @@
             <div class="thread-empty">เลือกบทสนทนาทางซ้ายเพื่อดูข้อความ</div>
           </div>
           <div class="reply-bar" data-reply-bar style="display:none">
+            <label class="reply-img-btn" title="ส่งรูป (เช่น QR Code)" style="padding:0 14px;display:flex;align-items:center;cursor:pointer;background:#fff;border:1px solid var(--ink,#0b0b0b);border-radius:8px;font-size:18px">📷<input type="file" accept="image/*" data-reply-img hidden></label>
             <textarea data-reply-input placeholder="พิมพ์ตอบลูกค้า… (Enter เพื่อส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"></textarea>
             <button data-reply-send type="button">ส่ง</button>
           </div>
@@ -129,9 +132,9 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260605f"></script>
-  <script src="../assets/store.js?v=20260605f"></script>
-  <script src="../assets/ui.js?v=20260605f"></script>
-  <script src="../assets/admin.js?v=20260605f"></script>
+  <script src="../assets/thai-geo.js?v=20260606a"></script>
+  <script src="../assets/store.js?v=20260606a"></script>
+  <script src="../assets/ui.js?v=20260606a"></script>
+  <script src="../assets/admin.js?v=20260606a"></script>
 </body>
 </html>

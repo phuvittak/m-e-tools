@@ -478,7 +478,7 @@
         if (!data) return;
         (data.documents || []).forEach(function (doc) {
           var id = (doc.name || "").split("/").pop();
-          if (id === "catalog" || /_reviews$/.test(id)) return; // ข้าม doc รวม + doc รีวิว
+          if (id === "catalog" || /_reviews$/.test(id) || /^chatimg-/.test(id)) return; // ข้าม doc รวม + รีวิว + รูปแชท
           var obj = {}, f = doc.fields || {};
           for (var k in f) obj[k] = unwrapFs(f[k]);
           if (!obj.id) obj.id = id;

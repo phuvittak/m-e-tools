@@ -476,7 +476,30 @@
     if (replyInput) replyInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); }
     });
+    var replyImg = document.querySelector("[data-reply-img]");
+    if (replyImg) replyImg.addEventListener("change", function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      e.target.value = "";
+      readImageFile(f, function (dataUrl) { sendImage(dataUrl); });
+    });
     load();
+
+    function sendImage(dataUrl) {
+      if (!state.activeUid || !dataUrl) return;
+      if (window.U && U.toast) U.toast("กำลังส่งรูป…", "ok");
+      var getToken = state.getIdToken ? state.getIdToken() : Promise.resolve("");
+      getToken.then(function (token) {
+        return fetch("/api/admin-reply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+          body: JSON.stringify({ userId: state.activeUid, image: dataUrl }),
+        });
+      }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (r) {
+          if (!r.ok) { if (window.U && U.toast) U.toast("ส่งรูปไม่สำเร็จ: " + (r.body.error || ""), "err"); return; }
+          if (window.U && U.toast) U.toast("ส่งรูปให้ลูกค้าแล้ว ✓", "ok");
+        }).catch(function () { if (window.U && U.toast) U.toast("ส่งรูปไม่สำเร็จ", "err"); });
+    }
 
     function sendReply() {
       if (!state.activeUid) return;
@@ -831,9 +854,9 @@
       var bubbles = [];
       pairs.forEach(function (m) {
         if (m.role) {
-          bubbles.push({ side: m.role === "user" ? "left" : "right", role: m.role, text: m.text || "", at: m.at });
+          bubbles.push({ side: m.role === "user" ? "left" : "right", role: m.role, text: m.text || "", image: m.image || "", at: m.at });
         } else {
-          if (m.text) bubbles.push({ side: "left", role: "user", text: m.text, at: m.at });
+          if (m.text || m.image) bubbles.push({ side: "left", role: "user", text: m.text || "", image: m.image || "", at: m.at });
           if (m.reply) bubbles.push({ side: "right", role: "bot", text: m.reply, at: m.at });
         }
       });
@@ -851,10 +874,12 @@
         '<div class="thread-body">' +
           bubbles.map(function (b) {
             var bubbleClass = b.role === "bot" ? "bot" : b.side;
+            var inner = (b.image ? '<a href="' + esc(b.image) + '" target="_blank" rel="noopener"><img class="bubble-img" src="' + esc(b.image) + '" alt="รูป" loading="lazy"></a>' : "") +
+              (b.text ? '<div>' + esc(b.text) + "</div>" : "");
             return '<div class="bubble-row ' + b.side + '">' +
               '<div class="bubble-col">' +
                 '<div class="bubble-role">' + esc(roleLabel[b.role] || "") + '</div>' +
-                '<div class="bubble ' + bubbleClass + '">' + esc(b.text) + '</div>' +
+                '<div class="bubble ' + bubbleClass + (b.image ? " has-img" : "") + '">' + inner + '</div>' +
                 '<div class="bubble-meta">' + fmtAbsolute(b.at) + '</div>' +
               '</div>' +
               '</div>';
