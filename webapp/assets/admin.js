@@ -841,6 +841,14 @@
     }
 
     function renderThread(uid) {
+      try { renderThreadInner(uid); }
+      catch (e) {
+        console.error("[renderThread]", e && e.message);
+        var box = document.querySelector("[data-thread]");
+        if (box) box.innerHTML = '<div class="thread-empty">แสดงบทสนทนาไม่สำเร็จ — ลองรีเฟรช</div>';
+      }
+    }
+    function renderThreadInner(uid) {
       var conv = state.byUser[uid];
       var box = document.querySelector("[data-thread]");
       var bar = document.querySelector("[data-reply-bar]");
