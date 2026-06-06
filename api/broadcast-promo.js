@@ -58,6 +58,18 @@ async function getPromo() {
     const pf = value && value.mapValue && value.mapValue.fields && value.mapValue.fields.promo;
     const f = pf && pf.mapValue && pf.mapValue.fields;
     if (!f) return null;
+    // links = array ของ {label,url}
+    const links = [];
+    const lf = f.links && f.links.arrayValue && f.links.arrayValue.values;
+    if (Array.isArray(lf)) {
+      lf.forEach((it) => {
+        const m = it && it.mapValue && it.mapValue.fields;
+        if (!m) return;
+        const label = (m.label && m.label.stringValue) || '';
+        const u = (m.url && m.url.stringValue) || '';
+        if (u) links.push({ label, url: u });
+      });
+    }
     return {
       enabled: !!(f.enabled && f.enabled.booleanValue),
       autoBroadcast: !!(f.autoBroadcast && f.autoBroadcast.booleanValue),
@@ -66,21 +78,35 @@ async function getPromo() {
       image: (f.image && f.image.stringValue) || '',
       startDate: (f.startDate && f.startDate.stringValue) || '',
       endDate: (f.endDate && f.endDate.stringValue) || '',
+      links,
+      dateText: (f.dateText && f.dateText.stringValue) || '',
+      conditions: (f.conditions && f.conditions.stringValue) || '',
     };
   } catch { return null; }
 }
-// แปลง promo → LINE messages (รูป + ข้อความ)
+// แปลง promo → LINE messages (รูปแบนเนอร์ + ข้อความหลายช่องทาง) — เลย์เอาต์ตามตัวอย่างที่เจ้าของต้องการ
+//   {title}
+//
+//   📌 {label} : {url}    (ทีละบรรทัด ตาม links)
+//
+//   👉 {dateText}
+//   *{conditions}
 function buildMessages(promo) {
   const messages = [];
   if (promo.image) {
     const u = `${SITE}/api/promo-image`;
     messages.push({ type: 'image', originalContentUrl: u, previewImageUrl: u });
   }
-  let text = '';
-  if (promo.title) text += '📣 ' + promo.title + '\n';
-  if (promo.text) text += promo.text + '\n';
-  text += '\n🛒 ดูสินค้า/โปรทั้งหมด: ' + SITE + '/shop.html';
-  messages.push({ type: 'text', text: text.trim().slice(0, 4900) });
+  const lines = [];
+  if (promo.title) lines.push(promo.title);
+  if (promo.text) lines.push(promo.text);
+  const linkLines = (promo.links || []).map((l) => '📌 ' + (l.label ? l.label + ' : ' : '') + l.url);
+  if (linkLines.length) { lines.push(''); linkLines.forEach((l) => lines.push(l)); }
+  if (promo.dateText) { lines.push(''); lines.push('👉 ' + promo.dateText); }
+  if (promo.conditions) lines.push('*' + promo.conditions);
+  // สำรอง: ถ้าไม่ได้ใส่ลิงก์ร้านเลย ใส่ลิงก์หน้าร้านให้
+  if (!linkLines.length) { lines.push(''); lines.push('🛒 ดูสินค้า/โปรทั้งหมด: ' + SITE + '/shop.html'); }
+  messages.push({ type: 'text', text: lines.join('\n').trim().slice(0, 4900) });
   return messages;
 }
 // ยิง broadcast เข้า LINE — ส่งหาเพื่อนทุกคนของ OA

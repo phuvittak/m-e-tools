@@ -229,7 +229,10 @@
     // hero promo banner (below hero). enabled=false → hidden
     // startDate/endDate = "YYYY-MM-DD" (ว่าง = ไม่จำกัด). โชว์เฉพาะช่วงวันที่กำหนด เช่น โปร 6.6
     // autoBroadcast=true → ส่งโปรหาเพื่อนทุกคน (LINE) อัตโนมัติเมื่อถึงวันเริ่ม
-    promo: { enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false },
+    // links = [{label,url}] ลิงก์ร้านหลายช่อง (Shopee/Lazada/TikTok ฯลฯ) แสดงในข้อความ broadcast + แบนเนอร์
+    // dateText = ช่วงวันที่โปร (เช่น "5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69"), conditions = หมายเหตุเงื่อนไข
+    promo: { enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false,
+             links: [], dateText: "", conditions: "" },
     // flash sale (below brands). endTime = epoch ms; items reference products
     flashSale: { enabled: false, title: "ลดพิเศษสุดคุ้ม", endTime: 0, items: [] },
     faq: [
