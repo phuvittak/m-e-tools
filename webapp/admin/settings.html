@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ตั้งค่าเว็บไซต์ — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260606m">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260606n">
 </head>
 <body data-admin="settings">
   <div class="admin" data-shell>
@@ -91,12 +91,12 @@
           </div>
           <p class="hint" style="margin:-2px 0 8px;color:#888;font-size:.85em">ถ้าตั้ง “วันที่โปรซ้ำ” ด้านบนแล้ว ช่องนี้ไม่ต้องกรอก · เว้นว่างทั้งหมด = แสดงตลอด</p>
           <div class="field"><label>รูปโปรโมชั่น (ใส่ได้หลายรูป — เลื่อนซ้าย-ขวาได้ทั้งบนเว็บและใน LINE)</label>
-            <div class="img-edit"><div class="img-preview" data-promo-prev></div>
-              <div class="img-edit-controls">
-                <label class="btn btn-ghost btn-sm filebtn">อัปโหลดรูป (เลือกหลายรูปได้)…<input type="file" accept="image/*" multiple data-promo-file></label>
-                <button type="button" class="btn btn-ghost btn-sm" data-promo-clear>ลบรูปทั้งหมด</button>
-              </div></div>
-            <p class="hint" style="margin:4px 0 0;color:#888;font-size:.85em">ใส่หลายรูปเพื่อให้ลูกค้าปัดดูทีละใบ (เช่น โปรแต่ละช่องทาง) · บน LINE จะส่งเป็นการ์ดเลื่อนได้สูงสุด 10 รูป</p>
+            <div class="promo-gallery" data-promo-prev></div>
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+              <label class="btn btn-ghost btn-sm filebtn">+ เพิ่มรูป (เลือกหลายรูปได้)…<input type="file" accept="image/*" multiple data-promo-file></label>
+              <button type="button" class="btn btn-ghost btn-sm" data-promo-clear>ลบรูปทั้งหมด</button>
+            </div>
+            <p class="hint" style="margin:6px 0 0;color:#888;font-size:.85em">เห็นรูปทั้งหมดที่มี · กด × บนรูปเพื่อลบทีละใบ · ลูกค้าจะปัดดูทีละใบ · บน LINE ส่งเป็นการ์ดเลื่อนได้สูงสุด 10 รูป</p>
           </div>
           <hr style="border:none;border-top:1px solid #eee;margin:14px 0">
           <label class="f-check" style="margin-bottom:6px"><input type="checkbox" data-promo-broadcast> 📣 ส่งโปรนี้หา <b>เพื่อนทุกคนใน LINE</b> อัตโนมัติเมื่อถึงวันเริ่มโปร</label>
@@ -171,9 +171,9 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260606m"></script>
-  <script src="../assets/store.js?v=20260606m"></script>
-  <script src="../assets/ui.js?v=20260606m"></script>
-  <script src="../assets/admin.js?v=20260606m"></script>
+  <script src="../assets/thai-geo.js?v=20260606n"></script>
+  <script src="../assets/store.js?v=20260606n"></script>
+  <script src="../assets/ui.js?v=20260606n"></script>
+  <script src="../assets/admin.js?v=20260606n"></script>
 </body>
 </html>
