@@ -823,6 +823,31 @@ async function pushHandoffToAdmin(customerUserId, customerText, token) {
 // ============================================================
 // log สนทนาลง Firestore
 // ============================================================
+// ดาวน์โหลดรูปที่ลูกค้าส่งมาทาง LINE → เก็บเป็น bot_message (image base64) ให้หลังร้านเห็น
+async function logCustomerImage(userId, messageId, lineToken) {
+  if (!userId || !messageId) return;
+  try {
+    const r = await fetch(`https://api-data.line.me/v2/bot/message/${messageId}/content`, {
+      headers: { Authorization: `Bearer ${lineToken}` },
+    });
+    if (!r.ok) { console.error('[img] LINE content fetch', r.status); return; }
+    const ct = r.headers.get('content-type') || 'image/jpeg';
+    const buf = Buffer.from(await r.arrayBuffer());
+    const dataUrl = `data:${ct};base64,${buf.toString('base64')}`;
+    const tooBig = dataUrl.length > 950000; // เกินลิมิต doc Firestore (~1MB)
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_messages`;
+    const fields = {
+      userId: { stringValue: String(userId).slice(0, 99) },
+      text: { stringValue: tooBig ? '[ลูกค้าส่งรูป (ใหญ่เกินแสดง)]' : '[ลูกค้าส่งรูป]' },
+      role: { stringValue: 'user' },
+      source: { stringValue: 'line' },
+      at: { timestampValue: new Date().toISOString() },
+    };
+    if (!tooBig) fields.image = { stringValue: dataUrl };
+    await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
+  } catch (e) { console.error('[img] store threw', e?.message); }
+}
+
 async function logBotMessage(userId, text, reply) {
   if (!userId) return;
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_messages`;
@@ -990,6 +1015,10 @@ export default async function handler(req, res) {
           // โหมด human — บอทเงียบ แต่ยัง log ข้อความลูกค้า
           await logBotMessage(userId, userText, '[human mode — bot silent]');
         }
+      }
+      // ลูกค้าส่งรูป → ดาวน์โหลดจาก LINE มาเก็บ ให้แอดมินเห็นในหลังร้าน
+      if (event.type === 'message' && event.message?.type === 'image') {
+        await logCustomerImage(event.source?.userId, event.message.id, token);
       }
     } catch (err) {
       console.error('[event] handler error:', err?.name, err?.message);

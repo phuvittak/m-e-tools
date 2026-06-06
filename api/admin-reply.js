@@ -82,19 +82,44 @@ export default async function handler(req, res) {
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const userId = String(body.userId || '').trim();
   const text = String(body.text || '').trim();
-  if (!userId || !text) { res.status(400).json({ error: 'missing-fields' }); return; }
+  const image = typeof body.image === 'string' ? body.image : '';
+  if (!userId || (!text && !image)) { res.status(400).json({ error: 'missing-fields' }); return; }
   if (text.length > 5000) { res.status(400).json({ error: 'text-too-long' }); return; }
+
+  const idToken = (req.headers['authorization'] || req.headers['Authorization'] || '').replace(/^Bearer\s+/i, '').trim();
+  const SITE = 'https://metoolsshop.vercel.app';
+
+  // ส่งรูป: เก็บรูปเป็น doc สาธารณะ products/chatimg-{id} (เขียนด้วย token แอดมิน → ผ่าน rule auth)
+  // แล้วได้ URL จริงสำหรับส่งเข้า LINE + ให้หลังร้านแสดงรูปผ่าน /api/product-image
+  let imageUrl = '';
+  if (image) {
+    if (!/^data:image\/[\w.+-]+;base64,/.test(image)) { res.status(400).json({ error: 'bad-image' }); return; }
+    const imgId = 'chatimg-' + Date.now().toString(36) + Math.floor(Math.random() * 1e4);
+    try {
+      const purl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/products/${imgId}`;
+      const wr = await fetch(purl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ fields: toFsFields({ image, chatImage: true, hidden: true, at: new Date() }) }),
+      });
+      if (!wr.ok) { const eb = await wr.text().catch(() => ''); console.error('[admin-reply] chatimg store', wr.status, eb.slice(0, 150)); res.status(500).json({ error: 'image-store-failed', status: wr.status }); return; }
+      imageUrl = `${SITE}/api/product-image?id=${imgId}`;
+    } catch (e) { res.status(500).json({ error: 'image-store-threw', message: e?.message }); return; }
+  }
 
   // 1) Push ไป LINE (เฉพาะลูกค้า LINE — ลูกค้าฝั่งเว็บจะอ่านจาก Firestore เอง)
   let linePushed = false;
   if (isLineUserId(userId)) {
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!token) { res.status(500).json({ error: 'no-line-token' }); return; }
+    const messages = [];
+    if (imageUrl) messages.push({ type: 'image', originalContentUrl: imageUrl, previewImageUrl: imageUrl });
+    if (text) messages.push({ type: 'text', text });
     try {
       const r = await fetch('https://api.line.me/v2/bot/message/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] }),
+        body: JSON.stringify({ to: userId, messages }),
       });
       if (!r.ok) {
         const errBody = await r.text().catch(() => '');
@@ -117,7 +142,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields: toFsFields({
-        userId, role: 'admin', text, source: 'admin', at: new Date(),
+        userId, role: 'admin', text: text || (imageUrl ? '[รูปภาพ]' : ''), image: imageUrl || '', source: 'admin', at: new Date(),
       }) }),
     });
   } catch (e) {
