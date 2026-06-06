@@ -231,8 +231,9 @@
     // autoBroadcast=true → ส่งโปรหาเพื่อนทุกคน (LINE) อัตโนมัติเมื่อถึงวันเริ่ม
     // links = [{label,url}] ลิงก์ร้านหลายช่อง (Shopee/Lazada/TikTok ฯลฯ) แสดงในข้อความ broadcast + แบนเนอร์
     // dateText = ช่วงวันที่โปร (เช่น "5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69"), conditions = หมายเหตุเงื่อนไข
+    // anchorDate = วันที่โปรซ้ำ (วัน=เดือน เช่น 2026-06-06) · spanDays = เริ่มก่อน/จบหลังกี่วัน (เริ่ม 3)
     promo: { enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false,
-             links: [], dateText: "", conditions: "" },
+             links: [], dateText: "", conditions: "", anchorDate: "", spanDays: 3 },
     // flash sale (below brands). endTime = epoch ms; items reference products
     flashSale: { enabled: false, title: "ลดพิเศษสุดคุ้ม", endTime: 0, items: [] },
     faq: [
@@ -1278,15 +1279,32 @@
     write(KEY.settings, Object.assign(s, patch));
     dispatch();
   }
-  /* ---------- Promo title tokens (เปลี่ยนหัวข้อตามวันที่เอง) -------- */
-  // ใช้ในหัวข้อ/รายละเอียดโปร: {dd} = เลขโปรซ้ำจากวันเริ่ม เช่น 6.6 / 11.11
-  //                            {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
-  // ฐานวันที่ = วันเริ่มโปร (ถ้าไม่ตั้ง ใช้วันนี้) → เจ้าของไม่ต้องแก้หัวข้อเอง
+  /* ---------- Promo: double-date + title tokens ------------------- */
+  // โปรวันที่ซ้ำ (เช่น 6.6, 8.8): เจ้าของตั้ง "วันที่โปรซ้ำ" (anchorDate, วัน=เดือน) ครั้งเดียว
+  //   ระบบคำนวณช่วงเอง: เริ่มก่อน spanDays วัน, จบหลัง spanDays วัน (ค่าเริ่ม 3)
+  //   {dd}   = เลขโปรซ้ำจากวันที่ซ้ำ เช่น 6.6 / 8.8 / 11.11
+  //   {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
   var THAI_MON_ABBR = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+  function isYmd(s) { return s && /^\d{4}-\d{2}-\d{2}$/.test(s); }
+  // บวก/ลบวันจากสตริง YYYY-MM-DD (UTC-safe) → คืน YYYY-MM-DD
+  function addDaysStr(ymd, n) {
+    var p = ymd.split("-"), dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    dt.setUTCDate(dt.getUTCDate() + n);
+    return dt.getUTCFullYear() + "-" + String(dt.getUTCMonth() + 1).padStart(2, "0") + "-" + String(dt.getUTCDate()).padStart(2, "0");
+  }
+  // วันฐานสำหรับ token = วันที่โปรซ้ำ (anchor) ถ้ามี, ไม่งั้นวันเริ่ม, ไม่งั้นวันนี้
   function promoBaseDate(promo) {
-    var s = promo && promo.startDate;
-    if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) { var p = s.split("-"); return { y: +p[0], m: +p[1], d: +p[2] }; }
+    var s = (promo && promo.anchorDate) || (promo && promo.startDate);
+    if (isYmd(s)) { var p = s.split("-"); return { y: +p[0], m: +p[1], d: +p[2] }; }
     var n = new Date(); return { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() };
+  }
+  // ช่วงโปรที่ใช้จริง: ถ้าตั้ง anchorDate → [anchor-span, anchor+span]; ไม่งั้นใช้ start/end ที่ตั้งมือ
+  function promoWindow(promo) {
+    var span = (promo && promo.spanDays != null && promo.spanDays !== "") ? +promo.spanDays : 3;
+    if (promo && isYmd(promo.anchorDate)) {
+      return { start: addDaysStr(promo.anchorDate, -span), end: addDaysStr(promo.anchorDate, span) };
+    }
+    return { start: (promo && promo.startDate) || "", end: (promo && promo.endDate) || "" };
   }
   function fillPromoTokens(str, promo) {
     if (!str) return str || "";
@@ -1573,7 +1591,7 @@
     provinces: provinces, districtsOf: districtsOf, subdistrictsOf: subdistrictsOf, zipsOf: zipsOf,
     setGeoData: setGeoData,
     getShipRates: getShipRates, getShippingFee: getShippingFee, setShipRate: setShipRate,
-    getSettings: getSettings, saveSettings: saveSettings, fillPromoTokens: fillPromoTokens, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
+    getSettings: getSettings, saveSettings: saveSettings, fillPromoTokens: fillPromoTokens, promoWindow: promoWindow, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
     registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loginGoogleCloud: loginGoogleCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
     cloudLoadAdminData: cloudLoadAdminData, cloudPushAdminData: cloudPushAdminData,

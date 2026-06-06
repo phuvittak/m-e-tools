@@ -1553,8 +1553,9 @@
   }
   function promoInWindow(promo) {
     var t = todayStr();
-    if (promo.startDate && t < promo.startDate) return false; // ยังไม่ถึงวันเริ่ม
-    if (promo.endDate && t > promo.endDate) return false;     // เลยวันสิ้นสุดแล้ว
+    var w = S.promoWindow ? S.promoWindow(promo) : { start: promo.startDate, end: promo.endDate };
+    if (w.start && t < w.start) return false; // ยังไม่ถึงวันเริ่ม
+    if (w.end && t > w.end) return false;     // เลยวันสิ้นสุดแล้ว
     return true;
   }
   function renderPromo(promo) {

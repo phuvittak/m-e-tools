@@ -1982,17 +1982,35 @@
       var promoEnd = root.querySelector("[data-promo-end]");
       if (promoStart) promoStart.value = promo.startDate || "";
       if (promoEnd) promoEnd.value = promo.endDate || "";
-      // ตัวอย่างหัวข้อหลังเติม token {dd}/{date} ตามวันเริ่ม — อัปเดตสดเมื่อพิมพ์/เปลี่ยนวันที่
-      var titlePrev = root.querySelector("[data-promo-titleprev]");
-      var updTitlePrev = function () {
-        if (!titlePrev || !S.fillPromoTokens) return;
-        var raw = promoTitle.value || "";
-        if (!/\{dd\}|\{date\}/.test(raw)) { titlePrev.textContent = ""; return; }
-        titlePrev.textContent = " → ตัวอย่าง: “" + S.fillPromoTokens(raw, { startDate: (promoStart && promoStart.value) || "" }) + "”";
+      var promoAnchor = root.querySelector("[data-promo-anchor]");
+      var promoSpan = root.querySelector("[data-promo-span]");
+      if (promoAnchor) promoAnchor.value = promo.anchorDate || "";
+      if (promoSpan) promoSpan.value = (promo.spanDays != null && promo.spanDays !== "") ? promo.spanDays : 3;
+      // อ็อบเจกต์โปรปัจจุบันจากค่าในฟอร์ม (ไว้คำนวณ token/ช่วงวันแบบสด)
+      var curPromo = function () {
+        return { title: promoTitle.value, anchorDate: (promoAnchor && promoAnchor.value) || "", spanDays: (promoSpan && promoSpan.value) || "", startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "" };
       };
-      promoTitle.addEventListener("input", updTitlePrev);
-      if (promoStart) promoStart.addEventListener("change", updTitlePrev);
-      updTitlePrev();
+      // ตัวอย่างหัวข้อหลังเติม token {dd}/{date} — อัปเดตสดเมื่อพิมพ์/เปลี่ยนวันที่
+      var titlePrev = root.querySelector("[data-promo-titleprev]");
+      var winPrev = root.querySelector("[data-promo-windowprev]");
+      var THMON = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+      var thDate = function (ymd) { if (!ymd) return ""; var p = ymd.split("-"); return (+p[2]) + " " + THMON[(+p[1]) - 1]; };
+      var updPromoPrev = function () {
+        var p = curPromo();
+        if (titlePrev && S.fillPromoTokens) {
+          if (!/\{dd\}|\{date\}/.test(p.title || "")) titlePrev.textContent = "";
+          else titlePrev.textContent = " → ตัวอย่าง: “" + S.fillPromoTokens(p.title, p) + "”";
+        }
+        if (winPrev && S.promoWindow) {
+          var w = S.promoWindow(p);
+          winPrev.textContent = (p.anchorDate && w.start && w.end) ? (" → โปรจะแสดง " + thDate(w.start) + " – " + thDate(w.end)) : "";
+        }
+      };
+      promoTitle.addEventListener("input", updPromoPrev);
+      if (promoStart) promoStart.addEventListener("change", updPromoPrev);
+      if (promoAnchor) promoAnchor.addEventListener("change", updPromoPrev);
+      if (promoSpan) promoSpan.addEventListener("input", updPromoPrev);
+      updPromoPrev();
       var promoDateText = root.querySelector("[data-promo-datetext]");
       var promoConditions = root.querySelector("[data-promo-conditions]");
       if (promoDateText) promoDateText.value = promo.dateText || "";
@@ -2089,7 +2107,7 @@
       patch.faq = faq.filter(function (f) { return (f.q || "").trim(); });
       patch.qrImage = pendingQR;
       patch.brands = brands.filter(function (b) { return (b.name || "").trim(); });
-      if (promoEnabled) { syncPLinks(); patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image, startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "", autoBroadcast: !!(root.querySelector("[data-promo-broadcast]") && root.querySelector("[data-promo-broadcast]").checked), links: plinks.filter(function (l) { return (l.url || "").trim(); }), dateText: (promoDateText && promoDateText.value) || "", conditions: (promoConditions && promoConditions.value) || "" }; }
+      if (promoEnabled) { syncPLinks(); patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image, startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "", autoBroadcast: !!(root.querySelector("[data-promo-broadcast]") && root.querySelector("[data-promo-broadcast]").checked), links: plinks.filter(function (l) { return (l.url || "").trim(); }), dateText: (promoDateText && promoDateText.value) || "", conditions: (promoConditions && promoConditions.value) || "", anchorDate: (promoAnchor && promoAnchor.value) || "", spanDays: (promoSpan && promoSpan.value !== "") ? Math.max(0, parseInt(promoSpan.value, 10) || 0) : 3 }; }
       if (flashEnabled) {
         var endStr = root.querySelector("[data-flash-end]").value;
         patch.flashSale = { enabled: flashEnabled.checked, title: root.querySelector("[data-flash-title]").value, endTime: endStr ? new Date(endStr).getTime() : 0, items: flash.items.filter(function (x) { return x.productId; }) };
