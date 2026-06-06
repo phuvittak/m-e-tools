@@ -4,7 +4,7 @@
   "installCommand": "",
   "outputDirectory": "webapp",
   "crons": [
-    { "path": "/api/broadcast-promo", "schedule": "0 2 * * *" }
+    { "path": "/api/broadcast-promo", "schedule": "0 13 * * *" }
   ],
   "headers": [
     {

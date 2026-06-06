@@ -231,10 +231,10 @@
     // autoBroadcast=true → ส่งโปรหาเพื่อนทุกคน (LINE) อัตโนมัติเมื่อถึงวันเริ่ม
     // links = [{label,url}] ลิงก์ร้านหลายช่อง (Shopee/Lazada/TikTok ฯลฯ) แสดงในข้อความ broadcast + แบนเนอร์
     // dateText = ช่วงวันที่โปร (เช่น "5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69"), conditions = หมายเหตุเงื่อนไข
-    // anchorDate = วันที่โปรซ้ำ (วัน=เดือน เช่น 2026-06-06) · spanDays = เริ่มก่อน/จบหลังกี่วัน (เริ่ม 3)
-    // recurring = ทำซ้ำเองทุกเดือน (1.1, 2.2, …, 12.12) โดยไม่ต้องตั้ง anchor
+    // anchorDate = วันที่โปรซ้ำ (วัน=เดือน เช่น 2026-06-06) · beforeDays/afterDays = เริ่มก่อน/จบหลังกี่วัน (เริ่ม 1/2)
+    // recurring = ทำซ้ำเองทุกเดือน (1.1, 2.2, …, 12.12) · โปรเริ่ม 2 ทุ่มของวันเริ่ม · dateText ว่าง = สร้างช่วงวันอัตโนมัติ
     promo: { enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false,
-             links: [], dateText: "", conditions: "", anchorDate: "", spanDays: 3, recurring: false },
+             links: [], dateText: "", conditions: "", anchorDate: "", beforeDays: 1, afterDays: 2, recurring: false },
     // flash sale (below brands). endTime = epoch ms; items reference products
     flashSale: { enabled: false, title: "ลดพิเศษสุดคุ้ม", endTime: 0, items: [] },
     faq: [
@@ -1284,9 +1284,10 @@
   // โปรวันที่ซ้ำ (เช่น 6.6, 8.8):
   //   recurring=true → ทำซ้ำเองทุกเดือน (1.1, 2.2, …, 12.12) ไม่ต้องตั้ง anchor
   //   ไม่งั้น เจ้าของตั้ง "วันที่โปรซ้ำ" (anchorDate, วัน=เดือน) ครั้งเดียว
-  //   ทั้งคู่: เริ่มก่อน spanDays วัน, จบหลัง spanDays วัน (ค่าเริ่ม 3)
+  //   ทั้งคู่: เริ่มก่อน beforeDays วัน (เริ่ม 2 ทุ่มของวันนั้น), จบหลัง afterDays วัน (ค่าเริ่ม 1/2)
   //   {dd}   = เลขโปรซ้ำ เช่น 6.6 / 8.8 / 11.11   ·   {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
   var THAI_MON_ABBR = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+  var PROMO_START_HOUR = 20; // โปรเริ่ม 2 ทุ่ม (20:00) ของวันเริ่ม
   function isYmd(s) { return s && /^\d{4}-\d{2}-\d{2}$/.test(s); }
   function pad2(n) { return String(n).padStart(2, "0"); }
   function localToday() { var n = new Date(); return n.getFullYear() + "-" + pad2(n.getMonth() + 1) + "-" + pad2(n.getDate()); }
@@ -1296,19 +1297,22 @@
     dt.setUTCDate(dt.getUTCDate() + n);
     return dt.getUTCFullYear() + "-" + pad2(dt.getUTCMonth() + 1) + "-" + pad2(dt.getUTCDate());
   }
-  function promoSpan(promo) { return (promo && promo.spanDays != null && promo.spanDays !== "") ? +promo.spanDays : 3; }
+  // Date (เวลาท้องถิ่น) จาก YYYY-MM-DD + ชั่วโมง
+  function dateAt(ymd, h, mi, se) { var p = ymd.split("-"); return new Date(+p[0], +p[1] - 1, +p[2], h || 0, mi || 0, se || 0); }
+  function promoBefore(promo) { return (promo && promo.beforeDays != null && promo.beforeDays !== "") ? +promo.beforeDays : 1; }
+  function promoAfter(promo) { return (promo && promo.afterDays != null && promo.afterDays !== "") ? +promo.afterDays : 2; }
   // โหมดทำซ้ำ: หา double-date (วัน=เดือน) ที่ "วันนี้อยู่ในช่วง"; ถ้าไม่มี คืนอันถัดไปที่จะมาถึง
   // ครอบ 3 ปี (ก่อน/นี้/หน้า) เผื่อช่วงคาบเกี่ยวปลายปี–ต้นปี
   function activeDouble(promo, today) {
     today = today || localToday();
-    var span = promoSpan(promo), ty = +today.slice(0, 4), anchors = [], y, m;
+    var before = promoBefore(promo), after = promoAfter(promo), ty = +today.slice(0, 4), anchors = [], y, m;
     for (y = ty - 1; y <= ty + 1; y++) for (m = 1; m <= 12; m++) anchors.push(y + "-" + pad2(m) + "-" + pad2(m));
     for (var i = 0; i < anchors.length; i++) {
-      var a = anchors[i], s = addDaysStr(a, -span), e = addDaysStr(a, span);
+      var a = anchors[i], s = addDaysStr(a, -before), e = addDaysStr(a, after);
       if (today >= s && today <= e) return { anchor: a, start: s, end: e, active: true };
     }
     var up = anchors.filter(function (a) { return a >= today; }).sort()[0] || anchors[anchors.length - 1];
-    return { anchor: up, start: addDaysStr(up, -span), end: addDaysStr(up, span), active: false };
+    return { anchor: up, start: addDaysStr(up, -before), end: addDaysStr(up, after), active: false };
   }
   // วันฐานสำหรับ token = วันที่ซ้ำของรอบที่ active/ถัดไป (recurring) → anchor → วันเริ่ม → วันนี้
   function promoBaseDate(promo) {
@@ -1317,15 +1321,26 @@
     if (isYmd(s)) { var p = s.split("-"); return { y: +p[0], m: +p[1], d: +p[2] }; }
     var n = new Date(); return { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() };
   }
-  // ช่วงโปรที่ใช้จริง: recurring → ช่วงของ double-date รอบปัจจุบัน/ถัดไป;
-  //   ไม่งั้น anchorDate → [anchor±span]; ไม่งั้นใช้ start/end ที่ตั้งมือ
+  // ช่วงโปรที่ใช้จริง (วันที่): recurring → ช่วง double-date รอบปัจจุบัน/ถัดไป;
+  //   anchorDate → [anchor-before, anchor+after]; ไม่งั้นใช้ start/end ที่ตั้งมือ
+  //   anchored=true ถ้ามาจากโหมดวันที่ซ้ำ (ใช้เวลาเริ่ม 2 ทุ่ม)
   function promoWindow(promo) {
-    if (promo && promo.recurring) { var d = activeDouble(promo); return { start: d.start, end: d.end }; }
+    if (promo && promo.recurring) { var d = activeDouble(promo); return { start: d.start, end: d.end, anchored: true }; }
     if (promo && isYmd(promo.anchorDate)) {
-      var span = promoSpan(promo);
-      return { start: addDaysStr(promo.anchorDate, -span), end: addDaysStr(promo.anchorDate, span) };
+      return { start: addDaysStr(promo.anchorDate, -promoBefore(promo)), end: addDaysStr(promo.anchorDate, promoAfter(promo)), anchored: true };
     }
-    return { start: (promo && promo.startDate) || "", end: (promo && promo.endDate) || "" };
+    return { start: (promo && promo.startDate) || "", end: (promo && promo.endDate) || "", anchored: false };
+  }
+  // โปรกำลังแสดงอยู่ไหม ณ ตอนนี้ — เคารพเวลาเริ่ม 2 ทุ่มของวันเริ่ม (โหมดวันที่ซ้ำ)
+  function promoActiveNow(promo, now) {
+    now = now || new Date();
+    var w = promoWindow(promo);
+    if (!w.start && !w.end) return true; // ไม่กำหนดช่วง = แสดงตลอด
+    var startM = w.start ? dateAt(w.start, w.anchored ? PROMO_START_HOUR : 0) : null;
+    var endM = w.end ? dateAt(w.end, 23, 59, 59) : null;
+    if (startM && now < startM) return false;
+    if (endM && now > endM) return false;
+    return true;
   }
   function fillPromoTokens(str, promo) {
     if (!str) return str || "";
@@ -1333,6 +1348,18 @@
     return String(str)
       .replace(/\{dd\}/g, b.m + "." + b.d)
       .replace(/\{date\}/g, b.d + " " + THAI_MON_ABBR[b.m - 1]);
+  }
+  // ช่วงวันที่โปร (สำหรับโชว์ในข้อความ 👉) — ถ้าเจ้าของพิมพ์เองใช้ของเขา, ไม่งั้นสร้างอัตโนมัติ
+  //   รูปแบบ: "5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69" (ปี พ.ศ. 2 หลัก, ใส่ '(2 ทุ่ม)' เฉพาะวันเริ่มโหมดวันที่ซ้ำ)
+  function promoDateText(promo) {
+    if (promo && promo.dateText) return fillPromoTokens(promo.dateText, promo);
+    var w = promoWindow(promo);
+    if (!w.start || !w.end) return "";
+    var sp = w.start.split("-"), ep = w.end.split("-");
+    var beYY = pad2((+ep[0] + 543) % 100);
+    var startTxt = (+sp[2]) + " " + THAI_MON_ABBR[+sp[1] - 1] + (w.anchored ? " (2 ทุ่ม)" : "");
+    var endTxt = (+ep[2]) + " " + THAI_MON_ABBR[+ep[1] - 1] + " " + beYY;
+    return startTxt + " – " + endTxt;
   }
   // Firebase config used by the chat: per-browser override (back office) wins,
   // else the committed FIREBASE_CONFIG (shared by every visitor → real online chat).
@@ -1612,7 +1639,7 @@
     provinces: provinces, districtsOf: districtsOf, subdistrictsOf: subdistrictsOf, zipsOf: zipsOf,
     setGeoData: setGeoData,
     getShipRates: getShipRates, getShippingFee: getShippingFee, setShipRate: setShipRate,
-    getSettings: getSettings, saveSettings: saveSettings, fillPromoTokens: fillPromoTokens, promoWindow: promoWindow, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
+    getSettings: getSettings, saveSettings: saveSettings, fillPromoTokens: fillPromoTokens, promoWindow: promoWindow, promoActiveNow: promoActiveNow, promoDateText: promoDateText, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
     registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loginGoogleCloud: loginGoogleCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
     cloudLoadAdminData: cloudLoadAdminData, cloudPushAdminData: cloudPushAdminData,

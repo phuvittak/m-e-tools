@@ -1983,21 +1983,22 @@
       if (promoStart) promoStart.value = promo.startDate || "";
       if (promoEnd) promoEnd.value = promo.endDate || "";
       var promoAnchor = root.querySelector("[data-promo-anchor]");
-      var promoSpan = root.querySelector("[data-promo-span]");
+      var promoBefore = root.querySelector("[data-promo-before]");
+      var promoAfter = root.querySelector("[data-promo-after]");
       var promoRecurring = root.querySelector("[data-promo-recurring]");
       var promoAnchorWrap = root.querySelector("[data-promo-anchor-wrap]");
       if (promoAnchor) promoAnchor.value = promo.anchorDate || "";
-      if (promoSpan) promoSpan.value = (promo.spanDays != null && promo.spanDays !== "") ? promo.spanDays : 3;
+      if (promoBefore) promoBefore.value = (promo.beforeDays != null && promo.beforeDays !== "") ? promo.beforeDays : 1;
+      if (promoAfter) promoAfter.value = (promo.afterDays != null && promo.afterDays !== "") ? promo.afterDays : 2;
       if (promoRecurring) promoRecurring.checked = !!promo.recurring;
       // อ็อบเจกต์โปรปัจจุบันจากค่าในฟอร์ม (ไว้คำนวณ token/ช่วงวันแบบสด)
       var curPromo = function () {
-        return { title: promoTitle.value, recurring: !!(promoRecurring && promoRecurring.checked), anchorDate: (promoAnchor && promoAnchor.value) || "", spanDays: (promoSpan && promoSpan.value) || "", startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "" };
+        var dtEl = root.querySelector("[data-promo-datetext]");
+        return { title: promoTitle.value, recurring: !!(promoRecurring && promoRecurring.checked), anchorDate: (promoAnchor && promoAnchor.value) || "", beforeDays: (promoBefore && promoBefore.value) || "", afterDays: (promoAfter && promoAfter.value) || "", startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "", dateText: (dtEl && dtEl.value) || "" };
       };
-      // ตัวอย่างหัวข้อหลังเติม token {dd}/{date} — อัปเดตสดเมื่อพิมพ์/เปลี่ยนวันที่
+      // ตัวอย่างหัวข้อหลังเติม token + ช่วงวันที่อัตโนมัติ — อัปเดตสดเมื่อพิมพ์/เปลี่ยนวันที่
       var titlePrev = root.querySelector("[data-promo-titleprev]");
       var winPrev = root.querySelector("[data-promo-windowprev]");
-      var THMON = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-      var thDate = function (ymd) { if (!ymd) return ""; var p = ymd.split("-"); return (+p[2]) + " " + THMON[(+p[1]) - 1]; };
       var updPromoPrev = function () {
         var p = curPromo();
         // โหมดทำซ้ำ: ซ่อนช่องวันที่โปรซ้ำ (ไม่ต้องเลือก)
@@ -2006,17 +2007,16 @@
           if (!/\{dd\}|\{date\}/.test(p.title || "")) titlePrev.textContent = "";
           else titlePrev.textContent = " → ตัวอย่าง: “" + S.fillPromoTokens(p.title, p) + "”";
         }
-        if (winPrev && S.promoWindow) {
-          var w = S.promoWindow(p);
-          if ((p.recurring || p.anchorDate) && w.start && w.end) {
-            winPrev.textContent = (p.recurring ? " → รอบถัดไป: " : " → โปรจะแสดง ") + thDate(w.start) + " – " + thDate(w.end);
-          } else winPrev.textContent = "";
+        if (winPrev && S.promoDateText) {
+          var dt = S.promoDateText(p);
+          winPrev.textContent = (dt && (p.recurring || p.anchorDate)) ? ((p.recurring ? " → รอบถัดไป: " : " → ช่วงโปร: ") + dt) : "";
         }
       };
       promoTitle.addEventListener("input", updPromoPrev);
       if (promoStart) promoStart.addEventListener("change", updPromoPrev);
       if (promoAnchor) promoAnchor.addEventListener("change", updPromoPrev);
-      if (promoSpan) promoSpan.addEventListener("input", updPromoPrev);
+      if (promoBefore) promoBefore.addEventListener("input", updPromoPrev);
+      if (promoAfter) promoAfter.addEventListener("input", updPromoPrev);
       if (promoRecurring) promoRecurring.addEventListener("change", updPromoPrev);
       updPromoPrev();
       var promoDateText = root.querySelector("[data-promo-datetext]");
@@ -2115,7 +2115,7 @@
       patch.faq = faq.filter(function (f) { return (f.q || "").trim(); });
       patch.qrImage = pendingQR;
       patch.brands = brands.filter(function (b) { return (b.name || "").trim(); });
-      if (promoEnabled) { syncPLinks(); patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image, startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "", autoBroadcast: !!(root.querySelector("[data-promo-broadcast]") && root.querySelector("[data-promo-broadcast]").checked), links: plinks.filter(function (l) { return (l.url || "").trim(); }), dateText: (promoDateText && promoDateText.value) || "", conditions: (promoConditions && promoConditions.value) || "", anchorDate: (promoAnchor && promoAnchor.value) || "", spanDays: (promoSpan && promoSpan.value !== "") ? Math.max(0, parseInt(promoSpan.value, 10) || 0) : 3, recurring: !!(promoRecurring && promoRecurring.checked) }; }
+      if (promoEnabled) { syncPLinks(); patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image, startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "", autoBroadcast: !!(root.querySelector("[data-promo-broadcast]") && root.querySelector("[data-promo-broadcast]").checked), links: plinks.filter(function (l) { return (l.url || "").trim(); }), dateText: (promoDateText && promoDateText.value) || "", conditions: (promoConditions && promoConditions.value) || "", anchorDate: (promoAnchor && promoAnchor.value) || "", beforeDays: (promoBefore && promoBefore.value !== "") ? Math.max(0, parseInt(promoBefore.value, 10) || 0) : 1, afterDays: (promoAfter && promoAfter.value !== "") ? Math.max(0, parseInt(promoAfter.value, 10) || 0) : 2, recurring: !!(promoRecurring && promoRecurring.checked) }; }
       if (flashEnabled) {
         var endStr = root.querySelector("[data-flash-end]").value;
         patch.flashSale = { enabled: flashEnabled.checked, title: root.querySelector("[data-flash-title]").value, endTime: endStr ? new Date(endStr).getTime() : 0, items: flash.items.filter(function (x) { return x.productId; }) };
