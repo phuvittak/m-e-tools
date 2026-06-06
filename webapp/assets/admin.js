@@ -1971,7 +1971,7 @@
     if (catList) { renderCats(); var catAddBtn = root.querySelector("[data-cat-add]"); if (catAddBtn) catAddBtn.addEventListener("click", function () { syncCats(); cats.push({ key: "c" + Date.now().toString(36), label: "", icon: "tool", image: "", hidden: false, parent: "" }); renderCats(); }); }
 
     // ----- Promo banner -----
-    var promo = Object.assign({ enabled: false, title: "", text: "", image: "", startDate: "", endDate: "" }, st.promo || {});
+    var promo = Object.assign({ enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false }, st.promo || {});
     var promoEnabled = root.querySelector("[data-promo-enabled]");
     if (promoEnabled) {
       promoEnabled.checked = !!promo.enabled;
@@ -1981,11 +1981,29 @@
       var promoEnd = root.querySelector("[data-promo-end]");
       if (promoStart) promoStart.value = promo.startDate || "";
       if (promoEnd) promoEnd.value = promo.endDate || "";
+      var promoBroadcast = root.querySelector("[data-promo-broadcast]");
+      if (promoBroadcast) promoBroadcast.checked = !!promo.autoBroadcast;
       var promoPrev = root.querySelector("[data-promo-prev]");
       var drawPromo = function () { promoPrev.innerHTML = promo.image ? '<img src="' + promo.image + '">' : '<span class="img-hint">ไม่มีรูป</span>'; };
       drawPromo();
       root.querySelector("[data-promo-file]").addEventListener("change", function (e) { var f = e.target.files && e.target.files[0]; if (!f) return; readImageFile(f, function (d) { promo.image = d; drawPromo(); }); });
       root.querySelector("[data-promo-clear]").addEventListener("click", function () { promo.image = ""; drawPromo(); });
+      // ส่งโปรหาเพื่อนทุกคน (LINE) ทันที — ต้องบันทึกตั้งค่าก่อน เพื่อให้ API อ่าน promo ล่าสุด
+      var sendNow = root.querySelector("[data-promo-sendnow]");
+      var sendStatus = root.querySelector("[data-promo-sendstatus]");
+      if (sendNow) sendNow.addEventListener("click", function () {
+        if (sendStatus) sendStatus.textContent = "กำลังส่ง… (บันทึกตั้งค่าก่อนถ้าเพิ่งแก้)";
+        sendNow.disabled = true;
+        var tokP = S.adminIdToken ? S.adminIdToken() : Promise.resolve("");
+        tokP.then(function (token) {
+          return fetch("/api/broadcast-promo", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token }, body: "{}" });
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+          .then(function (r) {
+            sendNow.disabled = false;
+            if (r.ok) { if (sendStatus) sendStatus.textContent = "ส่งหาเพื่อนทุกคนแล้ว ✓"; if (window.U && U.toast) U.toast("ส่งโปรหาเพื่อนทุกคนใน LINE แล้ว ✓", "ok"); }
+            else { var msg = r.body.error === "promo-disabled" ? "เปิดใช้งานแบนเนอร์โปร + บันทึกก่อนส่ง" : (r.body.error === "not-admin" ? "ยังไม่ใช่ admin" : "ส่งไม่สำเร็จ: " + (r.body.error || "")); if (sendStatus) sendStatus.textContent = msg; if (window.U && U.toast) U.toast(msg, "err"); }
+          }).catch(function () { sendNow.disabled = false; if (sendStatus) sendStatus.textContent = "ส่งไม่สำเร็จ"; });
+      });
     }
 
     // ----- Flash sale -----
@@ -2031,7 +2049,7 @@
       patch.faq = faq.filter(function (f) { return (f.q || "").trim(); });
       patch.qrImage = pendingQR;
       patch.brands = brands.filter(function (b) { return (b.name || "").trim(); });
-      if (promoEnabled) patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image, startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "" };
+      if (promoEnabled) patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image, startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "", autoBroadcast: !!(root.querySelector("[data-promo-broadcast]") && root.querySelector("[data-promo-broadcast]").checked) };
       if (flashEnabled) {
         var endStr = root.querySelector("[data-flash-end]").value;
         patch.flashSale = { enabled: flashEnabled.checked, title: root.querySelector("[data-flash-title]").value, endTime: endStr ? new Date(endStr).getTime() : 0, items: flash.items.filter(function (x) { return x.productId; }) };

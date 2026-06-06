@@ -228,7 +228,8 @@
     ],
     // hero promo banner (below hero). enabled=false → hidden
     // startDate/endDate = "YYYY-MM-DD" (ว่าง = ไม่จำกัด). โชว์เฉพาะช่วงวันที่กำหนด เช่น โปร 6.6
-    promo: { enabled: false, title: "", text: "", image: "", startDate: "", endDate: "" },
+    // autoBroadcast=true → ส่งโปรหาเพื่อนทุกคน (LINE) อัตโนมัติเมื่อถึงวันเริ่ม
+    promo: { enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false },
     // flash sale (below brands). endTime = epoch ms; items reference products
     flashSale: { enabled: false, title: "ลดพิเศษสุดคุ้ม", endTime: 0, items: [] },
     faq: [
@@ -1087,6 +1088,13 @@
     }).catch(function (err) { _adminRegPromise = null; console.warn("[admin register]", err && err.message); return null; });
     return _adminRegPromise;
   }
+  // คืน Firebase ID token ของแอดมิน (ไว้แนบเรียก API หลังร้าน เช่น broadcast-promo)
+  function adminIdToken() {
+    return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var u = m.auth && m.auth.currentUser;
+      return u ? u.getIdToken() : "";
+    }).catch(function () { return ""; });
+  }
   // รวมออเดอร์จาก cloud ลง local me_orders (cloud ชนะถ้า id ตรงกัน) เพื่อให้ทุกหน้าหลังร้าน
   // (แดชบอร์ด/ERP/คำสั่งซื้อ) เห็นออเดอร์ครบเหมือนกัน ผ่าน getOrders() ปกติ
   function absorbCloudOrders(cloudList) {
@@ -1553,7 +1561,7 @@
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
     session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS, PERM_DEFS: PERM_DEFS,
     logout: logout, requirePerm: requirePerm, checkPin: checkPin,
-    ensureAdminRegistered: ensureAdminRegistered, absorbCloudOrders: absorbCloudOrders,
+    ensureAdminRegistered: ensureAdminRegistered, adminIdToken: adminIdToken, absorbCloudOrders: absorbCloudOrders,
     deleteOrder: deleteOrder, deletePurchase: deletePurchase,
     getLedger: getLedger, saveLedgerEntry: saveLedgerEntry, deleteLedgerEntry: deleteLedgerEntry,
     getSuppliers: getSuppliers, saveSupplier: saveSupplier, deleteSupplier: deleteSupplier,
