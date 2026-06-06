@@ -84,6 +84,17 @@ async function getPromo() {
     };
   } catch { return null; }
 }
+// เติม token หัวข้อ/รายละเอียดตามวันเริ่มโปร (ให้ตรงกับ store.js fillPromoTokens)
+//   {dd} = เลขโปรซ้ำ เช่น 6.6 / 11.11   ·   {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
+const THAI_MON_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+function fillPromoTokens(str, promo) {
+  if (!str) return str || '';
+  let y, m, d;
+  const s = promo && promo.startDate;
+  if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) { const p = s.split('-'); y = +p[0]; m = +p[1]; d = +p[2]; }
+  else { const n = new Date(Date.now() + 7 * 3600 * 1000); y = n.getUTCFullYear(); m = n.getUTCMonth() + 1; d = n.getUTCDate(); }
+  return String(str).replace(/\{dd\}/g, m + '.' + d).replace(/\{date\}/g, d + ' ' + THAI_MON_ABBR[m - 1]);
+}
 // แปลง promo → LINE messages (รูปแบนเนอร์ + ข้อความหลายช่องทาง) — เลย์เอาต์ตามตัวอย่างที่เจ้าของต้องการ
 //   {title}
 //
@@ -98,11 +109,11 @@ function buildMessages(promo) {
     messages.push({ type: 'image', originalContentUrl: u, previewImageUrl: u });
   }
   const lines = [];
-  if (promo.title) lines.push(promo.title);
-  if (promo.text) lines.push(promo.text);
+  if (promo.title) lines.push(fillPromoTokens(promo.title, promo));
+  if (promo.text) lines.push(fillPromoTokens(promo.text, promo));
   const linkLines = (promo.links || []).map((l) => '📌 ' + (l.label ? l.label + ' : ' : '') + l.url);
   if (linkLines.length) { lines.push(''); linkLines.forEach((l) => lines.push(l)); }
-  if (promo.dateText) { lines.push(''); lines.push('👉 ' + promo.dateText); }
+  if (promo.dateText) { lines.push(''); lines.push('👉 ' + fillPromoTokens(promo.dateText, promo)); }
   if (promo.conditions) lines.push('*' + promo.conditions);
   // สำรอง: ถ้าไม่ได้ใส่ลิงก์ร้านเลย ใส่ลิงก์หน้าร้านให้
   if (!linkLines.length) { lines.push(''); lines.push('🛒 ดูสินค้า/โปรทั้งหมด: ' + SITE + '/shop.html'); }

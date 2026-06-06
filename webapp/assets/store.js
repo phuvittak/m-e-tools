@@ -1278,6 +1278,23 @@
     write(KEY.settings, Object.assign(s, patch));
     dispatch();
   }
+  /* ---------- Promo title tokens (เปลี่ยนหัวข้อตามวันที่เอง) -------- */
+  // ใช้ในหัวข้อ/รายละเอียดโปร: {dd} = เลขโปรซ้ำจากวันเริ่ม เช่น 6.6 / 11.11
+  //                            {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
+  // ฐานวันที่ = วันเริ่มโปร (ถ้าไม่ตั้ง ใช้วันนี้) → เจ้าของไม่ต้องแก้หัวข้อเอง
+  var THAI_MON_ABBR = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+  function promoBaseDate(promo) {
+    var s = promo && promo.startDate;
+    if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) { var p = s.split("-"); return { y: +p[0], m: +p[1], d: +p[2] }; }
+    var n = new Date(); return { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() };
+  }
+  function fillPromoTokens(str, promo) {
+    if (!str) return str || "";
+    var b = promoBaseDate(promo);
+    return String(str)
+      .replace(/\{dd\}/g, b.m + "." + b.d)
+      .replace(/\{date\}/g, b.d + " " + THAI_MON_ABBR[b.m - 1]);
+  }
   // Firebase config used by the chat: per-browser override (back office) wins,
   // else the committed FIREBASE_CONFIG (shared by every visitor → real online chat).
   function firebaseCfg() {
@@ -1556,7 +1573,7 @@
     provinces: provinces, districtsOf: districtsOf, subdistrictsOf: subdistrictsOf, zipsOf: zipsOf,
     setGeoData: setGeoData,
     getShipRates: getShipRates, getShippingFee: getShippingFee, setShipRate: setShipRate,
-    getSettings: getSettings, saveSettings: saveSettings, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
+    getSettings: getSettings, saveSettings: saveSettings, fillPromoTokens: fillPromoTokens, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
     registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loginGoogleCloud: loginGoogleCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
     cloudLoadAdminData: cloudLoadAdminData, cloudPushAdminData: cloudPushAdminData,

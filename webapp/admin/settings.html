@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ตั้งค่าเว็บไซต์ — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260606g">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260606h">
 </head>
 <body data-admin="settings">
   <div class="admin" data-shell>
@@ -64,7 +64,9 @@
         <div class="panel">
           <div class="panel-head"><h2>โปรโมชั่นหน้าแรก (แบนเนอร์ใต้ส่วนหัว)</h2></div>
           <label class="f-check" style="margin-bottom:10px"><input type="checkbox" data-promo-enabled> เปิดใช้งานแบนเนอร์โปรโมชั่น (ถ้าไม่เปิด หน้าแรกจะไม่มีส่วนนี้)</label>
-          <div class="field"><label>หัวข้อโปรโมชั่น</label><input data-promo-title placeholder="เช่น 6.6 เริ่มแล้ว! รีบช้อปเลย"></div>
+          <div class="field"><label>หัวข้อโปรโมชั่น</label><input data-promo-title placeholder="เช่น {dd} เริ่มแล้ว! รีบช้อปเลย">
+            <p class="hint" style="margin:4px 0 0;color:#888;font-size:.85em">พิมพ์ <code>{dd}</code> ตรงไหน ระบบจะแทนด้วยเลขโปรซ้ำจาก “วันเริ่มแสดง” ให้เอง (เช่น 6.6 / 7.7 / 11.11) — ตั้งครั้งเดียว <b>หัวข้อเปลี่ยนตามวันที่เองไม่ต้องแก้</b> · <code>{date}</code> = วันที่ไทย เช่น “6 มิ.ย.” <span data-promo-titleprev style="color:#16a34a"></span></p>
+          </div>
           <div class="field"><label>รายละเอียด (ไม่บังคับ)</label><textarea data-promo-text rows="2"></textarea></div>
           <div class="field">
             <label>ลิงก์ร้านค้า (Shopee / Lazada / TikTok ฯลฯ) — แสดงเป็น 📌 ทีละบรรทัดในข้อความ</label>
@@ -158,9 +160,9 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260606g"></script>
-  <script src="../assets/store.js?v=20260606g"></script>
-  <script src="../assets/ui.js?v=20260606g"></script>
-  <script src="../assets/admin.js?v=20260606g"></script>
+  <script src="../assets/thai-geo.js?v=20260606h"></script>
+  <script src="../assets/store.js?v=20260606h"></script>
+  <script src="../assets/ui.js?v=20260606h"></script>
+  <script src="../assets/admin.js?v=20260606h"></script>
 </body>
 </html>
