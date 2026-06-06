@@ -23,11 +23,8 @@
           navigator.serviceWorker.register(base + "sw.js", { scope: base }).then(function (reg) {
             try { reg.update(); } catch (e) {}
           }).catch(function () {});
-          // เมื่อ SW ตัวใหม่เข้าควบคุม → รีโหลด 1 ครั้งเพื่อให้ได้ไฟล์ใหม่ทันที (กันค้างของเก่า)
-          var reloaded = false;
-          navigator.serviceWorker.addEventListener("controllerchange", function () {
-            if (reloaded) return; reloaded = true; window.location.reload();
-          });
+          // (ไม่บังคับรีโหลดอัตโนมัติแล้ว — กันหน้าจอขาว/รีโหลดกลางคัน;
+          //  ความสดของไฟล์มาจาก no-cache header + SW network-first อยู่แล้ว)
         });
       }
     } catch (e) {}
