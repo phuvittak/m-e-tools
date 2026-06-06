@@ -1578,8 +1578,18 @@
       : '<a class="me-btn" href="shop.html">ดูสินค้า ▸</a>';
     var dateHtml = pdate ? '<p class="me-promo-date">👉 ' + esc(pdate) + "</p>" : "";
     var condHtml = promo.conditions ? '<p class="me-promo-cond">*' + esc(promo.conditions) + "</p>" : "";
-    box.innerHTML = '<section class="me-promo"><div class="wrap"><div class="me-promo-card">' +
-      (promo.image ? '<div class="me-promo-img" style="' + cssBg(promo.image) + '"></div>' : "") +
+    // รูป: หลายรูป → สไลด์เลื่อนซ้าย-ขวา (scroll-snap); รูปเดียว → ภาพนิ่ง
+    var imgs = (promo.images && promo.images.length) ? promo.images : (promo.image ? [promo.image] : []);
+    var imgHtml = "";
+    if (imgs.length > 1) {
+      imgHtml = '<div class="me-promo-slider">' + imgs.map(function (src) {
+        return '<div class="me-promo-slide" style="' + cssBg(src) + '"></div>';
+      }).join("") + "</div>";
+    } else if (imgs.length === 1) {
+      imgHtml = '<div class="me-promo-img" style="' + cssBg(imgs[0]) + '"></div>';
+    }
+    box.innerHTML = '<section class="me-promo"><div class="wrap"><div class="me-promo-card' + (imgs.length > 1 ? " has-slider" : "") + '">' +
+      imgHtml +
       '<div class="me-promo-body"><div class="me-promo-tag">โปรโมชั่นพิเศษ</div>' +
       '<h2 class="me-promo-title">' + esc(title) + "</h2>" +
       (ptext ? '<p class="me-promo-text">' + esc(ptext) + "</p>" : "") +

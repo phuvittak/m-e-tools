@@ -2049,11 +2049,31 @@
       renderPLinks();
       var plinkAdd = root.querySelector("[data-promo-link-add]");
       if (plinkAdd) plinkAdd.addEventListener("click", function () { syncPLinks(); plinks.push({ label: "", url: "" }); renderPLinks(); });
+      // ----- รูปโปรหลายรูป (เลื่อนซ้าย-ขวาบนเว็บ + image carousel บน LINE) -----
+      var pimages = (promo.images && promo.images.length) ? promo.images.slice() : (promo.image ? [promo.image] : []);
       var promoPrev = root.querySelector("[data-promo-prev]");
-      var drawPromo = function () { promoPrev.innerHTML = promo.image ? '<img src="' + promo.image + '">' : '<span class="img-hint">ไม่มีรูป</span>'; };
+      var drawPromo = function () {
+        if (!promoPrev) return;
+        promoPrev.innerHTML = pimages.length
+          ? pimages.map(function (src, i) {
+              return '<span class="gal-thumb" style="position:relative;display:inline-block;margin:0 6px 6px 0">' +
+                '<img src="' + src + '" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid #ddd">' +
+                '<button type="button" data-pimgdel="' + i + '" class="btn btn-sm btn-danger" style="position:absolute;top:-6px;right:-6px;padding:0 6px;border-radius:50%">×</button></span>';
+            }).join("")
+          : '<span class="img-hint">ไม่มีรูป</span>';
+        promoPrev.querySelectorAll("[data-pimgdel]").forEach(function (b) {
+          b.onclick = function () { pimages.splice(+b.dataset.pimgdel, 1); drawPromo(); };
+        });
+      };
       drawPromo();
-      root.querySelector("[data-promo-file]").addEventListener("change", function (e) { var f = e.target.files && e.target.files[0]; if (!f) return; readImageFile(f, function (d) { promo.image = d; drawPromo(); }); });
-      root.querySelector("[data-promo-clear]").addEventListener("click", function () { promo.image = ""; drawPromo(); });
+      root.querySelector("[data-promo-file]").addEventListener("change", function (e) {
+        var files = Array.prototype.slice.call(e.target.files || []);
+        if (!files.length) return;
+        var loaded = 0;
+        files.forEach(function (f) { readImageFile(f, function (d) { pimages.push(d); if (++loaded === files.length) drawPromo(); }); });
+        e.target.value = "";
+      });
+      root.querySelector("[data-promo-clear]").addEventListener("click", function () { pimages = []; drawPromo(); });
       // ส่งโปรหาเพื่อนทุกคน (LINE) ทันที — ต้องบันทึกตั้งค่าก่อน เพื่อให้ API อ่าน promo ล่าสุด
       var sendNow = root.querySelector("[data-promo-sendnow]");
       var sendStatus = root.querySelector("[data-promo-sendstatus]");
@@ -2115,7 +2135,7 @@
       patch.faq = faq.filter(function (f) { return (f.q || "").trim(); });
       patch.qrImage = pendingQR;
       patch.brands = brands.filter(function (b) { return (b.name || "").trim(); });
-      if (promoEnabled) { syncPLinks(); patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image, startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "", autoBroadcast: !!(root.querySelector("[data-promo-broadcast]") && root.querySelector("[data-promo-broadcast]").checked), links: plinks.filter(function (l) { return (l.url || "").trim(); }), dateText: (promoDateText && promoDateText.value) || "", conditions: (promoConditions && promoConditions.value) || "", anchorDate: (promoAnchor && promoAnchor.value) || "", beforeDays: (promoBefore && promoBefore.value !== "") ? Math.max(0, parseInt(promoBefore.value, 10) || 0) : 1, afterDays: (promoAfter && promoAfter.value !== "") ? Math.max(0, parseInt(promoAfter.value, 10) || 0) : 2, recurring: !!(promoRecurring && promoRecurring.checked) }; }
+      if (promoEnabled) { syncPLinks(); patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, images: pimages, image: pimages[0] || "", startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "", autoBroadcast: !!(root.querySelector("[data-promo-broadcast]") && root.querySelector("[data-promo-broadcast]").checked), links: plinks.filter(function (l) { return (l.url || "").trim(); }), dateText: (promoDateText && promoDateText.value) || "", conditions: (promoConditions && promoConditions.value) || "", anchorDate: (promoAnchor && promoAnchor.value) || "", beforeDays: (promoBefore && promoBefore.value !== "") ? Math.max(0, parseInt(promoBefore.value, 10) || 0) : 1, afterDays: (promoAfter && promoAfter.value !== "") ? Math.max(0, parseInt(promoAfter.value, 10) || 0) : 2, recurring: !!(promoRecurring && promoRecurring.checked) }; }
       if (flashEnabled) {
         var endStr = root.querySelector("[data-flash-end]").value;
         patch.flashSale = { enabled: flashEnabled.checked, title: root.querySelector("[data-flash-title]").value, endTime: endStr ? new Date(endStr).getTime() : 0, items: flash.items.filter(function (x) { return x.productId; }) };
