@@ -81,18 +81,34 @@ async function getPromo() {
       links,
       dateText: (f.dateText && f.dateText.stringValue) || '',
       conditions: (f.conditions && f.conditions.stringValue) || '',
+      anchorDate: (f.anchorDate && f.anchorDate.stringValue) || '',
+      spanDays: (f.spanDays && (f.spanDays.integerValue != null ? +f.spanDays.integerValue : (f.spanDays.doubleValue != null ? +f.spanDays.doubleValue : null))),
     };
   } catch { return null; }
 }
-// เติม token หัวข้อ/รายละเอียดตามวันเริ่มโปร (ให้ตรงกับ store.js fillPromoTokens)
-//   {dd} = เลขโปรซ้ำ เช่น 6.6 / 11.11   ·   {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
+// เติม token หัวข้อ/รายละเอียดตามวันที่โปรซ้ำ (ให้ตรงกับ store.js fillPromoTokens)
+//   {dd} = เลขโปรซ้ำ เช่น 6.6 / 8.8 / 11.11   ·   {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
 const THAI_MON_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const isYmd = (s) => s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+function addDaysStr(ymd, n) {
+  const p = ymd.split('-'), dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.getUTCFullYear() + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dt.getUTCDate()).padStart(2, '0');
+}
+// ช่วงโปรที่ใช้จริง: anchorDate → [anchor-span, anchor+span]; ไม่งั้น start/end ที่ตั้งมือ
+function promoWindow(promo) {
+  const span = (promo && promo.spanDays != null && promo.spanDays !== '') ? +promo.spanDays : 3;
+  if (promo && isYmd(promo.anchorDate)) {
+    return { start: addDaysStr(promo.anchorDate, -span), end: addDaysStr(promo.anchorDate, span) };
+  }
+  return { start: (promo && promo.startDate) || '', end: (promo && promo.endDate) || '' };
+}
 function fillPromoTokens(str, promo) {
   if (!str) return str || '';
-  let y, m, d;
-  const s = promo && promo.startDate;
-  if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) { const p = s.split('-'); y = +p[0]; m = +p[1]; d = +p[2]; }
-  else { const n = new Date(Date.now() + 7 * 3600 * 1000); y = n.getUTCFullYear(); m = n.getUTCMonth() + 1; d = n.getUTCDate(); }
+  let m, d;
+  const s = (promo && promo.anchorDate) || (promo && promo.startDate);
+  if (isYmd(s)) { const p = s.split('-'); m = +p[1]; d = +p[2]; }
+  else { const n = new Date(Date.now() + 7 * 3600 * 1000); m = n.getUTCMonth() + 1; d = n.getUTCDate(); }
   return String(str).replace(/\{dd\}/g, m + '.' + d).replace(/\{date\}/g, d + ' ' + THAI_MON_ABBR[m - 1]);
 }
 // แปลง promo → LINE messages (รูปแบนเนอร์ + ข้อความหลายช่องทาง) — เลย์เอาต์ตามตัวอย่างที่เจ้าของต้องการ
@@ -163,9 +179,11 @@ export default async function handler(req, res) {
     }
     if (!promo) { res.status(200).json({ ok: true, skipped: 'no-promo' }); return; }
     if (!promo.enabled || !promo.autoBroadcast) { res.status(200).json({ ok: true, skipped: 'auto-off' }); return; }
-    if (!promo.startDate) { res.status(200).json({ ok: true, skipped: 'no-start-date' }); return; }
+    // วันเริ่มจริง: ถ้าใช้โปรวันที่ซ้ำ = anchor-span, ไม่งั้น = วันเริ่มที่ตั้งมือ
+    const effStart = promoWindow(promo).start;
+    if (!effStart) { res.status(200).json({ ok: true, skipped: 'no-start-date' }); return; }
     // ส่งเฉพาะ "วันเริ่มโปร" เท่านั้น — cron ทำงานวันละครั้ง จึงส่งครั้งเดียวตามธรรมชาติ
-    if (thaiToday() !== promo.startDate) { res.status(200).json({ ok: true, skipped: 'not-start-day', today: thaiToday(), startDate: promo.startDate }); return; }
+    if (thaiToday() !== effStart) { res.status(200).json({ ok: true, skipped: 'not-start-day', today: thaiToday(), startDate: effStart }); return; }
     const result = await lineBroadcast(buildMessages(promo));
     if (!result.ok) { res.status(502).json({ error: 'line-broadcast-failed', status: result.status, body: result.body }); return; }
     res.status(200).json({ ok: true, channel: 'line', mode: 'auto', date: thaiToday() });
