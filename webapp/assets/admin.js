@@ -477,6 +477,8 @@
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); }
     });
     var replyImg = document.querySelector("[data-reply-img]");
+    var replyImgBtn = document.querySelector("[data-reply-img-btn]");
+    if (replyImgBtn && replyImg) replyImgBtn.addEventListener("click", function () { replyImg.click(); });
     if (replyImg) replyImg.addEventListener("change", function (e) {
       var f = e.target.files && e.target.files[0]; if (!f) return;
       e.target.value = "";

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>กล่องข้อความออนไลน์ — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260606b">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260606c">
   <style>
     .botinbox-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px }
     .botinbox-kpi { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:14px 16px }
@@ -124,7 +124,8 @@
             <div class="thread-empty">เลือกบทสนทนาทางซ้ายเพื่อดูข้อความ</div>
           </div>
           <div class="reply-bar" data-reply-bar style="display:none">
-            <label class="reply-img-btn" title="ส่งรูป (เช่น QR Code)" style="padding:0 14px;display:flex;align-items:center;cursor:pointer;background:#fff;border:1px solid var(--ink,#0b0b0b);border-radius:8px;font-size:18px">📷<input type="file" accept="image/*" data-reply-img hidden></label>
+            <button type="button" data-reply-img-btn title="ส่งรูป (เช่น QR Code)" style="padding:0 14px;font-size:18px;background:#fff;border:1px solid var(--ink,#0b0b0b);border-radius:8px;cursor:pointer">📷</button>
+            <input type="file" accept="image/*" data-reply-img style="display:none">
             <textarea data-reply-input placeholder="พิมพ์ตอบลูกค้า… (Enter เพื่อส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"></textarea>
             <button data-reply-send type="button">ส่ง</button>
           </div>
@@ -132,9 +133,9 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260606b"></script>
-  <script src="../assets/store.js?v=20260606b"></script>
-  <script src="../assets/ui.js?v=20260606b"></script>
-  <script src="../assets/admin.js?v=20260606b"></script>
+  <script src="../assets/thai-geo.js?v=20260606c"></script>
+  <script src="../assets/store.js?v=20260606c"></script>
+  <script src="../assets/ui.js?v=20260606c"></script>
+  <script src="../assets/admin.js?v=20260606c"></script>
 </body>
 </html>
