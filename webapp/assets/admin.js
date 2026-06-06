@@ -67,7 +67,7 @@
       ["settings.html", "settings", "ตั้งค่าเว็บไซต์", "settings"],
     ].filter(function (n) { return S.hasPerm(n[3]); });
     // แชทลูกค้าหน้าเว็บถูกถอดออก — ลูกค้าทักผ่าน LINE OA ตรง ดูทุกบทสนทนาในหน้า "แชทบอท LINE"
-    nav.push(["bot-inbox.html", "botinbox", "แชทบอท LINE", "botinbox"]);
+    nav.push(["bot-inbox.html", "botinbox", "กล่องข้อความออนไลน์", "botinbox"]);
     nav.push(["customers.html", "customers", "สรุปลูกค้า", "customers"]);
     if (S.isOwner()) nav.push(["bot-replies.html", "botreplies", "คำตอบของบอท", "botreplies"]);
     if (S.isOwner()) nav.push(["import.html", "import", "นำเข้าสินค้า (AI)", "inventory"]);
@@ -412,7 +412,41 @@
       alertBox.style.background = kind === "err" ? "#fee" : "#efe";
     }
 
-    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, unsubProfiles: null, unsubSessions: null, prevCount: 0, fs: null, profiles: {}, sessions: {}, search: "" };
+    var state = { messages: [], byUser: {}, activeUid: null, unsub: null, unsubProfiles: null, unsubSessions: null, prevCount: 0, fs: null, profiles: {}, sessions: {}, search: "", tab: "open" };
+    // เวลาข้อความล่าสุด "จากลูกค้า" ของบทสนทนา (ไว้เทียบกับเวลาที่ปิด → เด้งกลับเองถ้าทักใหม่)
+    function lastCustomerAt(c) {
+      var t = "";
+      (c.messages || []).forEach(function (m) {
+        var isUser = !m.role || m.role === "user";
+        if (isUser && (m.at || "") > t) t = m.at || "";
+      });
+      return t;
+    }
+    // บทสนทนา "ปิดแล้ว (เสร็จ)" = ถูกกดปิด และลูกค้ายังไม่ทักกลับมาหลังปิด
+    function convClosed(c) {
+      var s = state.sessions[c.userId];
+      if (!s || !s.closed) return false;
+      var closedAt = s.closedAt || "";
+      return lastCustomerAt(c) <= closedAt; // ถ้าทักหลังปิด → ไม่ถือว่าปิด (เด้งกลับ)
+    }
+    function convReengaged(c) {
+      var s = state.sessions[c.userId];
+      return !!(s && s.closed && lastCustomerAt(c) > (s.closedAt || ""));
+    }
+    function closeCustomer(uid) {
+      if (!state.fs) return;
+      var fs = state.fs;
+      fs.setDoc(fs.doc(fs.db, "bot_sessions", uid), { closed: true, closedAt: new Date().toISOString(), updatedAt: fs.serverTimestamp() }, { merge: true })
+        .then(function () { if (window.U && U.toast) U.toast("ปิดลูกค้าแล้ว — ย้ายไปช่อง \"เสร็จแล้ว\"", "ok"); })
+        .catch(function (err) { if (window.U && U.toast) U.toast("ปิดไม่สำเร็จ: " + err.message, "err"); });
+    }
+    function reopenCustomer(uid) {
+      if (!state.fs) return;
+      var fs = state.fs;
+      fs.setDoc(fs.doc(fs.db, "bot_sessions", uid), { closed: false, updatedAt: fs.serverTimestamp() }, { merge: true })
+        .then(function () { if (window.U && U.toast) U.toast("เปิดลูกค้ากลับมาแล้ว", "ok"); })
+        .catch(function (err) { if (window.U && U.toast) U.toast("เปิดไม่สำเร็จ: " + err.message, "err"); });
+    }
 
     if (refresh) refresh.addEventListener("click", function () {
       // listener อัปเดตเองอยู่แล้ว — ปุ่มนี้กลายเป็นปุ่ม re-subscribe เผื่อ connection ขาด
@@ -424,6 +458,15 @@
     if (searchInput) searchInput.addEventListener("input", function () {
       state.search = (searchInput.value || "").trim().toLowerCase();
       if (state.messages.length) groupAndRender();
+    });
+    // แท็บ ต้องดูแล / เสร็จแล้ว
+    document.querySelectorAll("[data-conv-tabs] [data-tab]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        state.tab = btn.getAttribute("data-tab");
+        document.querySelectorAll("[data-conv-tabs] [data-tab]").forEach(function (b) { b.classList.toggle("on", b === btn); });
+        state.activeUid = null;
+        if (state.messages.length) groupAndRender();
+      });
     });
 
     // reply bar — แอดมินตอบลูกค้าตรงในหน้า bot-inbox
@@ -523,9 +566,9 @@
           var db = fsMod.getFirestore(app, "default");
           state.adminUid = cred.user.uid;
           state.getIdToken = function () { return cred.user.getIdToken(); };
-          // โชว์ admin uid เพื่อให้เจ้าของไปเพิ่ม admins/{uid} ใน Firebase Console
+          // โชว์ admin uid + ปุ่ม "เพิ่มฉันเป็น admin" — เฉพาะ "เจ้าของร้าน" เท่านั้น
           var uidBox = document.querySelector("[data-admin-uid]");
-          if (uidBox) {
+          if (uidBox && S.isOwner()) {
             uidBox.style.display = "block";
             uidBox.querySelector("[data-uid-val]").textContent = cred.user.uid;
             var copyBtn = uidBox.querySelector("[data-uid-copy]");
@@ -681,23 +724,35 @@
         });
       }
 
-      var humanConvs = convs.filter(function (c) { return state.sessions[c.userId] && state.sessions[c.userId].mode === "human"; });
-      var botConvs   = convs.filter(function (c) { return !state.sessions[c.userId] || state.sessions[c.userId].mode !== "human"; });
+      // แยก "ปิดแล้ว (เสร็จ)" ออกจาก "ต้องดูแล (เปิด)" — เด้งกลับเองถ้าลูกค้าทักหลังปิด
+      var openConvs = convs.filter(function (c) { return !convClosed(c); });
+      var doneConvs = convs.filter(function (c) { return convClosed(c); });
+      var on = document.querySelector("[data-tab-open-n]"); if (on) on.textContent = openConvs.length;
+      var dn = document.querySelector("[data-tab-closed-n]"); if (dn) dn.textContent = doneConvs.length;
 
-      list.innerHTML =
-        '<div class="conv-section human">' +
-          '<div class="conv-section-head"><span>🔴 รอแอดมินตอบ</span><span>' + humanConvs.length + '</span></div>' +
-          (humanConvs.length ? humanConvs.map(rowHtml).join("") : '<div class="conv-section-empty">ไม่มีลูกค้ารออยู่</div>') +
-        '</div>' +
-        '<div class="conv-section bot">' +
-          '<div class="conv-section-head"><span>🤖 บอทตอบเอง</span><span>' + botConvs.length + '</span></div>' +
-          (botConvs.length ? botConvs.map(rowHtml).join("") : '<div class="conv-section-empty">ไม่มีลูกค้าใหม่</div>') +
-        '</div>';
+      if (state.tab === "closed") {
+        list.innerHTML = '<div class="conv-section">' +
+          '<div class="conv-section-head"><span>✓ เสร็จแล้ว</span><span>' + doneConvs.length + '</span></div>' +
+          (doneConvs.length ? doneConvs.map(rowHtml).join("") : '<div class="conv-section-empty">ยังไม่มีที่ปิด</div>') + '</div>';
+      } else {
+        var humanConvs = openConvs.filter(function (c) { return state.sessions[c.userId] && state.sessions[c.userId].mode === "human"; });
+        var botConvs   = openConvs.filter(function (c) { return !state.sessions[c.userId] || state.sessions[c.userId].mode !== "human"; });
+        list.innerHTML =
+          '<div class="conv-section human">' +
+            '<div class="conv-section-head"><span>🔴 รอแอดมินตอบ</span><span>' + humanConvs.length + '</span></div>' +
+            (humanConvs.length ? humanConvs.map(rowHtml).join("") : '<div class="conv-section-empty">ไม่มีลูกค้ารออยู่</div>') +
+          '</div>' +
+          '<div class="conv-section bot">' +
+            '<div class="conv-section-head"><span>🤖 บอทตอบเอง</span><span>' + botConvs.length + '</span></div>' +
+            (botConvs.length ? botConvs.map(rowHtml).join("") : '<div class="conv-section-empty">ไม่มีลูกค้าใหม่</div>') +
+          '</div>';
+      }
+      var tabConvs = state.tab === "closed" ? doneConvs : openConvs;
 
       list.querySelectorAll("[data-uid]").forEach(function (row) {
         row.addEventListener("click", function (e) {
-          // คลิกที่ปุ่ม toggle อย่าให้สลับบทสนทนา
-          if (e.target.closest("[data-toggle-bot]")) return;
+          // คลิกที่ปุ่มในแถว อย่าให้สลับบทสนทนา
+          if (e.target.closest("[data-toggle-bot],[data-close-cust],[data-reopen-cust]")) return;
           list.querySelectorAll(".conv-row").forEach(function (r) { r.classList.remove("on"); });
           row.classList.add("on");
           state.activeUid = row.dataset.uid;
@@ -713,10 +768,16 @@
           else resumeBotFor(uid);
         });
       });
+      list.querySelectorAll("[data-close-cust]").forEach(function (btn) {
+        btn.addEventListener("click", function (e) { e.stopPropagation(); closeCustomer(btn.getAttribute("data-close-cust")); });
+      });
+      list.querySelectorAll("[data-reopen-cust]").forEach(function (btn) {
+        btn.addEventListener("click", function (e) { e.stopPropagation(); reopenCustomer(btn.getAttribute("data-reopen-cust")); });
+      });
 
-      // auto-select: คงบทสนทนาที่เปิดอยู่ ถ้าไม่มี → เลือกจากกลุ่ม human ก่อน, ไม่มีค่อย bot
+      // auto-select: คงบทสนทนาที่เปิดอยู่ ถ้าไม่มี → เลือกตัวแรกของแท็บปัจจุบัน
       if (!state.activeUid || !byUser[state.activeUid]) {
-        state.activeUid = (humanConvs[0] || botConvs[0] || convs[0]).userId;
+        state.activeUid = (tabConvs[0] || convs[0]).userId;
       }
       var firstRow = list.querySelector('[data-uid="' + cssEsc(state.activeUid) + '"]');
       if (firstRow) { firstRow.classList.add("on"); renderThread(state.activeUid); }
@@ -736,10 +797,17 @@
       var toggleBtn = inHuman
         ? '<button class="resume" data-toggle-bot="' + esc(c.userId) + '" data-action="resume" type="button">เปิดบอท</button>'
         : '<button class="pause" data-toggle-bot="' + esc(c.userId) + '" data-action="pause" type="button">ปิดบอท</button>';
-      return '<div class="conv-row" data-uid="' + esc(c.userId) + '">' +
-        '<div class="who"><span>' + srcBadge + ' ' + displayName + '</span><span>' + c.messages.length + ' ข้อความ</span></div>' +
+      // ปุ่มปิด/เปิดลูกค้า (จบการขาย). ถ้าทักกลับมาหลังปิด แสดงป้ายเตือน
+      var isDone = state.sessions[c.userId] && state.sessions[c.userId].closed && lastCustomerAt(c) <= (state.sessions[c.userId].closedAt || "");
+      var reeng = convReengaged(c);
+      var closeBtn = isDone
+        ? '<button class="resume" data-reopen-cust="' + esc(c.userId) + '" type="button">↩ เปิดใหม่</button>'
+        : '<button class="pause" data-close-cust="' + esc(c.userId) + '" type="button" title="ปิดเมื่อขายเสร็จ">✓ ปิด</button>';
+      var reengBadge = reeng ? '<span style="background:var(--price-red,#D7261E);color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700">💬 ทักกลับมา</span> ' : "";
+      return '<div class="conv-row' + (reeng ? " reengaged" : "") + '" data-uid="' + esc(c.userId) + '">' +
+        '<div class="who"><span>' + reengBadge + srcBadge + ' ' + displayName + '</span><span>' + c.messages.length + ' ข้อความ</span></div>' +
         '<div class="last">' + esc(c.lastText) + '</div>' +
-        '<div class="meta"><span>' + when + '</span><span class="conv-actions">' + toggleBtn + '</span></div>' +
+        '<div class="meta"><span>' + when + '</span><span class="conv-actions">' + toggleBtn + " " + closeBtn + '</span></div>' +
         '</div>';
     }
 

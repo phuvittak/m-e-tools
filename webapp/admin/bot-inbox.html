@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>แชทบอทลูกค้า — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260605e">
+  <title>กล่องข้อความออนไลน์ — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css?v=20260605f">
   <style>
     .botinbox-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px }
     .botinbox-kpi { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:14px 16px }
@@ -15,6 +15,10 @@
     .botinbox-split { display:grid; grid-template-columns:320px 1fr; gap:12px; min-height:560px }
     @media (max-width:900px) { .botinbox-split { grid-template-columns:1fr } }
 
+    .conv-tabs { display:flex; gap:8px; margin-bottom:10px }
+    .conv-tab { flex:1; padding:9px 8px; border:2px solid var(--ink); background:#fff; border-radius:8px; cursor:pointer; font-family:var(--font-body); font-weight:700; font-size:13px; color:var(--ink) }
+    .conv-tab.on { background:var(--dw-yellow,#FEBD17) }
+    .conv-row.reengaged { outline:2px solid var(--price-red,#D7261E); outline-offset:-2px }
     .conv-list { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; overflow:auto; max-height:70vh; padding:6px }
     .conv-section { margin-bottom:10px }
     .conv-section:last-child { margin-bottom:0 }
@@ -73,7 +77,7 @@
   <div class="admin" data-shell>
     <main class="main">
       <div class="topbar">
-        <div><h1>แชทบอทลูกค้า</h1><div class="sub">บันทึกข้อความที่ลูกค้าทักบอท LINE + คำตอบที่บอทตอบ</div></div>
+        <div><h1>กล่องข้อความออนไลน์</h1><div class="sub">รวมแชทลูกค้าทุกช่องทาง (LINE และอื่นๆ ในอนาคต) — ดู/ตอบได้ในที่เดียว</div></div>
         <button class="btn btn-ghost" data-refresh>↻ รีเฟรช</button>
       </div>
 
@@ -103,6 +107,10 @@
 
       <div style="margin-bottom:10px">
         <input data-search type="search" placeholder="🔎 ค้นหาลูกค้า — ชื่อ, ID, หรือคำที่ลูกค้าถาม (เช่น สว่าน)" style="width:100%; padding:10px 14px; border:1px solid var(--border-3); border-radius:8px; font-family:var(--font-body); font-size:14px; outline:none; background:#fff">
+      </div>
+      <div class="conv-tabs" data-conv-tabs>
+        <button type="button" class="conv-tab on" data-tab="open">🔴 ต้องดูแล (<span data-tab-open-n>0</span>)</button>
+        <button type="button" class="conv-tab" data-tab="closed">✓ เสร็จแล้ว (<span data-tab-closed-n>0</span>)</button>
       </div>
 
       <div class="botinbox-split">

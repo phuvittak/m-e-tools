@@ -1527,6 +1527,22 @@
         '<div class="me-brand-name">' + esc(b.name) + '</div><div class="me-brand-tag">' + esc(b.tag || "") + "</div>" +
         (b.primary ? '<div class="me-brand-stamp">ศูนย์แท้</div>' : "") + "</a>";
     }).join("");
+    setupBrandsAutoScroll(box);
+  }
+  // แบรนด์เรียงแนวยาว เลื่อนหาได้ + เลื่อนเองอัตโนมัติช้าๆ (หยุดเมื่อผู้ใช้แตะ/เลื่อนเอง วนกลับเมื่อสุด)
+  function setupBrandsAutoScroll(box) {
+    if (box._brandTimer) clearInterval(box._brandTimer);
+    var paused = false, resumeT = null;
+    function pause() { paused = true; if (resumeT) clearTimeout(resumeT); }
+    function resumeSoon() { if (resumeT) clearTimeout(resumeT); resumeT = setTimeout(function () { paused = false; }, 3000); }
+    ["mouseenter", "touchstart", "pointerdown", "wheel"].forEach(function (ev) { box.addEventListener(ev, pause, { passive: true }); });
+    ["mouseleave", "touchend"].forEach(function (ev) { box.addEventListener(ev, resumeSoon, { passive: true }); });
+    box._brandTimer = setInterval(function () {
+      if (paused) return;
+      if (box.scrollWidth <= box.clientWidth + 4) return;            // ไม่ล้น = ไม่ต้องเลื่อน
+      if (box.scrollLeft + box.clientWidth >= box.scrollWidth - 2) box.scrollLeft = 0; // สุดแล้ววนกลับ
+      else box.scrollLeft += 1;
+    }, 30);
   }
   function renderPromo(promo) {
     var box = document.querySelector("[data-promo]"); if (!box) return;
