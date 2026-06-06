@@ -25,6 +25,8 @@
   // ลงทะเบียนเครื่องนี้เป็น admin แล้ว subscribe ออเดอร์จาก cloud (ทุกหน้าหลังร้าน) → ดูดลง local
   // ให้ทุกหน้า (แดชบอร์ด/คำสั่งซื้อ/ERP) เห็นออเดอร์ครบเหมือนกันทุกเครื่อง ผ่าน getOrders()
   if (S.ensureAdminRegistered) S.ensureAdminRegistered().then(function (uid) { if (uid) subscribeOrdersGlobal(); });
+  // เรียลไทม์: settings/staff/สินค้า อัปเดตเองทุกหน้าหลังร้านเมื่อมีการแก้จากอีกเครื่อง
+  if (S.startAdminRealtime) S.startAdminRealtime();
   ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, import: function(){} }[view] || function () {})();
 
   // subscribe orders/{id} จาก Firestore แบบเรียลไทม์ → S.absorbCloudOrders() เขียนลง local me_orders
@@ -1969,12 +1971,16 @@
     if (catList) { renderCats(); var catAddBtn = root.querySelector("[data-cat-add]"); if (catAddBtn) catAddBtn.addEventListener("click", function () { syncCats(); cats.push({ key: "c" + Date.now().toString(36), label: "", icon: "tool", image: "", hidden: false, parent: "" }); renderCats(); }); }
 
     // ----- Promo banner -----
-    var promo = Object.assign({ enabled: false, title: "", text: "", image: "" }, st.promo || {});
+    var promo = Object.assign({ enabled: false, title: "", text: "", image: "", startDate: "", endDate: "" }, st.promo || {});
     var promoEnabled = root.querySelector("[data-promo-enabled]");
     if (promoEnabled) {
       promoEnabled.checked = !!promo.enabled;
       root.querySelector("[data-promo-title]").value = promo.title || "";
       root.querySelector("[data-promo-text]").value = promo.text || "";
+      var promoStart = root.querySelector("[data-promo-start]");
+      var promoEnd = root.querySelector("[data-promo-end]");
+      if (promoStart) promoStart.value = promo.startDate || "";
+      if (promoEnd) promoEnd.value = promo.endDate || "";
       var promoPrev = root.querySelector("[data-promo-prev]");
       var drawPromo = function () { promoPrev.innerHTML = promo.image ? '<img src="' + promo.image + '">' : '<span class="img-hint">ไม่มีรูป</span>'; };
       drawPromo();
@@ -2025,7 +2031,7 @@
       patch.faq = faq.filter(function (f) { return (f.q || "").trim(); });
       patch.qrImage = pendingQR;
       patch.brands = brands.filter(function (b) { return (b.name || "").trim(); });
-      if (promoEnabled) patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image };
+      if (promoEnabled) patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image, startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "" };
       if (flashEnabled) {
         var endStr = root.querySelector("[data-flash-end]").value;
         patch.flashSale = { enabled: flashEnabled.checked, title: root.querySelector("[data-flash-title]").value, endTime: endStr ? new Date(endStr).getTime() : 0, items: flash.items.filter(function (x) { return x.productId; }) };

@@ -227,7 +227,8 @@
       { key: "power", label: "เครื่องมือไฟฟ้าอื่นๆ", icon: "compressor", image: "" },
     ],
     // hero promo banner (below hero). enabled=false → hidden
-    promo: { enabled: false, title: "", text: "", image: "" },
+    // startDate/endDate = "YYYY-MM-DD" (ว่าง = ไม่จำกัด). โชว์เฉพาะช่วงวันที่กำหนด เช่น โปร 6.6
+    promo: { enabled: false, title: "", text: "", image: "", startDate: "", endDate: "" },
     // flash sale (below brands). endTime = epoch ms; items reference products
     flashSale: { enabled: false, title: "ลดพิเศษสุดคุ้ม", endTime: 0, items: [] },
     faq: [
@@ -377,6 +378,42 @@
       console.warn("[cloud load init]", err && err.message);
       return false;
     });
+  }
+
+  /* ---------- Realtime: admin data + product catalog (หลังร้าน) ------ */
+  // ฟังการเปลี่ยนแปลงจาก cloud แบบเรียลไทม์ → อัปเดต local + dispatch ให้หน้า re-render
+  //   admin_data/{key}: onSnapshot ทีละ doc (get เดี่ยวได้แม้ list ปิด) → settings/staff/ฯลฯ สด
+  //   products/catalog: เปลี่ยน updatedAt ทุกครั้งที่บันทึกสินค้า → re-pull รายตัว (ได้รูปครบ)
+  // เรียกครั้งเดียวตอนเปิดหน้าหลังร้าน; ปลอดภัยถ้าเรียกซ้ำ (กันด้วย flag)
+  var _adminRtStarted = false;
+  function startAdminRealtime() {
+    if (_adminRtStarted) return;
+    _adminRtStarted = true;
+    loadFirebaseAuthAndDb("admin").then(function (m) {
+      var fs = m.fsMod;
+      ADMIN_CLOUD_KEYS.forEach(function (key) {
+        fs.onSnapshot(fs.doc(m.db, "admin_data", key), function (snap) {
+          if (!snap || !snap.exists || !snap.exists()) return;
+          var data = snap.data();
+          if (!data || data.value === undefined) return;
+          if (key === KEY.settings && data.value && typeof data.value === "object") {
+            var existing = read(KEY.settings, {});
+            var merged = Object.assign({}, data.value);
+            if (existing.deletePin) merged.deletePin = existing.deletePin; // เก็บ PIN local ไว้
+            write(key, merged, { skipCloud: true });
+          } else {
+            write(key, data.value, { skipCloud: true });
+          }
+          dispatch();
+        }, function (err) { console.warn("[rt admin]", key, err && err.message); });
+      });
+      // products/catalog เปลี่ยน → ดึงสินค้าใหม่ทั้งหมด (ข้าม snapshot แรกเพราะ init โหลดอยู่แล้ว)
+      var firstCat = true;
+      fs.onSnapshot(fs.doc(m.db, "products", "catalog"), function () {
+        if (firstCat) { firstCat = false; return; }
+        cloudLoadProducts();
+      }, function (err) { console.warn("[rt catalog]", err && err.message); });
+    }).catch(function () {});
   }
 
   /* ---------- Cloud sync: PRODUCT CATALOG ↔ Firestore -------------- */
@@ -1499,6 +1536,7 @@
     getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,
     saveProduct: saveProduct, deleteProduct: deleteProduct, adjustStock: adjustStock,
     cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, cloudPushProduct: cloudPushProduct,
+    startAdminRealtime: startAdminRealtime,
     getCart: getCart, addToCart: addToCart, updateCartItem: updateCartItem,
     removeCartItem: removeCartItem, clearCart: clearCart,
     cartCount: cartCount, cartLines: cartLines, cartTotals: cartTotals,
