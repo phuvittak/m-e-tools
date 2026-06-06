@@ -43,10 +43,6 @@ async function isAdminReq(req) {
 }
 
 /* ---------- helpers ---------- */
-// วันที่วันนี้ "YYYY-MM-DD" ตามเวลาไทย (UTC+7) — ให้ตรงกับวันที่ที่เจ้าของตั้งในหลังร้าน
-function thaiToday() {
-  return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
-}
 // อ่าน promo จาก admin_data/me_settings (public read)
 async function getPromo() {
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/admin_data/me_settings`;
@@ -83,6 +79,7 @@ async function getPromo() {
       conditions: (f.conditions && f.conditions.stringValue) || '',
       anchorDate: (f.anchorDate && f.anchorDate.stringValue) || '',
       spanDays: (f.spanDays && (f.spanDays.integerValue != null ? +f.spanDays.integerValue : (f.spanDays.doubleValue != null ? +f.spanDays.doubleValue : null))),
+      recurring: !!(f.recurring && f.recurring.booleanValue),
     };
   } catch { return null; }
 }
@@ -90,15 +87,31 @@ async function getPromo() {
 //   {dd} = เลขโปรซ้ำ เช่น 6.6 / 8.8 / 11.11   ·   {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
 const THAI_MON_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 const isYmd = (s) => s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+const pad2 = (n) => String(n).padStart(2, '0');
+function thaiToday() { return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10); }
 function addDaysStr(ymd, n) {
   const p = ymd.split('-'), dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
   dt.setUTCDate(dt.getUTCDate() + n);
-  return dt.getUTCFullYear() + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dt.getUTCDate()).padStart(2, '0');
+  return dt.getUTCFullYear() + '-' + pad2(dt.getUTCMonth() + 1) + '-' + pad2(dt.getUTCDate());
 }
-// ช่วงโปรที่ใช้จริง: anchorDate → [anchor-span, anchor+span]; ไม่งั้น start/end ที่ตั้งมือ
+const promoSpan = (promo) => (promo && promo.spanDays != null && promo.spanDays !== '') ? +promo.spanDays : 3;
+// โหมดทำซ้ำ: หา double-date (วัน=เดือน) ที่วันนี้อยู่ในช่วง; ไม่งั้นคืนอันถัดไป
+function activeDouble(promo, today) {
+  today = today || thaiToday();
+  const span = promoSpan(promo), ty = +today.slice(0, 4), anchors = [];
+  for (let y = ty - 1; y <= ty + 1; y++) for (let m = 1; m <= 12; m++) anchors.push(y + '-' + pad2(m) + '-' + pad2(m));
+  for (const a of anchors) {
+    const s = addDaysStr(a, -span), e = addDaysStr(a, span);
+    if (today >= s && today <= e) return { anchor: a, start: s, end: e, active: true };
+  }
+  const up = anchors.filter((a) => a >= today).sort()[0] || anchors[anchors.length - 1];
+  return { anchor: up, start: addDaysStr(up, -span), end: addDaysStr(up, span), active: false };
+}
+// ช่วงโปรที่ใช้จริง: recurring → double-date รอบปัจจุบัน/ถัดไป; anchorDate → [anchor±span]; ไม่งั้น start/end
 function promoWindow(promo) {
-  const span = (promo && promo.spanDays != null && promo.spanDays !== '') ? +promo.spanDays : 3;
+  if (promo && promo.recurring) { const d = activeDouble(promo); return { start: d.start, end: d.end }; }
   if (promo && isYmd(promo.anchorDate)) {
+    const span = promoSpan(promo);
     return { start: addDaysStr(promo.anchorDate, -span), end: addDaysStr(promo.anchorDate, span) };
   }
   return { start: (promo && promo.startDate) || '', end: (promo && promo.endDate) || '' };
@@ -106,7 +119,7 @@ function promoWindow(promo) {
 function fillPromoTokens(str, promo) {
   if (!str) return str || '';
   let m, d;
-  const s = (promo && promo.anchorDate) || (promo && promo.startDate);
+  const s = (promo && promo.recurring) ? activeDouble(promo).anchor : ((promo && promo.anchorDate) || (promo && promo.startDate));
   if (isYmd(s)) { const p = s.split('-'); m = +p[1]; d = +p[2]; }
   else { const n = new Date(Date.now() + 7 * 3600 * 1000); m = n.getUTCMonth() + 1; d = n.getUTCDate(); }
   return String(str).replace(/\{dd\}/g, m + '.' + d).replace(/\{date\}/g, d + ' ' + THAI_MON_ABBR[m - 1]);

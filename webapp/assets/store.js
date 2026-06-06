@@ -232,8 +232,9 @@
     // links = [{label,url}] ลิงก์ร้านหลายช่อง (Shopee/Lazada/TikTok ฯลฯ) แสดงในข้อความ broadcast + แบนเนอร์
     // dateText = ช่วงวันที่โปร (เช่น "5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69"), conditions = หมายเหตุเงื่อนไข
     // anchorDate = วันที่โปรซ้ำ (วัน=เดือน เช่น 2026-06-06) · spanDays = เริ่มก่อน/จบหลังกี่วัน (เริ่ม 3)
+    // recurring = ทำซ้ำเองทุกเดือน (1.1, 2.2, …, 12.12) โดยไม่ต้องตั้ง anchor
     promo: { enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false,
-             links: [], dateText: "", conditions: "", anchorDate: "", spanDays: 3 },
+             links: [], dateText: "", conditions: "", anchorDate: "", spanDays: 3, recurring: false },
     // flash sale (below brands). endTime = epoch ms; items reference products
     flashSale: { enabled: false, title: "ลดพิเศษสุดคุ้ม", endTime: 0, items: [] },
     faq: [
@@ -1280,28 +1281,48 @@
     dispatch();
   }
   /* ---------- Promo: double-date + title tokens ------------------- */
-  // โปรวันที่ซ้ำ (เช่น 6.6, 8.8): เจ้าของตั้ง "วันที่โปรซ้ำ" (anchorDate, วัน=เดือน) ครั้งเดียว
-  //   ระบบคำนวณช่วงเอง: เริ่มก่อน spanDays วัน, จบหลัง spanDays วัน (ค่าเริ่ม 3)
-  //   {dd}   = เลขโปรซ้ำจากวันที่ซ้ำ เช่น 6.6 / 8.8 / 11.11
-  //   {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
+  // โปรวันที่ซ้ำ (เช่น 6.6, 8.8):
+  //   recurring=true → ทำซ้ำเองทุกเดือน (1.1, 2.2, …, 12.12) ไม่ต้องตั้ง anchor
+  //   ไม่งั้น เจ้าของตั้ง "วันที่โปรซ้ำ" (anchorDate, วัน=เดือน) ครั้งเดียว
+  //   ทั้งคู่: เริ่มก่อน spanDays วัน, จบหลัง spanDays วัน (ค่าเริ่ม 3)
+  //   {dd}   = เลขโปรซ้ำ เช่น 6.6 / 8.8 / 11.11   ·   {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
   var THAI_MON_ABBR = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
   function isYmd(s) { return s && /^\d{4}-\d{2}-\d{2}$/.test(s); }
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function localToday() { var n = new Date(); return n.getFullYear() + "-" + pad2(n.getMonth() + 1) + "-" + pad2(n.getDate()); }
   // บวก/ลบวันจากสตริง YYYY-MM-DD (UTC-safe) → คืน YYYY-MM-DD
   function addDaysStr(ymd, n) {
     var p = ymd.split("-"), dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
     dt.setUTCDate(dt.getUTCDate() + n);
-    return dt.getUTCFullYear() + "-" + String(dt.getUTCMonth() + 1).padStart(2, "0") + "-" + String(dt.getUTCDate()).padStart(2, "0");
+    return dt.getUTCFullYear() + "-" + pad2(dt.getUTCMonth() + 1) + "-" + pad2(dt.getUTCDate());
   }
-  // วันฐานสำหรับ token = วันที่โปรซ้ำ (anchor) ถ้ามี, ไม่งั้นวันเริ่ม, ไม่งั้นวันนี้
+  function promoSpan(promo) { return (promo && promo.spanDays != null && promo.spanDays !== "") ? +promo.spanDays : 3; }
+  // โหมดทำซ้ำ: หา double-date (วัน=เดือน) ที่ "วันนี้อยู่ในช่วง"; ถ้าไม่มี คืนอันถัดไปที่จะมาถึง
+  // ครอบ 3 ปี (ก่อน/นี้/หน้า) เผื่อช่วงคาบเกี่ยวปลายปี–ต้นปี
+  function activeDouble(promo, today) {
+    today = today || localToday();
+    var span = promoSpan(promo), ty = +today.slice(0, 4), anchors = [], y, m;
+    for (y = ty - 1; y <= ty + 1; y++) for (m = 1; m <= 12; m++) anchors.push(y + "-" + pad2(m) + "-" + pad2(m));
+    for (var i = 0; i < anchors.length; i++) {
+      var a = anchors[i], s = addDaysStr(a, -span), e = addDaysStr(a, span);
+      if (today >= s && today <= e) return { anchor: a, start: s, end: e, active: true };
+    }
+    var up = anchors.filter(function (a) { return a >= today; }).sort()[0] || anchors[anchors.length - 1];
+    return { anchor: up, start: addDaysStr(up, -span), end: addDaysStr(up, span), active: false };
+  }
+  // วันฐานสำหรับ token = วันที่ซ้ำของรอบที่ active/ถัดไป (recurring) → anchor → วันเริ่ม → วันนี้
   function promoBaseDate(promo) {
-    var s = (promo && promo.anchorDate) || (promo && promo.startDate);
+    var s = (promo && promo.recurring) ? activeDouble(promo).anchor
+          : ((promo && promo.anchorDate) || (promo && promo.startDate));
     if (isYmd(s)) { var p = s.split("-"); return { y: +p[0], m: +p[1], d: +p[2] }; }
     var n = new Date(); return { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() };
   }
-  // ช่วงโปรที่ใช้จริง: ถ้าตั้ง anchorDate → [anchor-span, anchor+span]; ไม่งั้นใช้ start/end ที่ตั้งมือ
+  // ช่วงโปรที่ใช้จริง: recurring → ช่วงของ double-date รอบปัจจุบัน/ถัดไป;
+  //   ไม่งั้น anchorDate → [anchor±span]; ไม่งั้นใช้ start/end ที่ตั้งมือ
   function promoWindow(promo) {
-    var span = (promo && promo.spanDays != null && promo.spanDays !== "") ? +promo.spanDays : 3;
+    if (promo && promo.recurring) { var d = activeDouble(promo); return { start: d.start, end: d.end }; }
     if (promo && isYmd(promo.anchorDate)) {
+      var span = promoSpan(promo);
       return { start: addDaysStr(promo.anchorDate, -span), end: addDaysStr(promo.anchorDate, span) };
     }
     return { start: (promo && promo.startDate) || "", end: (promo && promo.endDate) || "" };
