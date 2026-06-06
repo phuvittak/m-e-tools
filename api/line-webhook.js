@@ -824,6 +824,23 @@ async function pushHandoffToAdmin(customerUserId, customerText, token) {
 // log สนทนาลง Firestore
 // ============================================================
 // ดาวน์โหลดรูปที่ลูกค้าส่งมาทาง LINE → เก็บเป็น bot_message (image base64) ให้หลังร้านเห็น
+// ลูกค้าส่งสติกเกอร์ → เก็บเป็น bot_message (image = URL รูปสติกเกอร์จาก LINE CDN ขนาดเล็ก)
+async function logCustomerSticker(userId, message) {
+  if (!userId || !message?.stickerId) return;
+  const url = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${message.stickerId}/android/sticker.png`;
+  const fsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_messages`;
+  try {
+    await fetch(fsUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: {
+      userId: { stringValue: String(userId).slice(0, 99) },
+      text: { stringValue: '[สติกเกอร์]' },
+      image: { stringValue: url },
+      role: { stringValue: 'user' },
+      source: { stringValue: 'line' },
+      at: { timestampValue: new Date().toISOString() },
+    } }) });
+  } catch (e) { console.error('[sticker] store threw', e?.message); }
+}
+
 async function logCustomerImage(userId, messageId, lineToken) {
   if (!userId || !messageId) return;
   try {
@@ -1019,6 +1036,10 @@ export default async function handler(req, res) {
       // ลูกค้าส่งรูป → ดาวน์โหลดจาก LINE มาเก็บ ให้แอดมินเห็นในหลังร้าน
       if (event.type === 'message' && event.message?.type === 'image') {
         await logCustomerImage(event.source?.userId, event.message.id, token);
+      }
+      // ลูกค้าส่งสติกเกอร์ → เก็บ URL รูปสติกเกอร์ ให้แอดมินเห็น
+      if (event.type === 'message' && event.message?.type === 'sticker') {
+        await logCustomerSticker(event.source?.userId, event.message);
       }
     } catch (err) {
       console.error('[event] handler error:', err?.name, err?.message);
