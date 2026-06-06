@@ -1544,9 +1544,22 @@
       else box.scrollLeft += 1;
     }, 30);
   }
+  // วันนี้ในรูปแบบ YYYY-MM-DD (เวลาท้องถิ่น) — เทียบกับช่วงวันที่ของโปร
+  function todayStr() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+  function promoInWindow(promo) {
+    var t = todayStr();
+    if (promo.startDate && t < promo.startDate) return false; // ยังไม่ถึงวันเริ่ม
+    if (promo.endDate && t > promo.endDate) return false;     // เลยวันสิ้นสุดแล้ว
+    return true;
+  }
   function renderPromo(promo) {
     var box = document.querySelector("[data-promo]"); if (!box) return;
-    if (!promo || !promo.enabled) { box.innerHTML = ""; return; }
+    if (!promo || !promo.enabled || !promoInWindow(promo)) { box.innerHTML = ""; return; }
     box.innerHTML = '<section class="me-promo"><div class="wrap"><div class="me-promo-card">' +
       (promo.image ? '<div class="me-promo-img" style="' + cssBg(promo.image) + '"></div>' : "") +
       '<div class="me-promo-body"><div class="me-promo-tag">โปรโมชั่นพิเศษ</div>' +
