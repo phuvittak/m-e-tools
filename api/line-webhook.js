@@ -827,18 +827,46 @@ async function pushHandoffToAdmin(customerUserId, customerText, token) {
 // ลูกค้าส่งสติกเกอร์ → เก็บเป็น bot_message (image = URL รูปสติกเกอร์จาก LINE CDN ขนาดเล็ก)
 async function logCustomerSticker(userId, message) {
   if (!userId || !message?.stickerId) return;
-  const url = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${message.stickerId}/android/sticker.png`;
+  // สติกเกอร์เคลื่อนไหว (APNG) ใช้ URL animation → โชว์แล้วขยับจริงในเว็บ; แบบนิ่งใช้ PNG ธรรมดา
+  const animated = ['ANIMATION', 'ANIMATION_SOUND', 'POPUP', 'POPUP_SOUND'].includes(message.stickerResourceType || '');
+  const url = animated
+    ? `https://stickershop.line-scdn.net/stickershop/v1/sticker/${message.stickerId}/iPhone/sticker_animation@2x.png`
+    : `https://stickershop.line-scdn.net/stickershop/v1/sticker/${message.stickerId}/android/sticker.png`;
   const fsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_messages`;
   try {
     await fetch(fsUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: {
       userId: { stringValue: String(userId).slice(0, 99) },
       text: { stringValue: '[สติกเกอร์]' },
       image: { stringValue: url },
+      kind: { stringValue: 'sticker' },
       role: { stringValue: 'user' },
       source: { stringValue: 'line' },
       at: { timestampValue: new Date().toISOString() },
     } }) });
   } catch (e) { console.error('[sticker] store threw', e?.message); }
+}
+
+// วิดีโอจากลูกค้า: เก็บข้อความ + เวลา (วินาที) + ลิงก์ดูผ่าน proxy (/api/line-content)
+// ไม่ดาวน์โหลดเก็บ base64 (วิดีโอใหญ่เกินขีดจำกัด Firestore) — สตรีมจาก LINE ตอนเปิดดู
+async function logCustomerVideo(userId, message) {
+  if (!userId || !message?.id) return;
+  const ms = Number(message.duration) || 0;
+  const sec = Math.round(ms / 1000);
+  const mmss = sec > 0 ? Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0') : '';
+  const proxy = `${SHOP.website}/api/line-content?id=${encodeURIComponent(message.id)}`;
+  const fsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_messages`;
+  try {
+    await fetch(fsUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: {
+      userId: { stringValue: String(userId).slice(0, 99) },
+      text: { stringValue: '🎬 วิดีโอ' + (mmss ? ' (' + mmss + ' นาที)' : '') },
+      video: { stringValue: proxy },
+      videoDuration: { stringValue: mmss },
+      kind: { stringValue: 'video' },
+      role: { stringValue: 'user' },
+      source: { stringValue: 'line' },
+      at: { timestampValue: new Date().toISOString() },
+    } }) });
+  } catch (e) { console.error('[video] store threw', e?.message); }
 }
 
 async function logCustomerImage(userId, messageId, lineToken) {
@@ -1037,9 +1065,13 @@ export default async function handler(req, res) {
       if (event.type === 'message' && event.message?.type === 'image') {
         await logCustomerImage(event.source?.userId, event.message.id, token);
       }
-      // ลูกค้าส่งสติกเกอร์ → เก็บ URL รูปสติกเกอร์ ให้แอดมินเห็น
+      // ลูกค้าส่งสติกเกอร์ → เก็บ URL รูปสติกเกอร์ (แบบเคลื่อนไหวถ้าเป็นสติกเกอร์ขยับ) ให้แอดมินเห็น
       if (event.type === 'message' && event.message?.type === 'sticker') {
         await logCustomerSticker(event.source?.userId, event.message);
+      }
+      // ลูกค้าส่งวิดีโอ → เก็บข้อความ + เวลา + ลิงก์ดู (สตรีมผ่าน proxy)
+      if (event.type === 'message' && event.message?.type === 'video') {
+        await logCustomerVideo(event.source?.userId, event.message);
       }
     } catch (err) {
       console.error('[event] handler error:', err?.name, err?.message);
