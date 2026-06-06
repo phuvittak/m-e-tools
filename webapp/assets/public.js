@@ -1560,6 +1560,11 @@
   function renderPromo(promo) {
     var box = document.querySelector("[data-promo]"); if (!box) return;
     if (!promo || !promo.enabled || !promoInWindow(promo)) { box.innerHTML = ""; return; }
+    // หัวข้อ/รายละเอียด: เติม token {dd}/{date} จากวันเริ่มโปรให้เอง (เจ้าของไม่ต้องแก้เอง)
+    var fill = S.fillPromoTokens ? function (s) { return S.fillPromoTokens(s, promo); } : function (s) { return s || ""; };
+    var title = fill(promo.title || "");
+    var ptext = fill(promo.text || "");
+    var pdate = fill(promo.dateText || "");
     // ลิงก์ร้านหลายช่อง (Shopee/Lazada/TikTok ฯลฯ) — ปุ่มเรียงกัน, เปิดแท็บใหม่
     var links = (promo.links || []).filter(function (l) { return l && l.url; });
     var linksHtml = links.length
@@ -1567,13 +1572,13 @@
           return '<a class="me-btn me-btn-sm" href="' + esc(l.url) + '" target="_blank" rel="noopener">📌 ' + esc(l.label || "เปิดลิงก์") + " ▸</a>";
         }).join("") + "</div>"
       : '<a class="me-btn" href="shop.html">ดูสินค้า ▸</a>';
-    var dateHtml = promo.dateText ? '<p class="me-promo-date">👉 ' + esc(promo.dateText) + "</p>" : "";
+    var dateHtml = pdate ? '<p class="me-promo-date">👉 ' + esc(pdate) + "</p>" : "";
     var condHtml = promo.conditions ? '<p class="me-promo-cond">*' + esc(promo.conditions) + "</p>" : "";
     box.innerHTML = '<section class="me-promo"><div class="wrap"><div class="me-promo-card">' +
       (promo.image ? '<div class="me-promo-img" style="' + cssBg(promo.image) + '"></div>' : "") +
       '<div class="me-promo-body"><div class="me-promo-tag">โปรโมชั่นพิเศษ</div>' +
-      '<h2 class="me-promo-title">' + esc(promo.title || "") + "</h2>" +
-      (promo.text ? '<p class="me-promo-text">' + esc(promo.text) + "</p>" : "") +
+      '<h2 class="me-promo-title">' + esc(title) + "</h2>" +
+      (ptext ? '<p class="me-promo-text">' + esc(ptext) + "</p>" : "") +
       dateHtml + linksHtml + condHtml +
       "</div></div></div></section>";
   }

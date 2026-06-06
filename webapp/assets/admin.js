@@ -1975,12 +1975,24 @@
     var promoEnabled = root.querySelector("[data-promo-enabled]");
     if (promoEnabled) {
       promoEnabled.checked = !!promo.enabled;
-      root.querySelector("[data-promo-title]").value = promo.title || "";
+      var promoTitle = root.querySelector("[data-promo-title]");
+      promoTitle.value = promo.title || "";
       root.querySelector("[data-promo-text]").value = promo.text || "";
       var promoStart = root.querySelector("[data-promo-start]");
       var promoEnd = root.querySelector("[data-promo-end]");
       if (promoStart) promoStart.value = promo.startDate || "";
       if (promoEnd) promoEnd.value = promo.endDate || "";
+      // ตัวอย่างหัวข้อหลังเติม token {dd}/{date} ตามวันเริ่ม — อัปเดตสดเมื่อพิมพ์/เปลี่ยนวันที่
+      var titlePrev = root.querySelector("[data-promo-titleprev]");
+      var updTitlePrev = function () {
+        if (!titlePrev || !S.fillPromoTokens) return;
+        var raw = promoTitle.value || "";
+        if (!/\{dd\}|\{date\}/.test(raw)) { titlePrev.textContent = ""; return; }
+        titlePrev.textContent = " → ตัวอย่าง: “" + S.fillPromoTokens(raw, { startDate: (promoStart && promoStart.value) || "" }) + "”";
+      };
+      promoTitle.addEventListener("input", updTitlePrev);
+      if (promoStart) promoStart.addEventListener("change", updTitlePrev);
+      updTitlePrev();
       var promoDateText = root.querySelector("[data-promo-datetext]");
       var promoConditions = root.querySelector("[data-promo-conditions]");
       if (promoDateText) promoDateText.value = promo.dateText || "";
