@@ -22,6 +22,7 @@
     seeded: "me_seeded_v2",
     cloudProducts: "me_cloud_products", // catalog pulled from Firestore (customers only)
     deletedOrders: "me_deleted_orders", // tombstones: order ids ที่ลบแล้ว (กัน cloud snapshot ดูดกลับ)
+    stockApplied: "me_stock_applied",   // order ids ที่ตัดสต๊อกแล้ว (กันตัดซ้ำตอนรับออเดอร์จาก cloud)
     ratings: "me_ratings",              // ดาวที่เบราว์เซอร์นี้ให้ไว้ { productId: stars }
   };
 
@@ -964,6 +965,9 @@
         total: subtotal + deposit + thisShip,
         revenue: subtotal, cost: cost,
         paid: true, received: false, status: "paid",
+        // stockApplied=true เฉพาะตอนผู้สั่งมีสิทธิ์คลัง (ตัดสต๊อก cloud แล้วผ่าน saveProduct)
+        // ลูกค้าหน้าร้านไม่มีสิทธิ์ → false → ฝั่งหลังร้านจะตัดสต๊อกให้ตอนรับออเดอร์เข้า
+        stockApplied: hasPerm("inventory"),
       };
       if (mode === "rent") {
         order.rentStart = dateStr(Date.now());
@@ -1120,6 +1124,38 @@
       write(KEY.orders, order.map(function (id) { return byId[id]; }), { skipCloud: true });
       dispatch();
     }
+    // ตัดสต๊อกอัตโนมัติเมื่อรับออเดอร์ใหม่จาก cloud (ลูกค้าสั่งออนไลน์ → สต๊อกหลังร้านลดเอง)
+    // ทำเฉพาะเครื่องหลังร้าน (มีสิทธิ์คลัง) และตัดครั้งเดียวต่อออเดอร์
+    if (isStaff() && hasPerm("inventory")) {
+      var appliedSet = read(KEY.stockApplied, []);
+      cloudList.forEach(function (c) {
+        if (!c || !c.id) return;
+        if (tomb.indexOf(c.id) >= 0) return;
+        if (c.stockApplied) return;                  // ผู้สั่งตัดสต๊อก cloud ไปแล้ว
+        if (appliedSet.indexOf(c.id) >= 0) return;   // เครื่องนี้ตัดไปแล้ว
+        if (c.status === "cancelled") return;        // ออเดอร์ยกเลิก ไม่ตัด
+        applyOrderStock(c);                          // ลดสต๊อก/เพิ่มยอดเช่า + ดันขึ้น cloud
+        appliedSet.push(c.id);
+        write(KEY.stockApplied, appliedSet, { skipCloud: true });
+        cloudMarkStockApplied(c.id);                 // ติดธงบน cloud กันเครื่องหลังร้านอื่นตัดซ้ำ
+      });
+    }
+  }
+  // ลดสต๊อก (ซื้อ) / เพิ่มยอดเช่า (เช่า) ตามรายการในออเดอร์ — saveProduct ดันขึ้น cloud ให้เอง
+  function applyOrderStock(o) {
+    if (!o || !o.items) return;
+    o.items.forEach(function (it) {
+      var p = getProduct(it.productId); if (!p) return;
+      if (o.type === "rent") p.rented = (p.rented || 0) + it.qty;
+      else p.stock = Math.max(0, (p.stock || 0) - it.qty);
+      saveProduct(p);
+    });
+  }
+  // setDoc merge เฉพาะ field stockApplied (ไม่แตะ timestamp อื่น) ในฐานะ admin
+  function cloudMarkStockApplied(id) {
+    loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      return m.fsMod.setDoc(m.fsMod.doc(m.db, "orders", String(id)), { stockApplied: true }, { merge: true });
+    }).catch(function (err) { console.warn("[stock flag]", id, err && err.message); });
   }
   function deleteOrder(id) {
     if (!hasPerm("orders_delete")) return false;

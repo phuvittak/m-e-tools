@@ -1522,27 +1522,39 @@
   }
   function renderBrands(brands) {
     var box = document.querySelector("[data-brands]"); if (!box) return;
-    box.innerHTML = (brands || []).filter(function (b) { return !b.hidden; }).map(function (b) {
+    var list = (brands || []).filter(function (b) { return !b.hidden; });
+    function card(b) {
       return '<a class="me-brand-card' + (b.primary ? " is-primary" : "") + '" href="shop.html?brand=' + encodeURIComponent(b.name) + '">' +
         '<div class="me-brand-name">' + esc(b.name) + '</div><div class="me-brand-tag">' + esc(b.tag || "") + "</div>" +
         (b.primary ? '<div class="me-brand-stamp">ศูนย์แท้</div>' : "") + "</a>";
-    }).join("");
-    setupBrandsAutoScroll(box);
+    }
+    var one = list.map(card).join("");
+    // วน 3 ชุด เพื่อเลื่อนวนไม่รู้จบ (เลยขวาสุดต่ออันแรกเอง / ปัดซ้ายก็วน) — ไม่ตันปลายทาง
+    box.innerHTML = list.length ? (one + one + one) : "";
+    setupBrandsAutoScroll(box, list.length);
   }
   // แบรนด์เรียงแนวยาว เลื่อนหาได้ + เลื่อนเองอัตโนมัติช้าๆ (หยุดเมื่อผู้ใช้แตะ/เลื่อนเอง วนกลับเมื่อสุด)
-  function setupBrandsAutoScroll(box) {
-    if (box._brandTimer) clearInterval(box._brandTimer);
+  function setupBrandsAutoScroll(box, n) {
+    if (box._brandTimer) { clearInterval(box._brandTimer); box._brandTimer = null; }
+    if (!n) return;
     var paused = false, resumeT = null;
-    function pause() { paused = true; if (resumeT) clearTimeout(resumeT); }
-    function resumeSoon() { if (resumeT) clearTimeout(resumeT); resumeT = setTimeout(function () { paused = false; }, 3000); }
-    ["mouseenter", "touchstart", "pointerdown", "wheel"].forEach(function (ev) { box.addEventListener(ev, pause, { passive: true }); });
-    ["mouseleave", "touchend"].forEach(function (ev) { box.addEventListener(ev, resumeSoon, { passive: true }); });
+    function pause() { paused = true; if (resumeT) { clearTimeout(resumeT); resumeT = null; } }
+    function resumeSoon() { if (resumeT) clearTimeout(resumeT); resumeT = setTimeout(function () { paused = false; }, 1500); }
+    box.addEventListener("mouseenter", pause);
+    box.addEventListener("mouseleave", function () { paused = false; });
+    box.addEventListener("touchstart", pause, { passive: true });
+    box.addEventListener("touchend", resumeSoon, { passive: true });
+    box.addEventListener("wheel", function () { pause(); resumeSoon(); }, { passive: true });
+    function third() { return box.scrollWidth / 3; }
+    // เริ่มที่ชุดกลาง เพื่อให้ปัดได้ทั้งซ้าย-ขวาแบบไม่มีขอบ
+    (function init() { var t = third(); if (t > 0) box.scrollLeft = t; else requestAnimationFrame(init); })();
     box._brandTimer = setInterval(function () {
-      if (paused) return;
-      if (box.scrollWidth <= box.clientWidth + 4) return;            // ไม่ล้น = ไม่ต้องเลื่อน
-      if (box.scrollLeft + box.clientWidth >= box.scrollWidth - 2) box.scrollLeft = 0; // สุดแล้ววนกลับ
-      else box.scrollLeft += 1;
-    }, 30);
+      var t = third();
+      if (t <= 0) return;
+      if (!paused) box.scrollLeft += 0.6;                  // เลื่อนเองช้าๆ
+      if (box.scrollLeft >= 2 * t) box.scrollLeft -= t;    // เลยชุดที่ 2 → วาร์ปถอย 1 ชุด (เนียน)
+      else if (box.scrollLeft <= 0) box.scrollLeft += t;   // ปัดซ้ายเลยต้น → วาร์ปไป 1 ชุด
+    }, 16);
   }
   // วันนี้ในรูปแบบ YYYY-MM-DD (เวลาท้องถิ่น) — เทียบกับช่วงวันที่ของโปร
   function todayStr() {
