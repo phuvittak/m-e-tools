@@ -1703,6 +1703,7 @@
             "<td>" + adminStatusBadges(o) + (o.staffMessage ? '<br><span class="prod-sku">📩 ' + esc(o.staffMessage) + "</span>" : "") + "</td>" +
             '<td><div class="ord-act">' + (opts ? '<select class="statussel" data-os="' + o.id + '">' + opts + "</select>" : '<span class="prod-sku">—</span>') +
               '<div class="ord-msg"><input data-msg="' + o.id + '" value="' + esc(o.staffMessage || "") + '" placeholder="ตอบลูกค้า เช่น ของถึงใน 2 วัน"><button class="btn btn-sm" data-sendmsg="' + o.id + '">ส่ง</button></div>' +
+              '<button class="btn btn-sm" data-printlabel="' + o.id + '">🖨️ พิมพ์ที่อยู่</button>' +
               (S.hasPerm("orders_delete") ? '<button class="btn btn-sm btn-danger" data-delorder="' + o.id + '">ลบคำสั่งซื้อ</button>' : "") +
             "</div></td></tr>";
         }).join("") + "</tbody>";
@@ -1726,8 +1727,59 @@
       tb.querySelectorAll("[data-delorder]").forEach(function (b) {
         b.onclick = function () { askPin("ลบคำสั่งซื้อ " + b.dataset.delorder, function () { S.deleteOrder(b.dataset.delorder); U.toast("ลบคำสั่งซื้อแล้ว", "ok"); render(); }); };
       });
+      tb.querySelectorAll("[data-printlabel]").forEach(function (b) {
+        b.onclick = function () { var ord = S.getOrders().filter(function (x) { return x.id === b.dataset.printlabel; })[0]; if (ord) printOrderLabel(ord); };
+      });
     }
     render();
+  }
+
+  // พิมพ์ใบที่อยู่/ใบจัดส่งของคำสั่งซื้อ → เปิดผ่าน iframe ซ่อน แล้วสั่งพิมพ์ (เลือกเครื่องพิมพ์ในกล่องของระบบ)
+  // รองรับเครื่องพิมพ์สติกเกอร์ 100×150 มม. (ตั้งขนาดกระดาษที่ไดรเวอร์) หรือ A4 ทั่วไป
+  function printOrderLabel(o) {
+    var st = S.getSettings();
+    var c = o.customer || {};
+    var deliver = o.fulfillment === "delivery";
+    var addr = (o.address && o.address.text) || (deliver ? "—" : "รับเองที่ร้าน M.E.Tools");
+    var items = (o.items || []).map(function (it) { return "• " + esc(it.name) + " ×" + it.qty; }).join("<br>");
+    var shopPhone = String(st.phone || "").replace(/\s*,\s*/g, ", ");
+    var doc =
+      '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบจัดส่ง ' + esc(o.id) + '</title><style>' +
+      '@page{margin:8mm}' +
+      '*{box-sizing:border-box}body{font-family:"Sarabun",system-ui,sans-serif;margin:0;color:#000}' +
+      '.label{border:2px solid #000;border-radius:8px;padding:14px;max-width:150mm}' +
+      '.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px}' +
+      '.hd .b{font-weight:800;font-size:20px}.hd .o{font-weight:800;font-size:15px}' +
+      '.sec{margin:8px 0}.k{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.04em}' +
+      '.to{font-size:20px;font-weight:800;line-height:1.35}.to .ph{font-size:18px}' +
+      '.ad{font-size:16px;line-height:1.45;margin-top:2px}' +
+      '.row{display:flex;gap:10px;flex-wrap:wrap;font-size:13px;color:#222;margin-top:4px}' +
+      '.items{font-size:14px;line-height:1.6;margin-top:2px}' +
+      '.frm{border-top:1px dashed #888;margin-top:10px;padding-top:8px;font-size:12px;color:#444}' +
+      '.chip{display:inline-block;border:1px solid #000;border-radius:4px;padding:1px 7px;font-size:12px;font-weight:700;margin-left:6px}' +
+      '</style></head><body><div class="label">' +
+      '<div class="hd"><div><div class="b">📦 ' + esc(st.company || "M.E.Tools") + '</div><div style="font-size:12px;color:#555">ใบจัดส่งสินค้า</div></div>' +
+      '<div style="text-align:right"><div class="o">' + esc(o.id) + '</div><div style="font-size:12px">' + esc(S.fmtDate(o.createdAt)) + '</div>' +
+      '<div><span class="chip">' + esc(deliver ? "จัดส่ง" : "รับที่ร้าน") + '</span></div></div></div>' +
+      '<div class="sec"><div class="k">ผู้รับ / ส่งถึง</div>' +
+      '<div class="to">' + esc(c.name || "—") + '<br><span class="ph">โทร. ' + esc(c.phone || "—") + '</span></div>' +
+      '<div class="ad">' + esc(addr) + '</div></div>' +
+      '<div class="sec"><div class="k">รายการสินค้า</div><div class="items">' + (items || "—") + '</div>' +
+      '<div class="row"><div>ยอดรวม: <b>' + esc(S.money(o.total)) + '</b></div>' +
+      (o.shipping ? '<div>ค่าจัดส่ง: ' + esc(S.money(o.shipping)) + '</div>' : "") +
+      (o.type === "rent" ? '<div>เช่า ' + esc(o.days || "") + ' วัน</div>' : "") + '</div></div>' +
+      '<div class="frm"><b>ผู้ส่ง:</b> ' + esc(st.company || "M.E.Tools") + " · " + esc(shopPhone) + "<br>" + esc(st.address || "") + "</div>" +
+      '</div></body></html>';
+    var ifr = document.createElement("iframe");
+    ifr.setAttribute("aria-hidden", "true");
+    ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+    document.body.appendChild(ifr);
+    var d = ifr.contentWindow.document;
+    d.open(); d.write(doc); d.close();
+    setTimeout(function () {
+      try { ifr.contentWindow.focus(); ifr.contentWindow.print(); } catch (e) { U.toast("เปิดหน้าต่างพิมพ์ไม่สำเร็จ", "err"); }
+      setTimeout(function () { try { document.body.removeChild(ifr); } catch (e) {} }, 2000);
+    }, 300);
   }
   // next valid transitions for an order, per the pay→receive→(return) flow
   function statusOptions(o) {
@@ -2054,13 +2106,14 @@
       var promoPrev = root.querySelector("[data-promo-prev]");
       var drawPromo = function () {
         if (!promoPrev) return;
-        promoPrev.innerHTML = pimages.length
-          ? pimages.map(function (src, i) {
-              return '<span class="gal-thumb" style="position:relative;display:inline-block;margin:0 6px 6px 0">' +
-                '<img src="' + src + '" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid #ddd">' +
-                '<button type="button" data-pimgdel="' + i + '" class="btn btn-sm btn-danger" style="position:absolute;top:-6px;right:-6px;padding:0 6px;border-radius:50%">×</button></span>';
-            }).join("")
-          : '<span class="img-hint">ไม่มีรูป</span>';
+        if (!pimages.length) { promoPrev.innerHTML = '<span class="img-hint">ยังไม่มีรูป — กด “เพิ่มรูป” ด้านล่าง</span>'; return; }
+        promoPrev.innerHTML = '<div class="pcount">มีทั้งหมด ' + pimages.length + ' รูป (ลูกค้าปัดดูทีละใบ)</div>' +
+          pimages.map(function (src, i) {
+            return '<div class="ptile">' +
+              '<span class="pnum">' + (i + 1) + "</span>" +
+              '<img src="' + src + '" alt="รูปที่ ' + (i + 1) + '">' +
+              '<button type="button" class="pdel" data-pimgdel="' + i + '" title="ลบรูปนี้">×</button></div>';
+          }).join("");
         promoPrev.querySelectorAll("[data-pimgdel]").forEach(function (b) {
           b.onclick = function () { pimages.splice(+b.dataset.pimgdel, 1); drawPromo(); };
         });
