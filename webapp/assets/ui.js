@@ -229,7 +229,7 @@
       '<div class="me-chat-panel" data-webchat-panel hidden>' +
         '<div class="me-chat-head"><span>แชทกับ M.E.Tools</span><button data-webchat-close aria-label="ปิด">×</button></div>' +
         '<div class="me-chat-body" data-webchat-body><div class="me-chat-empty">พิมพ์ข้อความด้านล่างเพื่อเริ่มสนทนา</div></div>' +
-        '<form class="me-chat-input" data-webchat-form><input data-webchat-text placeholder="พิมพ์ข้อความ…" autocomplete="off" maxlength="2000"><button class="me-btn me-btn-sm" type="submit">ส่ง</button></form>' +
+        '<form class="me-chat-input" data-webchat-form><button type="button" class="me-chat-imgbtn" data-webchat-imgbtn title="ส่งรูป" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0 4px">📷</button><input type="file" accept="image/*" data-webchat-img style="display:none"><input data-webchat-text placeholder="พิมพ์ข้อความ…" autocomplete="off" maxlength="2000"><button class="me-btn me-btn-sm" type="submit">ส่ง</button></form>' +
       "</div>";
     document.body.appendChild(box);
     box.querySelector("[data-webchat-fab]").addEventListener("click", function () {
@@ -245,6 +245,39 @@
       inp.value = "";
       sendWebChat(t);
     });
+    var wcImgBtn = box.querySelector("[data-webchat-imgbtn]");
+    var wcImg = box.querySelector("[data-webchat-img]");
+    if (wcImgBtn && wcImg) wcImgBtn.addEventListener("click", function () { wcImg.click(); });
+    if (wcImg) wcImg.addEventListener("change", function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      e.target.value = "";
+      webChatCompress(f, function (dataUrl) { sendWebChatImage(dataUrl); });
+    });
+  }
+  // ย่อรูปก่อนส่ง (ฝั่งลูกค้าเว็บ)
+  function webChatCompress(file, cb) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var max = 900, s = Math.min(1, max / Math.max(img.width, img.height));
+        var w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+        var c = document.createElement("canvas"); c.width = w; c.height = h;
+        try { c.getContext("2d").drawImage(img, 0, 0, w, h); cb(c.toDataURL("image/jpeg", 0.75)); } catch (e) { cb(fr.result); }
+      };
+      img.onerror = function () { cb(fr.result); };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  }
+  function sendWebChatImage(dataUrl) {
+    if (!webchatState.initted) { initWebChatFirestore(); return; }
+    if (!webchatState.userId || !webchatState.db) return;
+    var fs = webchatState.fs;
+    fs.addDoc(fs.collection(webchatState.db, "bot_messages"), {
+      userId: webchatState.userId, role: "user", text: "[ลูกค้าส่งรูป]", image: dataUrl,
+      source: "web", at: fs.serverTimestamp(),
+    }).catch(function () {});
   }
   function openWebChat() {
     var box = document.querySelector("[data-webchat]"); if (!box) return;
@@ -330,18 +363,20 @@
     // flatten: paired (text + reply) → 2 bubbles, flat (role) → 1 bubble
     var bubbles = [];
     msgs.forEach(function (m) {
-      if (m.role === "user") bubbles.push({ side: "me", text: m.text });
-      else if (m.role === "admin") bubbles.push({ side: "shop", text: m.text, who: "ร้าน" });
+      if (m.role === "user") bubbles.push({ side: "me", text: m.text, image: m.image });
+      else if (m.role === "admin") bubbles.push({ side: "shop", text: m.text, image: m.image, who: "ร้าน" });
       else if (m.role === "bot") bubbles.push({ side: "bot", text: m.text });
       else {
-        if (m.text) bubbles.push({ side: "me", text: m.text });
+        if (m.text || m.image) bubbles.push({ side: "me", text: m.text, image: m.image });
         if (m.reply) bubbles.push({ side: "bot", text: m.reply });
       }
     });
     body.innerHTML = bubbles.map(function (b) {
+      var isPlaceholder = b.image && (b.text === "[ลูกค้าส่งรูป]" || b.text === "[รูปภาพ]");
       return '<div class="me-chat-msg ' + b.side + '">' +
         (b.who ? '<span class="chat-who">' + esc(b.who) + '</span>' : "") +
-        esc(b.text) + '</div>';
+        (b.image ? '<a href="' + esc(b.image) + '" target="_blank" rel="noopener"><img src="' + esc(b.image) + '" alt="รูป" style="max-width:170px;max-height:190px;border-radius:8px;display:block"></a>' : "") +
+        (b.text && !isPlaceholder ? esc(b.text) : "") + '</div>';
     }).join("");
     body.scrollTop = body.scrollHeight;
   }

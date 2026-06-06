@@ -662,6 +662,7 @@
                 role: f.role || "",
                 text: f.text || "",
                 reply: f.reply || "",
+                image: f.image || "",
                 source: f.source || "line",
                 at: atStr
               };
