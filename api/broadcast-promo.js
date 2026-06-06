@@ -66,12 +66,17 @@ async function getPromo() {
         if (u) links.push({ label, url: u });
       });
     }
+    // จำนวนรูปใน promo.images[] (เนื้อหา base64 อ่านผ่าน /api/promo-image?i=N)
+    let imageCount = 0;
+    const imgArr = f.images && f.images.arrayValue && f.images.arrayValue.values;
+    if (Array.isArray(imgArr)) imageCount = imgArr.filter((v) => v && v.stringValue).length;
     return {
       enabled: !!(f.enabled && f.enabled.booleanValue),
       autoBroadcast: !!(f.autoBroadcast && f.autoBroadcast.booleanValue),
       title: (f.title && f.title.stringValue) || '',
       text: (f.text && f.text.stringValue) || '',
       image: (f.image && f.image.stringValue) || '',
+      imageCount,
       startDate: (f.startDate && f.startDate.stringValue) || '',
       endDate: (f.endDate && f.endDate.stringValue) || '',
       links,
@@ -151,7 +156,21 @@ function promoDateText(promo) {
 //   *{conditions}
 function buildMessages(promo) {
   const messages = [];
-  if (promo.image) {
+  // รูป: หลายรูป → image carousel (ปัดซ้าย-ขวา, สูงสุด 10); รูปเดียว → image message
+  const n = promo.imageCount || (promo.image ? 1 : 0);
+  const tapUri = (promo.links && promo.links[0] && promo.links[0].url) || `${SITE}/shop.html`;
+  if (n >= 2) {
+    const columns = [];
+    for (let i = 0; i < Math.min(n, 10); i++) {
+      const u = `${SITE}/api/promo-image?i=${i}`;
+      columns.push({ imageUrl: u, action: { type: 'uri', label: 'ดูเลย', uri: tapUri } });
+    }
+    messages.push({
+      type: 'template',
+      altText: fillPromoTokens(promo.title, promo) || 'โปรโมชั่นพิเศษ',
+      template: { type: 'image_carousel', columns },
+    });
+  } else if (n === 1) {
     const u = `${SITE}/api/promo-image`;
     messages.push({ type: 'image', originalContentUrl: u, previewImageUrl: u });
   }

@@ -233,7 +233,7 @@
     // dateText = ช่วงวันที่โปร (เช่น "5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69"), conditions = หมายเหตุเงื่อนไข
     // anchorDate = วันที่โปรซ้ำ (วัน=เดือน เช่น 2026-06-06) · beforeDays/afterDays = เริ่มก่อน/จบหลังกี่วัน (เริ่ม 1/2)
     // recurring = ทำซ้ำเองทุกเดือน (1.1, 2.2, …, 12.12) · โปรเริ่ม 2 ทุ่มของวันเริ่ม · dateText ว่าง = สร้างช่วงวันอัตโนมัติ
-    promo: { enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false,
+    promo: { enabled: false, title: "", text: "", image: "", images: [], startDate: "", endDate: "", autoBroadcast: false,
              links: [], dateText: "", conditions: "", anchorDate: "", beforeDays: 1, afterDays: 2, recurring: false },
     // flash sale (below brands). endTime = epoch ms; items reference products
     flashSale: { enabled: false, title: "ลดพิเศษสุดคุ้ม", endTime: 0, items: [] },

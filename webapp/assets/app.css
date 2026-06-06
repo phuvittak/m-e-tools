@@ -238,6 +238,14 @@ img { max-width: 100%; display: block; }
 .me-promo-date { font-family: var(--font-body); color: #fff; font-weight: 700; margin: 0; }
 .me-promo-cond { font-family: var(--font-body); color: var(--concrete-200); font-size: 12px; margin: 2px 0 0; opacity: .8; }
 .me-promo-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 2px; }
+/* multi-image swipeable slider (เลื่อนซ้าย-ขวา) */
+.me-promo-slider { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; min-height: 190px; }
+.me-promo-slider::-webkit-scrollbar { display: none; }
+.me-promo-slide { flex: 0 0 100%; scroll-snap-align: center; background-size: cover; background-position: center; min-height: 190px; }
+@media (max-width: 720px) {
+  .me-promo-card { grid-template-columns: 1fr; }
+  .me-promo-slide, .me-promo-slider, .me-promo-img { min-height: 220px; }
+}
 
 /* ---------- flash sale (below brands) ---------- */
 .me-flash { background: var(--ink); padding: 56px 0; }
