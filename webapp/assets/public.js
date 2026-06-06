@@ -1552,10 +1552,12 @@
     return d.getFullYear() + "-" + m + "-" + day;
   }
   function promoInWindow(promo) {
+    // เคารพเวลาเริ่ม 2 ทุ่ม + ช่วงก่อน/หลังที่คำนวณ (โหมดวันที่ซ้ำ)
+    if (S.promoActiveNow) return S.promoActiveNow(promo);
     var t = todayStr();
     var w = S.promoWindow ? S.promoWindow(promo) : { start: promo.startDate, end: promo.endDate };
-    if (w.start && t < w.start) return false; // ยังไม่ถึงวันเริ่ม
-    if (w.end && t > w.end) return false;     // เลยวันสิ้นสุดแล้ว
+    if (w.start && t < w.start) return false;
+    if (w.end && t > w.end) return false;
     return true;
   }
   function renderPromo(promo) {
@@ -1565,7 +1567,8 @@
     var fill = S.fillPromoTokens ? function (s) { return S.fillPromoTokens(s, promo); } : function (s) { return s || ""; };
     var title = fill(promo.title || "");
     var ptext = fill(promo.text || "");
-    var pdate = fill(promo.dateText || "");
+    // ช่วงวันที่: ใช้ของเจ้าของถ้าพิมพ์ไว้ ไม่งั้นสร้างอัตโนมัติจากช่วงโปร
+    var pdate = S.promoDateText ? S.promoDateText(promo) : fill(promo.dateText || "");
     // ลิงก์ร้านหลายช่อง (Shopee/Lazada/TikTok ฯลฯ) — ปุ่มเรียงกัน, เปิดแท็บใหม่
     var links = (promo.links || []).filter(function (l) { return l && l.url; });
     var linksHtml = links.length

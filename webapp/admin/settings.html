@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ตั้งค่าเว็บไซต์ — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260606j">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260606k">
 </head>
 <body data-admin="settings">
   <div class="admin" data-shell>
@@ -73,16 +73,17 @@
             <div data-promo-links></div>
             <button type="button" class="btn btn-sm" data-promo-link-add style="margin-top:6px">+ เพิ่มลิงก์ร้าน</button>
           </div>
-          <div class="field"><label>ช่วงวันที่โปร (โชว์ในข้อความ นำหน้าด้วย 👉)</label><input data-promo-datetext placeholder="เช่น 5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69"></div>
+          <div class="field"><label>ช่วงวันที่โปร (โชว์ในข้อความ นำหน้าด้วย 👉) — <b>เว้นว่าง = ระบบใส่ให้อัตโนมัติ</b></label><input data-promo-datetext placeholder="ปล่อยว่างได้ ระบบจะใส่ให้เอง เช่น 5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69"></div>
           <div class="field"><label>หมายเหตุเงื่อนไข (โชว์ด้วย * นำหน้า)</label><input data-promo-conditions placeholder="เช่น เงื่อนไขเป็นไปตามที่บริษัทกำหนด"></div>
           <div class="panel-sub" style="background:#fafafa;border:1px solid #eee;border-radius:8px;padding:12px;margin:6px 0">
             <div style="font-weight:600;margin-bottom:8px">🗓️ โปรวันที่ซ้ำ (เช่น 6.6, 8.8) — แนะนำ</div>
             <label class="f-check" style="margin-bottom:8px"><input type="checkbox" data-promo-recurring> 🔁 <b>ทำซ้ำเองทุกเดือนอัตโนมัติ</b> (1.1, 2.2, 3.3, … 12.12) — ตั้งครั้งเดียวใช้ตลอด ไม่ต้องเลือกวันที่</label>
             <div class="row" style="display:flex;gap:12px;flex-wrap:wrap">
-              <div class="field" style="flex:1.4;min-width:160px" data-promo-anchor-wrap><label>วันที่โปรซ้ำ (เฉพาะครั้งเดียว เช่น 6/6)</label><input type="date" data-promo-anchor></div>
-              <div class="field" style="flex:1;min-width:120px"><label>เริ่มก่อน / จบหลัง (วัน)</label><input type="number" min="0" max="30" data-promo-span placeholder="3"></div>
+              <div class="field" style="flex:1.6;min-width:160px" data-promo-anchor-wrap><label>วันที่โปรซ้ำ (เฉพาะครั้งเดียว เช่น 6/6)</label><input type="date" data-promo-anchor></div>
+              <div class="field" style="flex:1;min-width:100px"><label>เริ่มก่อน (วัน)</label><input type="number" min="0" max="30" data-promo-before placeholder="1"></div>
+              <div class="field" style="flex:1;min-width:100px"><label>จบหลัง (วัน)</label><input type="number" min="0" max="30" data-promo-after placeholder="2"></div>
             </div>
-            <p class="hint" style="margin:2px 0 0;color:#888;font-size:.85em">ติ๊ก “ทำซ้ำทุกเดือน” แล้วโปรจะ <b>โผล่เองทุกวันที่ซ้ำเดือน</b> (เริ่มก่อน/จบหลังตามจำนวนวัน) · <code>{dd}</code> เปลี่ยนตามเดือนให้เอง เช่น มิ.ย.→6.6, ส.ค.→8.8 · หรือถ้าอยากจัดครั้งเดียวให้เลือก “วันที่โปรซ้ำ” แทน <span data-promo-windowprev style="color:#16a34a"></span></p>
+            <p class="hint" style="margin:2px 0 0;color:#888;font-size:.85em">ติ๊ก “ทำซ้ำทุกเดือน” แล้วโปรจะ <b>โผล่เองทุกวันที่ซ้ำเดือน</b> · <b>เริ่ม 2 ทุ่ม</b>ของวันเริ่ม (ก่อนวันโปร) แล้วจบตามจำนวนวันหลัง · <code>{dd}</code> เปลี่ยนตามเดือนให้เอง เช่น มิ.ย.→6.6, ส.ค.→8.8 <span data-promo-windowprev style="color:#16a34a"></span></p>
           </div>
           <div class="row" style="display:flex;gap:12px;flex-wrap:wrap">
             <div class="field" style="flex:1;min-width:140px"><label>วันเริ่มแสดง (ใช้เมื่อไม่ตั้งวันที่โปรซ้ำ)</label><input type="date" data-promo-start></div>
@@ -169,9 +170,9 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260606j"></script>
-  <script src="../assets/store.js?v=20260606j"></script>
-  <script src="../assets/ui.js?v=20260606j"></script>
-  <script src="../assets/admin.js?v=20260606j"></script>
+  <script src="../assets/thai-geo.js?v=20260606k"></script>
+  <script src="../assets/store.js?v=20260606k"></script>
+  <script src="../assets/ui.js?v=20260606k"></script>
+  <script src="../assets/admin.js?v=20260606k"></script>
 </body>
 </html>

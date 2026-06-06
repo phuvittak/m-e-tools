@@ -78,12 +78,19 @@ async function getPromo() {
       dateText: (f.dateText && f.dateText.stringValue) || '',
       conditions: (f.conditions && f.conditions.stringValue) || '',
       anchorDate: (f.anchorDate && f.anchorDate.stringValue) || '',
-      spanDays: (f.spanDays && (f.spanDays.integerValue != null ? +f.spanDays.integerValue : (f.spanDays.doubleValue != null ? +f.spanDays.doubleValue : null))),
+      beforeDays: numField(f.beforeDays),
+      afterDays: numField(f.afterDays),
       recurring: !!(f.recurring && f.recurring.booleanValue),
     };
   } catch { return null; }
 }
-// เติม token หัวข้อ/รายละเอียดตามวันที่โปรซ้ำ (ให้ตรงกับ store.js fillPromoTokens)
+function numField(x) {
+  if (!x) return null;
+  if (x.integerValue != null) return +x.integerValue;
+  if (x.doubleValue != null) return +x.doubleValue;
+  return null;
+}
+// เติม token หัวข้อ/รายละเอียดตามวันที่โปรซ้ำ (ให้ตรงกับ store.js)
 //   {dd} = เลขโปรซ้ำ เช่น 6.6 / 8.8 / 11.11   ·   {date} = วันที่ไทยสั้น เช่น "6 มิ.ย."
 const THAI_MON_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 const isYmd = (s) => s && /^\d{4}-\d{2}-\d{2}$/.test(s);
@@ -94,27 +101,27 @@ function addDaysStr(ymd, n) {
   dt.setUTCDate(dt.getUTCDate() + n);
   return dt.getUTCFullYear() + '-' + pad2(dt.getUTCMonth() + 1) + '-' + pad2(dt.getUTCDate());
 }
-const promoSpan = (promo) => (promo && promo.spanDays != null && promo.spanDays !== '') ? +promo.spanDays : 3;
+const promoBefore = (p) => (p && p.beforeDays != null && p.beforeDays !== '') ? +p.beforeDays : 1;
+const promoAfter = (p) => (p && p.afterDays != null && p.afterDays !== '') ? +p.afterDays : 2;
 // โหมดทำซ้ำ: หา double-date (วัน=เดือน) ที่วันนี้อยู่ในช่วง; ไม่งั้นคืนอันถัดไป
 function activeDouble(promo, today) {
   today = today || thaiToday();
-  const span = promoSpan(promo), ty = +today.slice(0, 4), anchors = [];
+  const before = promoBefore(promo), after = promoAfter(promo), ty = +today.slice(0, 4), anchors = [];
   for (let y = ty - 1; y <= ty + 1; y++) for (let m = 1; m <= 12; m++) anchors.push(y + '-' + pad2(m) + '-' + pad2(m));
   for (const a of anchors) {
-    const s = addDaysStr(a, -span), e = addDaysStr(a, span);
+    const s = addDaysStr(a, -before), e = addDaysStr(a, after);
     if (today >= s && today <= e) return { anchor: a, start: s, end: e, active: true };
   }
   const up = anchors.filter((a) => a >= today).sort()[0] || anchors[anchors.length - 1];
-  return { anchor: up, start: addDaysStr(up, -span), end: addDaysStr(up, span), active: false };
+  return { anchor: up, start: addDaysStr(up, -before), end: addDaysStr(up, after), active: false };
 }
-// ช่วงโปรที่ใช้จริง: recurring → double-date รอบปัจจุบัน/ถัดไป; anchorDate → [anchor±span]; ไม่งั้น start/end
+// ช่วงโปรที่ใช้จริง: recurring → double-date รอบปัจจุบัน/ถัดไป; anchorDate → [anchor-before, anchor+after]; ไม่งั้น start/end
 function promoWindow(promo) {
-  if (promo && promo.recurring) { const d = activeDouble(promo); return { start: d.start, end: d.end }; }
+  if (promo && promo.recurring) { const d = activeDouble(promo); return { start: d.start, end: d.end, anchored: true }; }
   if (promo && isYmd(promo.anchorDate)) {
-    const span = promoSpan(promo);
-    return { start: addDaysStr(promo.anchorDate, -span), end: addDaysStr(promo.anchorDate, span) };
+    return { start: addDaysStr(promo.anchorDate, -promoBefore(promo)), end: addDaysStr(promo.anchorDate, promoAfter(promo)), anchored: true };
   }
-  return { start: (promo && promo.startDate) || '', end: (promo && promo.endDate) || '' };
+  return { start: (promo && promo.startDate) || '', end: (promo && promo.endDate) || '', anchored: false };
 }
 function fillPromoTokens(str, promo) {
   if (!str) return str || '';
@@ -123,6 +130,17 @@ function fillPromoTokens(str, promo) {
   if (isYmd(s)) { const p = s.split('-'); m = +p[1]; d = +p[2]; }
   else { const n = new Date(Date.now() + 7 * 3600 * 1000); m = n.getUTCMonth() + 1; d = n.getUTCDate(); }
   return String(str).replace(/\{dd\}/g, m + '.' + d).replace(/\{date\}/g, d + ' ' + THAI_MON_ABBR[m - 1]);
+}
+// ช่วงวันที่โปร (สำหรับ 👉) — ของเจ้าของถ้าพิมพ์ไว้ ไม่งั้นสร้างอัตโนมัติ "5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69"
+function promoDateText(promo) {
+  if (promo && promo.dateText) return fillPromoTokens(promo.dateText, promo);
+  const w = promoWindow(promo);
+  if (!w.start || !w.end) return '';
+  const sp = w.start.split('-'), ep = w.end.split('-');
+  const beYY = pad2((+ep[0] + 543) % 100);
+  const startTxt = (+sp[2]) + ' ' + THAI_MON_ABBR[+sp[1] - 1] + (w.anchored ? ' (2 ทุ่ม)' : '');
+  const endTxt = (+ep[2]) + ' ' + THAI_MON_ABBR[+ep[1] - 1] + ' ' + beYY;
+  return startTxt + ' – ' + endTxt;
 }
 // แปลง promo → LINE messages (รูปแบนเนอร์ + ข้อความหลายช่องทาง) — เลย์เอาต์ตามตัวอย่างที่เจ้าของต้องการ
 //   {title}
@@ -142,7 +160,8 @@ function buildMessages(promo) {
   if (promo.text) lines.push(fillPromoTokens(promo.text, promo));
   const linkLines = (promo.links || []).map((l) => '📌 ' + (l.label ? l.label + ' : ' : '') + l.url);
   if (linkLines.length) { lines.push(''); linkLines.forEach((l) => lines.push(l)); }
-  if (promo.dateText) { lines.push(''); lines.push('👉 ' + fillPromoTokens(promo.dateText, promo)); }
+  const dt = promoDateText(promo); // ของเจ้าของ หรือสร้างอัตโนมัติ
+  if (dt) { lines.push(''); lines.push('👉 ' + dt); }
   if (promo.conditions) lines.push('*' + promo.conditions);
   // สำรอง: ถ้าไม่ได้ใส่ลิงก์ร้านเลย ใส่ลิงก์หน้าร้านให้
   if (!linkLines.length) { lines.push(''); lines.push('🛒 ดูสินค้า/โปรทั้งหมด: ' + SITE + '/shop.html'); }
