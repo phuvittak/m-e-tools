@@ -1971,7 +1971,7 @@
     if (catList) { renderCats(); var catAddBtn = root.querySelector("[data-cat-add]"); if (catAddBtn) catAddBtn.addEventListener("click", function () { syncCats(); cats.push({ key: "c" + Date.now().toString(36), label: "", icon: "tool", image: "", hidden: false, parent: "" }); renderCats(); }); }
 
     // ----- Promo banner -----
-    var promo = Object.assign({ enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false }, st.promo || {});
+    var promo = Object.assign({ enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false, links: [], dateText: "", conditions: "" }, st.promo || {});
     var promoEnabled = root.querySelector("[data-promo-enabled]");
     if (promoEnabled) {
       promoEnabled.checked = !!promo.enabled;
@@ -1981,8 +1981,36 @@
       var promoEnd = root.querySelector("[data-promo-end]");
       if (promoStart) promoStart.value = promo.startDate || "";
       if (promoEnd) promoEnd.value = promo.endDate || "";
+      var promoDateText = root.querySelector("[data-promo-datetext]");
+      var promoConditions = root.querySelector("[data-promo-conditions]");
+      if (promoDateText) promoDateText.value = promo.dateText || "";
+      if (promoConditions) promoConditions.value = promo.conditions || "";
       var promoBroadcast = root.querySelector("[data-promo-broadcast]");
       if (promoBroadcast) promoBroadcast.checked = !!promo.autoBroadcast;
+      // ----- ตัวแก้ไขลิงก์ร้าน (label + url ทีละแถว) -----
+      var plinks = (promo.links || []).map(function (l) { return { label: l.label || "", url: l.url || "" }; });
+      var plinkBox = root.querySelector("[data-promo-links]");
+      // var (ไม่ใช่ function decl) เพราะ strict mode block-scope — ต้องเรียกได้จาก save handler ด้านล่าง
+      var syncPLinks = function () {
+        if (!plinkBox) return;
+        plinkBox.querySelectorAll("[data-pll]").forEach(function (i) { plinks[+i.dataset.pll].label = i.value; });
+        plinkBox.querySelectorAll("[data-plu]").forEach(function (i) { plinks[+i.dataset.plu].url = i.value; });
+      };
+      var renderPLinks = function () {
+        if (!plinkBox) return;
+        plinkBox.innerHTML = plinks.map(function (l, i) {
+          return '<div class="row-edit" style="display:flex;gap:6px;margin-bottom:6px">' +
+            '<input data-pll="' + i + '" value="' + esc(l.label) + '" placeholder="ชื่อช่อง เช่น Shopee Mall" style="flex:1">' +
+            '<input data-plu="' + i + '" value="' + esc(l.url) + '" placeholder="วางลิงก์ https://…" style="flex:1.6">' +
+            '<button class="btn btn-sm btn-danger" data-pldel="' + i + '">ลบ</button></div>';
+        }).join("");
+        plinkBox.querySelectorAll("[data-pldel]").forEach(function (b) {
+          b.onclick = function () { syncPLinks(); plinks.splice(+b.dataset.pldel, 1); renderPLinks(); };
+        });
+      }
+      renderPLinks();
+      var plinkAdd = root.querySelector("[data-promo-link-add]");
+      if (plinkAdd) plinkAdd.addEventListener("click", function () { syncPLinks(); plinks.push({ label: "", url: "" }); renderPLinks(); });
       var promoPrev = root.querySelector("[data-promo-prev]");
       var drawPromo = function () { promoPrev.innerHTML = promo.image ? '<img src="' + promo.image + '">' : '<span class="img-hint">ไม่มีรูป</span>'; };
       drawPromo();
@@ -2049,7 +2077,7 @@
       patch.faq = faq.filter(function (f) { return (f.q || "").trim(); });
       patch.qrImage = pendingQR;
       patch.brands = brands.filter(function (b) { return (b.name || "").trim(); });
-      if (promoEnabled) patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image, startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "", autoBroadcast: !!(root.querySelector("[data-promo-broadcast]") && root.querySelector("[data-promo-broadcast]").checked) };
+      if (promoEnabled) { syncPLinks(); patch.promo = { enabled: promoEnabled.checked, title: root.querySelector("[data-promo-title]").value, text: root.querySelector("[data-promo-text]").value, image: promo.image, startDate: (promoStart && promoStart.value) || "", endDate: (promoEnd && promoEnd.value) || "", autoBroadcast: !!(root.querySelector("[data-promo-broadcast]") && root.querySelector("[data-promo-broadcast]").checked), links: plinks.filter(function (l) { return (l.url || "").trim(); }), dateText: (promoDateText && promoDateText.value) || "", conditions: (promoConditions && promoConditions.value) || "" }; }
       if (flashEnabled) {
         var endStr = root.querySelector("[data-flash-end]").value;
         patch.flashSale = { enabled: flashEnabled.checked, title: root.querySelector("[data-flash-title]").value, endTime: endStr ? new Date(endStr).getTime() : 0, items: flash.items.filter(function (x) { return x.productId; }) };

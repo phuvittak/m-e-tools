@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ตั้งค่าเว็บไซต์ — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260606f">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260606g">
 </head>
 <body data-admin="settings">
   <div class="admin" data-shell>
@@ -64,8 +64,15 @@
         <div class="panel">
           <div class="panel-head"><h2>โปรโมชั่นหน้าแรก (แบนเนอร์ใต้ส่วนหัว)</h2></div>
           <label class="f-check" style="margin-bottom:10px"><input type="checkbox" data-promo-enabled> เปิดใช้งานแบนเนอร์โปรโมชั่น (ถ้าไม่เปิด หน้าแรกจะไม่มีส่วนนี้)</label>
-          <div class="field"><label>หัวข้อโปรโมชั่น</label><input data-promo-title placeholder="เช่น ลดทั้งร้านต้อนรับหน้าฝน"></div>
-          <div class="field"><label>รายละเอียด</label><textarea data-promo-text rows="2"></textarea></div>
+          <div class="field"><label>หัวข้อโปรโมชั่น</label><input data-promo-title placeholder="เช่น 6.6 เริ่มแล้ว! รีบช้อปเลย"></div>
+          <div class="field"><label>รายละเอียด (ไม่บังคับ)</label><textarea data-promo-text rows="2"></textarea></div>
+          <div class="field">
+            <label>ลิงก์ร้านค้า (Shopee / Lazada / TikTok ฯลฯ) — แสดงเป็น 📌 ทีละบรรทัดในข้อความ</label>
+            <div data-promo-links></div>
+            <button type="button" class="btn btn-sm" data-promo-link-add style="margin-top:6px">+ เพิ่มลิงก์ร้าน</button>
+          </div>
+          <div class="field"><label>ช่วงวันที่โปร (โชว์ในข้อความ นำหน้าด้วย 👉)</label><input data-promo-datetext placeholder="เช่น 5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69"></div>
+          <div class="field"><label>หมายเหตุเงื่อนไข (โชว์ด้วย * นำหน้า)</label><input data-promo-conditions placeholder="เช่น เงื่อนไขเป็นไปตามที่บริษัทกำหนด"></div>
           <div class="row" style="display:flex;gap:12px;flex-wrap:wrap">
             <div class="field" style="flex:1;min-width:140px"><label>วันเริ่มแสดง (ไม่บังคับ)</label><input type="date" data-promo-start></div>
             <div class="field" style="flex:1;min-width:140px"><label>วันสิ้นสุด (ไม่บังคับ)</label><input type="date" data-promo-end></div>
@@ -151,9 +158,9 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260606f"></script>
-  <script src="../assets/store.js?v=20260606f"></script>
-  <script src="../assets/ui.js?v=20260606f"></script>
-  <script src="../assets/admin.js?v=20260606f"></script>
+  <script src="../assets/thai-geo.js?v=20260606g"></script>
+  <script src="../assets/store.js?v=20260606g"></script>
+  <script src="../assets/ui.js?v=20260606g"></script>
+  <script src="../assets/admin.js?v=20260606g"></script>
 </body>
 </html>
