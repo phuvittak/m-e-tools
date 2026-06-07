@@ -162,7 +162,7 @@ function buildMessages(promo) {
   if (n >= 2) {
     const columns = [];
     for (let i = 0; i < Math.min(n, 10); i++) {
-      const u = `${SITE}/api/promo-image?i=${i}`;
+      const u = `${SITE}/api/product-image?promo=1&i=${i}`;
       columns.push({ imageUrl: u, action: { type: 'uri', label: 'ดูเลย', uri: tapUri } });
     }
     messages.push({
@@ -171,7 +171,7 @@ function buildMessages(promo) {
       template: { type: 'image_carousel', columns },
     });
   } else if (n === 1) {
-    const u = `${SITE}/api/promo-image`;
+    const u = `${SITE}/api/product-image?promo=1`;
     messages.push({ type: 'image', originalContentUrl: u, previewImageUrl: u });
   }
   const lines = [];

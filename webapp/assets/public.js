@@ -1779,7 +1779,7 @@
       var f = e.target.files && e.target.files[0]; if (!f) return; e.target.value = "";
       if (scanStatus) { scanStatus.textContent = "⏳ กำลังอ่านป้าย…"; scanStatus.style.color = "#222"; }
       compressImage(f, function (dataUrl) {
-        fetch("/api/read-product-label", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl }) })
+        fetch("/api/ai-parse-product", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl }) })
           .then(function (r) { return r.json(); })
           .then(function (res) {
             var p = res && res.parsed;
