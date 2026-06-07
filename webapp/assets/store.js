@@ -1177,6 +1177,43 @@
   function deletePurchase(id) { write(KEY.purchases, read(KEY.purchases, []).filter(function (p) { return p.id !== id; })); dispatch(); }
   function checkPin(pin) { return String(pin) === String(getSettings().deletePin || "1234"); }
 
+  /* ---------- Warranty registration (ลงทะเบียนประกันสินค้า) -------- */
+  // ลูกค้า/พนักงานกรอกฟอร์มหน้าร้าน → เก็บใน Firestore warranties/{id} (ต้องมี anon auth)
+  // หลังร้านอ่านได้ทั้งหมด (rule: read if isAdmin) + ค้น/กรองตามผู้ลงทะเบียน
+  function submitWarranty(data) {
+    return loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      var uid = (m.auth && m.auth.currentUser && m.auth.currentUser.uid) || "";
+      var id = genId("WR");
+      var payload = Object.assign({}, data, {
+        id: id, userId: uid, status: "pending",
+        registrant: data.registrant === "staff" ? "staff" : "customer",
+        createdAtTs: fs.serverTimestamp(),
+      });
+      return fs.setDoc(fs.doc(m.db, "warranties", id), payload).then(function () { return id; });
+    });
+  }
+  // หลังร้าน: ฟังรายการประกันแบบเรียลไทม์
+  function subscribeWarranties(cb) {
+    return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      return fs.onSnapshot(fs.collection(m.db, "warranties"), function (snap) {
+        var list = snap.docs.map(function (d) {
+          var x = d.data() || {};
+          if (x.createdAtTs && x.createdAtTs.toDate) x.createdAt = x.createdAtTs.toDate().getTime();
+          delete x.createdAtTs;
+          return x;
+        }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+        cb(list);
+      }, function (err) { console.warn("[warranty sub]", err && err.message); });
+    }).catch(function (err) { console.warn("[warranty sub init]", err && err.message); return null; });
+  }
+  function deleteWarranty(id) {
+    return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      return m.fsMod.deleteDoc(m.fsMod.doc(m.db, "warranties", String(id)));
+    });
+  }
+
   /* ---------- Chat (customer ↔ shop, LINE-OA style) -------------- */
   function getChats() { return read(KEY.chats, {}); }
   function saveChats(c) { write(KEY.chats, c); dispatch(); }
@@ -1671,6 +1708,7 @@
     removeCartItem: removeCartItem, clearCart: clearCart,
     cartCount: cartCount, cartLines: cartLines, cartTotals: cartTotals,
     getOrders: getOrders, placeOrder: placeOrder, setOrderStatus: setOrderStatus, saveOrderMessage: saveOrderMessage,
+    submitWarranty: submitWarranty, subscribeWarranties: subscribeWarranties, deleteWarranty: deleteWarranty,
     getMetrics: getMetrics, revenueByDay: revenueByDay,
     provinces: provinces, districtsOf: districtsOf, subdistrictsOf: subdistrictsOf, zipsOf: zipsOf,
     setGeoData: setGeoData,

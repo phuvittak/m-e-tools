@@ -11,7 +11,7 @@
   if (view === "staff" || view === "botreplies") {
     if (!S.requirePerm(null, "../login.html")) return;
     if (!S.isOwner()) { window.location.href = "dashboard.html"; return; }
-  } else if (view === "chat" || view === "botinbox" || view === "customers") {
+  } else if (view === "chat" || view === "botinbox" || view === "customers" || view === "warranty") {
     if (!S.requirePerm(null, "../login.html")) return; // any staff
   } else if (!S.requirePerm(permFor[view] || "dashboard", "../login.html")) return;
 
@@ -27,7 +27,7 @@
   if (S.ensureAdminRegistered) S.ensureAdminRegistered().then(function (uid) { if (uid) subscribeOrdersGlobal(); });
   // เรียลไทม์: settings/staff/สินค้า อัปเดตเองทุกหน้าหลังร้านเมื่อมีการแก้จากอีกเครื่อง
   if (S.startAdminRealtime) S.startAdminRealtime();
-  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, import: function(){} }[view] || function () {})();
+  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, warranty: initWarranty, import: function(){} }[view] || function () {})();
 
   // subscribe orders/{id} จาก Firestore แบบเรียลไทม์ → S.absorbCloudOrders() เขียนลง local me_orders
   function subscribeOrdersGlobal() {
@@ -60,6 +60,7 @@
       botinbox: '<path d="M12 2C6.48 2 2 6.04 2 11c0 2.5 1.16 4.74 3 6.33V22l3.83-2.1c1.01.23 2.07.35 3.17.35 5.52 0 10-4.04 10-9s-4.48-9-10-9z"/><circle cx="8.5" cy="11" r="1.2" fill="currentColor"/><circle cx="12" cy="11" r="1.2" fill="currentColor"/><circle cx="15.5" cy="11" r="1.2" fill="currentColor"/>',
       botreplies: '<path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M7 8h10M7 12h7" stroke-linecap="round"/>',
       customers: '<path d="M17 21v-2a4 4 0 0 0-3-3.87"/><path d="M4 21v-2a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v2"/><circle cx="9" cy="7" r="4"/><circle cx="17" cy="6" r="3"/>',
+      warranty: '<path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>',
     };
     var nav = [
       ["dashboard.html", "dashboard", "แดชบอร์ด", "dashboard"],
@@ -70,6 +71,7 @@
     ].filter(function (n) { return S.hasPerm(n[3]); });
     // แชทลูกค้าหน้าเว็บถูกถอดออก — ลูกค้าทักผ่าน LINE OA ตรง ดูทุกบทสนทนาในหน้า "แชทบอท LINE"
     nav.push(["bot-inbox.html", "botinbox", "กล่องข้อความออนไลน์", "botinbox"]);
+    nav.push(["warranty.html", "warranty", "ลงทะเบียนประกัน", "warranty"]);
     nav.push(["customers.html", "customers", "สรุปลูกค้า", "customers"]);
     if (S.isOwner()) nav.push(["bot-replies.html", "botreplies", "คำตอบของบอท", "botreplies"]);
     if (S.isOwner()) nav.push(["import.html", "import", "นำเข้าสินค้า (AI)", "inventory"]);
@@ -1269,6 +1271,76 @@
   // หน้า "ใครอยากได้อะไร / ยอดซื้อต่อคน"
   // อ่าน Firestore orders (ทั้งหมด) → จัด group by userId → คำนวณยอดรวม, จัดอันดับ
   // นับเฉพาะออเดอร์ที่ "ยืนยันแล้ว" (status != cancelled) เพื่อไม่ให้ออเดอร์ที่ยกเลิกมาทำให้สับสน
+  /* ===================== WARRANTY (ลงทะเบียนประกัน) ===================== */
+  function initWarranty() {
+    var root = document.querySelector("[data-warranty-root]"); if (!root) return;
+    var all = [], tab = "all", q = "";
+    var listBox = root.querySelector("[data-wl-list]");
+    var countEl = root.querySelector("[data-wl-count]");
+    var searchEl = root.querySelector("[data-wl-search]");
+    var canDelete = S.isOwner();
+    if (searchEl) searchEl.addEventListener("input", function () { q = searchEl.value.trim().toLowerCase(); render(); });
+    root.querySelectorAll("[data-wl-tab]").forEach(function (b) {
+      b.addEventListener("click", function () { tab = b.getAttribute("data-wl-tab"); root.querySelectorAll("[data-wl-tab]").forEach(function (x) { x.classList.toggle("on", x === b); }); render(); });
+    });
+    if (S.subscribeWarranties) S.subscribeWarranties(function (list) { all = list || []; render(); });
+    else if (listBox) listBox.innerHTML = '<div class="wl-empty">ต้องตั้งค่า Firebase ให้พร้อมก่อน</div>';
+
+    function regLabel(r) { return r === "staff" ? "พนักงานลงให้" : "ลูกค้าลงเอง"; }
+    function matches(w) {
+      if (tab === "customer" && w.registrant === "staff") return false;
+      if (tab === "staff" && w.registrant !== "staff") return false;
+      if (!q) return true;
+      var hay = [(w.firstName || "") + " " + (w.lastName || ""), w.phone, w.serial, w.model, w.brand, w.email, w.lineId, w.id].join(" ").toLowerCase();
+      return hay.indexOf(q) >= 0;
+    }
+    function render() {
+      if (!listBox) return;
+      var list = all.filter(matches);
+      if (countEl) countEl.textContent = list.length + " รายการ" + (all.length ? " (จากทั้งหมด " + all.length + ")" : "");
+      if (!list.length) { listBox.innerHTML = '<div class="wl-empty">' + (all.length ? "ไม่พบรายการที่ค้นหา" : "ยังไม่มีการลงทะเบียนประกัน") + "</div>"; return; }
+      listBox.innerHTML = list.map(function (w) {
+        var name = esc((w.firstName || "") + " " + (w.lastName || "")).trim() || "—";
+        var when = w.createdAt ? fmtAbsolute(new Date(w.createdAt).toISOString()) : "";
+        var badge = '<span class="wl-badge ' + (w.registrant === "staff" ? "staff" : "cust") + '">' + regLabel(w.registrant) + "</span>";
+        return '<div class="wl-item" data-wl-id="' + esc(w.id) + '">' +
+          '<div class="wl-item-main"><div class="wl-item-name">' + name + " " + badge + "</div>" +
+          '<div class="wl-item-sub">📞 ' + esc(w.phone || "—") + " · " + esc(w.brand || "") + " " + esc(w.model || "") + (w.serial ? " · SN: " + esc(w.serial) : "") + "</div>" +
+          '<div class="wl-item-sub" style="color:#999">' + esc(when) + "</div></div>" +
+          '<button class="btn btn-sm" data-wl-view="' + esc(w.id) + '">ดู</button>' +
+          (canDelete ? '<button class="btn btn-sm btn-danger" data-wl-del="' + esc(w.id) + '">ลบ</button>' : "") +
+          "</div>";
+      }).join("");
+      listBox.querySelectorAll("[data-wl-view]").forEach(function (b) { b.onclick = function () { openDetail(byId(b.dataset.wlView)); }; });
+      listBox.querySelectorAll("[data-wl-del]").forEach(function (b) { b.onclick = function () {
+        askPin("ลบใบลงทะเบียนประกันนี้", function () { S.deleteWarranty(b.dataset.wlDel).then(function () { U.toast("ลบแล้ว", "ok"); }).catch(function () { U.toast("ลบไม่สำเร็จ", "err"); }); });
+      }; });
+    }
+    function byId(id) { return all.filter(function (w) { return w.id === id; })[0]; }
+    function openDetail(w) {
+      if (!w) return;
+      var rows = [
+        ["ผู้ลงทะเบียน", regLabel(w.registrant)], ["ชื่อ-นามสกุล", (w.firstName || "") + " " + (w.lastName || "")],
+        ["เบอร์โทร", w.phone], ["อีเมล", w.email], ["LINE ID", w.lineId],
+        ["ที่อยู่", w.address], ["จังหวัด", w.province], ["รหัสไปรษณีย์", w.postcode],
+        ["วันที่ซื้อ", w.purchaseDate], ["Date code", w.dateCode], ["ร้าน/สาขา", (w.retailer || "") + (w.branch ? " · " + w.branch : "")],
+        ["ยี่ห้อ", w.brand], ["ประเภท", w.category], ["รุ่น", w.model], ["รหัสสินค้า/SN", w.serial],
+        ["หมายเหตุ", w.comment], ["เลขอ้างอิง", w.id],
+      ].filter(function (r) { return (r[1] || "").toString().trim(); });
+      var imgs = "";
+      if (w.receipt) imgs += '<div><div class="wl-doc-label">ใบเสร็จ/ใบรับประกัน</div><a href="' + esc(w.receipt) + '" target="_blank" rel="noopener"><img class="wl-doc" src="' + esc(w.receipt) + '"></a></div>';
+      if (w.otherDoc) imgs += '<div><div class="wl-doc-label">เอกสารอื่น</div><a href="' + esc(w.otherDoc) + '" target="_blank" rel="noopener"><img class="wl-doc" src="' + esc(w.otherDoc) + '"></a></div>';
+      var modal = document.createElement("div");
+      modal.className = "wl-modal";
+      modal.innerHTML = '<div class="wl-modal-card"><button class="wl-modal-x" aria-label="ปิด">×</button>' +
+        '<h2>ใบลงทะเบียนประกัน</h2>' +
+        '<table class="wl-detail">' + rows.map(function (r) { return "<tr><th>" + esc(r[0]) + "</th><td>" + esc(String(r[1])) + "</td></tr>"; }).join("") + "</table>" +
+        (imgs ? '<div class="wl-docs">' + imgs + "</div>" : "") + "</div>";
+      modal.addEventListener("click", function (e) { if (e.target === modal || e.target.classList.contains("wl-modal-x")) document.body.removeChild(modal); });
+      document.body.appendChild(modal);
+    }
+  }
+
   function initCustomers() {
     var alertBox = document.querySelector("[data-alert]");
     var byCatBox = document.querySelector("[data-by-category]");

@@ -148,7 +148,7 @@
   var pageRefresh = null;
   window.addEventListener("me-products-loaded", function () { if (pageRefresh) try { pageRefresh(); } catch (e) {} });
 
-  var routes = { home: initHome, categories: initCategories, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog };
+  var routes = { home: initHome, categories: initCategories, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog, warranty: initWarranty };
 
   // หน้า "หมวดหมู่" — กริดช่องหมวดแบบซ้อนหลายชั้น (เหมือน iToolmart)
   //   ?cat=<key> = ดูหมวดย่อยภายใต้หมวดนั้น. กดหมวดที่มีลูก → ลงลึกต่อ, กดหมวดที่ไม่มีลูก → ดูสินค้า
@@ -1714,6 +1714,53 @@
 
   function iconForCat(key) { return { drill: "drill", saw: "saw", grinder: "grinder", battery: "battery", measure: "measure", hand: "wrench", power: "compressor" }[key] || "tool"; }
   function uniq(arr) { return arr.filter(function (v, i) { return arr.indexOf(v) === i; }); }
+
+  /* ---------- warranty registration form (ลงทะเบียนประกัน) ---------- */
+  function initWarranty() {
+    var form = document.querySelector("[data-warranty-form]"); if (!form) return;
+    var statusEl = form.querySelector("[data-wr-status]");
+    var files = { receipt: "", otherDoc: "" };
+    // จังหวัด
+    var provSel = form.querySelector("[data-province]");
+    if (provSel) provSel.innerHTML = '<option value="">เลือกจังหวัด</option>' + S.provinces().map(function (p) { return "<option>" + esc(p) + "</option>"; }).join("");
+    // ถ้าล็อกอินเป็นพนักงาน → ตั้งผู้ลงทะเบียนเริ่มต้นเป็น "พนักงานขาย"
+    var sess = S.session();
+    var regSel = form.querySelector('[data-w="registrant"]');
+    if (regSel && sess && (sess.role === "owner" || sess.role === "employee")) regSel.value = "staff";
+    // แนบรูป (ย่อขนาด) + พรีวิว
+    form.querySelectorAll("[data-w-file]").forEach(function (inp) {
+      var key = inp.getAttribute("data-w-file");
+      var prev = form.querySelector('[data-prev="' + key + '"]');
+      inp.addEventListener("change", function (e) {
+        var f = e.target.files && e.target.files[0]; if (!f) { files[key] = ""; if (prev) prev.innerHTML = ""; return; }
+        compressImage(f, function (d) { files[key] = d; if (prev) prev.innerHTML = '<img src="' + d + '" alt="">'; });
+      });
+    });
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var data = {};
+      form.querySelectorAll("[data-w]").forEach(function (el) { data[el.getAttribute("data-w")] = (el.value || "").trim(); });
+      if (!data.firstName || !data.lastName || !data.phone) { setStatus("กรุณากรอกชื่อ–นามสกุล และเบอร์โทร", "err"); return; }
+      if (!files.receipt) { setStatus("กรุณาแนบรูปใบเสร็จ/ใบรับประกัน", "err"); return; }
+      data.receipt = files.receipt; data.otherDoc = files.otherDoc;
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn) { btn.disabled = true; btn.textContent = "กำลังส่ง…"; }
+      setStatus("กำลังบันทึก…", "");
+      S.submitWarranty(data).then(function (id) {
+        document.querySelector(".wr-wrap").innerHTML =
+          '<div class="wr-card wr-done"><div class="big">✅</div>' +
+          '<h2>ลงทะเบียนประกันเรียบร้อย</h2>' +
+          '<p>เลขที่อ้างอิง: <b>' + esc(id) + "</b></p>" +
+          '<p style="color:#666">ทีมงานได้รับข้อมูลแล้ว เก็บเลขอ้างอิงไว้ตรวจสอบสถานะได้</p>' +
+          '<a class="me-btn" href="index.html">กลับหน้าแรก</a></div>';
+        window.scrollTo(0, 0);
+      }).catch(function (err) {
+        if (btn) { btn.disabled = false; btn.textContent = "ลงทะเบียน / Submit"; }
+        setStatus("บันทึกไม่สำเร็จ: " + (err && err.message ? err.message : "ลองใหม่อีกครั้ง") + " (ต้องตั้งค่า Firebase ให้พร้อม)", "err");
+      });
+    });
+    function setStatus(msg, kind) { if (statusEl) { statusEl.textContent = msg; statusEl.style.color = kind === "err" ? "var(--price-red,#e11)" : "#222"; } }
+  }
   function checkedValues(scope, f) { return Array.prototype.slice.call(scope.querySelectorAll("[data-f=" + f + "]:checked")).map(function (c) { return c.value; }); }
   function clampInt(v, min, max) { v = parseInt(v, 10); if (isNaN(v)) v = min; return Math.max(min, Math.min(max, v)); }
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
