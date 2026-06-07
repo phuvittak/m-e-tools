@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>นำเข้าสินค้า — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260607c">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260607d">
   <style>
     .imp-card { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:20px; margin-bottom:16px }
     .imp-card h2 { margin:0 0 6px; font-size:16px }
@@ -159,10 +159,10 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="../assets/thai-geo.js?v=20260607c"></script>
-  <script src="../assets/store.js?v=20260607c"></script>
-  <script src="../assets/ui.js?v=20260607c"></script>
-  <script src="../assets/admin.js?v=20260607c"></script>
+  <script src="../assets/thai-geo.js?v=20260607d"></script>
+  <script src="../assets/store.js?v=20260607d"></script>
+  <script src="../assets/ui.js?v=20260607d"></script>
+  <script src="../assets/admin.js?v=20260607d"></script>
   <script>
   (function () {
     var S = window.MEStore;
@@ -308,7 +308,9 @@
           setAlert("ดึงข้อมูลไม่สำเร็จ: " + (data.message || data.error), "err");
           return;
         }
-        log("✅ AI พบ " + (data.products||[]).length + " รายการ");
+        var engineName = { gemini: "Gemini (ฟรี)", groq: "Groq (ฟรี)", claude: "Claude" }[data.via] || "AI";
+        log("✅ ดึงด้วย " + engineName + " สำเร็จ — พบ " + (data.products||[]).length + " รายการ");
+        if (data.via) setAlert("✅ ใช้ " + engineName + " ดึงข้อมูลได้ — พบ " + (data.products||[]).length + " รายการ", "ok");
         showResults(data.products, label);
       } catch(e) {
         log("❌ " + (e.message || e));
