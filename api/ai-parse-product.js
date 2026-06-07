@@ -14,6 +14,8 @@ const FIRESTORE_DB = 'default';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = 'gemini-2.0-flash-lite';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 function unwrapFsValue(v) {
   if (!v || typeof v !== 'object') return null;
@@ -146,8 +148,20 @@ async function claudeExtract(pageText) {
   const data = await r.json();
   return parseJson((data?.content?.[0]?.text || '[]').trim(), []);
 }
+// ดึงสินค้าด้วย Groq (ฟรี โควต้าเยอะ — OpenAI-compatible API) ใช้เป็นชั้นฟรีที่ 2
+async function groqExtract(pageText) {
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + GROQ_API_KEY, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.2, max_tokens: 4096, messages: [{ role: 'system', content: IMPORT_SYSTEM }, { role: 'user', content: pageText }] }),
+    signal: AbortSignal.timeout(40000),
+  });
+  if (!r.ok) throw new Error('groq ' + r.status);
+  const data = await r.json();
+  return parseJson((data?.choices?.[0]?.message?.content || '[]').trim(), []);
+}
 async function handleImport(res, url, textIn) {
-  if (!GEMINI_API_KEY && !ANTHROPIC_API_KEY) { res.status(500).json({ error: 'no-api-key', message: 'ยังไม่ได้ตั้ง GEMINI_API_KEY หรือ ANTHROPIC_API_KEY ใน Vercel' }); return; }
+  if (!GEMINI_API_KEY && !GROQ_API_KEY && !ANTHROPIC_API_KEY) { res.status(500).json({ error: 'no-api-key', message: 'ยังไม่ได้ตั้ง GEMINI_API_KEY / GROQ_API_KEY / ANTHROPIC_API_KEY ตัวใดเลยใน Vercel' }); return; }
   try {
     let pageText = String(textIn || '');
     if (url) {
@@ -165,12 +179,17 @@ async function handleImport(res, url, textIn) {
       try { products = await geminiExtract(pageText); via = 'gemini'; }
       catch (e) { console.warn('[import] gemini failed → fallback claude:', e?.message); }
     }
-    // 2) Gemini โควต้าเต็ม/ล่ม → ใช้ Claude แทน
+    // 2) Gemini เต็ม/ล่ม → ลอง Groq (ฟรี)
+    if (products == null && GROQ_API_KEY) {
+      try { products = await groqExtract(pageText); via = 'groq'; }
+      catch (e) { console.warn('[import] groq failed → fallback claude:', e?.message); }
+    }
+    // 3) ฟรีทั้งคู่เต็ม/ล่ม → ใช้ Claude (เสียเงิน) เป็นด่านสุดท้าย
     if (products == null && ANTHROPIC_API_KEY) {
       try { products = await claudeExtract(pageText); via = 'claude'; }
       catch (e) { res.status(502).json({ error: 'ai-error', message: 'AI วิเคราะห์ไม่สำเร็จ: ' + String(e.message || e) }); return; }
     }
-    if (products == null) { res.status(502).json({ error: 'ai-unavailable', message: 'Gemini โควต้าเต็ม และยังไม่ได้ตั้ง ANTHROPIC_API_KEY ไว้สำรอง' }); return; }
+    if (products == null) { res.status(502).json({ error: 'ai-unavailable', message: 'AI ฟรีโควต้าเต็มทั้งหมด และไม่มี ANTHROPIC_API_KEY สำรอง — ลองใหม่พรุ่งนี้หรือใส่ GROQ_API_KEY/ANTHROPIC_API_KEY' }); return; }
 
     const normalized = (Array.isArray(products) ? products : []).map(normalizeImported).filter(function (p) { return p.name; });
     res.status(200).json({ ok: true, products: normalized, via });
