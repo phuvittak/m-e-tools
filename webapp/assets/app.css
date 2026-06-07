@@ -438,6 +438,12 @@ img { max-width: 100%; display: block; }
 .pd-brand { font-family: var(--font-display-en); font-style: italic; font-size: 16px; background: var(--ink); color: var(--dw-yellow); padding: 3px 10px; align-self: flex-start; }
 .pd-name { font-family: var(--font-display-th); font-style: italic; font-weight: 900; font-size: clamp(26px,3vw,40px); line-height: 1.02; text-transform: uppercase; margin: 0; }
 .pd-desc { font-family: var(--font-body); font-size: 16px; line-height: 1.6; color: var(--fg-1); margin: 0; }
+.pd-desc p { margin: 0 0 8px; }
+.pd-desc p:last-child { margin-bottom: 0; }
+.pd-desc-h { font-weight: 800; color: var(--ink); margin: 12px 0 4px; }
+.pd-desc-list { margin: 4px 0 10px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.pd-desc-list li { position: relative; padding-left: 22px; line-height: 1.5; }
+.pd-desc-list li::before { content: "✓"; position: absolute; left: 0; top: 0; color: var(--dw-yellow-deep, #b8860b); font-weight: 900; }
 .pd-prices { display: flex; gap: 24px; flex-wrap: wrap; padding: 16px 0; border-top: 3px solid var(--ink); border-bottom: 3px solid var(--ink); }
 .pd-price-box .k { font-family: var(--font-display-en); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-3); }
 .pd-price-box .v { font-family: var(--font-display-th); font-style: italic; font-weight: 900; font-size: 34px; line-height: 1; }
