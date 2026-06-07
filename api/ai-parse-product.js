@@ -150,13 +150,16 @@ async function claudeExtract(pageText) {
 }
 // ดึงสินค้าด้วย Groq (ฟรี โควต้าเยอะ — OpenAI-compatible API) ใช้เป็นชั้นฟรีที่ 2
 async function groqExtract(pageText) {
+  // Groq ฟรีจำกัด tokens/นาที (TPM) — input + max_tokens รวมต้องไม่เกินลิมิต
+  // จึงตัดข้อความให้สั้นลง + ลด max_tokens กัน error 413 (Request too large)
+  const txt = String(pageText).slice(0, 8000);
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + GROQ_API_KEY, 'content-type': 'application/json' },
-    body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.2, max_tokens: 4096, messages: [{ role: 'system', content: IMPORT_SYSTEM }, { role: 'user', content: pageText }] }),
+    body: JSON.stringify({ model: GROQ_MODEL, temperature: 0.2, max_tokens: 2048, messages: [{ role: 'system', content: IMPORT_SYSTEM }, { role: 'user', content: txt }] }),
     signal: AbortSignal.timeout(40000),
   });
-  if (!r.ok) throw new Error('groq ' + r.status);
+  if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error('groq ' + r.status + (t ? ': ' + t.replace(/\s+/g, ' ').slice(0, 160) : '')); }
   const data = await r.json();
   return parseJson((data?.choices?.[0]?.message?.content || '[]').trim(), []);
 }
