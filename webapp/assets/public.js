@@ -1785,8 +1785,9 @@
             var p = res && res.parsed;
             if (!p || (!p.model && !p.serial && !p.brand)) { if (scanStatus) { scanStatus.textContent = "อ่านไม่ชัด — ลองถ่ายใกล้/ชัดขึ้น หรือกรอกเอง"; scanStatus.style.color = "var(--price-red,#e11)"; } return; }
             setW("model", p.model); setW("serial", p.serial); setW("brand", p.brand); setW("category", p.category);
+            var vEl = form.querySelector("[data-w-verify]"); if (vEl) vEl.checked = false; // ต้องตรวจ+ติ๊กใหม่ทุกครั้ง
             var got = [p.model ? "รุ่น " + p.model : "", p.serial ? "S/N " + p.serial : ""].filter(Boolean).join(" · ");
-            if (scanStatus) { scanStatus.textContent = "✅ กรอกให้แล้ว: " + (got || "ตรวจสอบความถูกต้องอีกครั้ง"); scanStatus.style.color = "#1a7f37"; }
+            if (scanStatus) { scanStatus.textContent = "✅ กรอกให้แล้ว: " + (got || "—") + " — โปรดตรวจความถูกต้องแล้วติ๊กยืนยันด้านล่าง"; scanStatus.style.color = "#1a7f37"; }
           })
           .catch(function () { if (scanStatus) { scanStatus.textContent = "เชื่อมต่อ AI ไม่ได้ — กรอกเอง"; scanStatus.style.color = "var(--price-red,#e11)"; } });
       });
@@ -1805,6 +1806,14 @@
       var data = {};
       form.querySelectorAll("[data-w]").forEach(function (el) { data[el.getAttribute("data-w")] = (el.value || "").trim(); });
       if (!data.firstName || !data.lastName || !data.phone) { setStatus("กรุณากรอกชื่อ–นามสกุล และเบอร์โทร", "err"); return; }
+      // ต้องติ๊กยืนยันว่าตรวจรุ่น/Serial แล้ว (กัน AI อ่านผิด)
+      var verifyEl = form.querySelector("[data-w-verify]");
+      if (verifyEl && !verifyEl.checked) {
+        var vbox = verifyEl.closest(".wr-verify");
+        if (vbox) { vbox.classList.add("need"); vbox.scrollIntoView({ behavior: "smooth", block: "center" }); setTimeout(function () { vbox.classList.remove("need"); }, 600); }
+        setStatus("กรุณาตรวจสอบ รุ่น/Serial Number แล้วติ๊กยืนยันก่อนส่ง", "err"); return;
+      }
+      data.verified = true;
       if (!files.receipt) { setStatus("กรุณาแนบรูปใบเสร็จ/ใบรับประกัน", "err"); return; }
       data.receipt = files.receipt; data.otherDoc = files.otherDoc;
       var btn = form.querySelector('button[type="submit"]');
