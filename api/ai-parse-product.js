@@ -20,6 +20,41 @@ export default async function handler(req, res) {
   }
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+
+  // โหมดอ่านป้าย/ฉลากจากรูป (vision) — ใช้ในฟอร์มลงทะเบียนประกัน (รวมไว้ที่นี่เพื่อประหยัดจำนวนฟังก์ชัน Vercel)
+  if (body.image) {
+    const raw = String(body.image);
+    const mm = /^data:(image\/[\w.+-]+);base64,(.*)$/.exec(raw);
+    const mediaType = mm ? mm[1] : 'image/jpeg';
+    const imgB64 = mm ? mm[2] : raw.replace(/^data:[^,]*,/, '');
+    if (!imgB64) { res.status(400).json({ error: 'no-image' }); return; }
+    const sys = `คุณคือผู้ช่วยอ่านป้าย/ฉลากเครื่องมือช่างจากรูปถ่าย — รองรับ "ทุกยี่ห้อ"
+(DEWALT, MAKITA, BOSCH, OSUKA, INGCO, STANLEY, HITACHI/HiKOKI ฯลฯ) อ่านตามที่เห็นจริงบนป้าย
+ตอบเป็น JSON เท่านั้น: {"model":"รหัสรุ่น เช่น OCHD802/DCD701 (ไม่เจอใส่ \\"\\")","serial":"Serial/SN เช่น NA015131 B1H7MDN (ไม่เจอใส่ \\"\\")","brand":"ยี่ห้อ (ไม่เจอใส่ \\"\\")","category":"ประเภทสั้นๆ เช่น สว่านไร้สาย/แบตเตอรี่ (ไม่แน่ใจใส่ \\"\\")"}
+กฎ: อ่านเฉพาะที่เห็นจริง ห้ามเดา ถ้าไม่ชัดใส่ค่าว่าง · model มักเป็นรหัสตัวใหญ่ · serial มักยาวกว่าและอยู่ใกล้ QR/บาร์โค้ด`;
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001', max_tokens: 512, system: sys,
+          messages: [{ role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imgB64 } },
+            { type: 'text', text: 'อ่านป้าย/ฉลากในรูปนี้ แล้วตอบเป็น JSON ตามรูปแบบ' },
+          ] }],
+        }),
+      });
+      if (!r.ok) { const e = await r.text(); res.status(502).json({ error: 'anthropic-error', message: e.slice(0, 200) }); return; }
+      const data = await r.json();
+      const txt = (data?.content?.[0]?.text || '{}').trim();
+      let parsed;
+      try { parsed = JSON.parse(txt); }
+      catch { const x = txt.match(/```(?:json)?\s*([\s\S]*?)```/); parsed = x ? JSON.parse(x[1].trim()) : {}; }
+      res.status(200).json({ ok: true, parsed: parsed || {} });
+    } catch (e) { res.status(500).json({ error: 'internal', message: e?.message }); }
+    return;
+  }
+
   const raw = String(body.text || '').trim();
   if (!raw) { res.status(400).json({ error: 'missing-text' }); return; }
 
