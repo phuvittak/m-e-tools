@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ตั้งค่าเว็บไซต์ — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260606E">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260607a">
 </head>
 <body data-admin="settings">
   <div class="admin" data-shell>
@@ -57,52 +57,22 @@
 
         <div class="panel">
           <div class="panel-head"><h2>หมวดเครื่องมือ (หน้าแรก + ตัวกรอง)</h2><button class="btn btn-sm" data-cat-add>+ เพิ่มหมวด</button></div>
-          <div class="img-hint" style="margin-bottom:10px">เปลี่ยนชื่อหมวด · เลือกไอคอน/อัปโหลดรูป · ลากเพื่อจัดลำดับ · ติ๊ก <b>VAT</b> = หมวดนั้นคิด VAT (เอาออก = หมวดยกเว้น VAT) — ใช้ร่วมกับโหมด VAT ในหน้า “VAT & รับบัตร”</div>
+          <div class="img-hint" style="margin-bottom:10px">เปลี่ยนชื่อหมวด · เลือกไอคอนสำเร็จรูป หรืออัปโหลดรูปเอง · ลากเพื่อจัดลำดับ (ลำดับนี้จะใช้ทั้งหน้าแรกและตัวกรองในหน้าสินค้า)</div>
           <div data-catlist></div>
         </div>
 
         <div class="panel">
           <div class="panel-head"><h2>โปรโมชั่นหน้าแรก (แบนเนอร์ใต้ส่วนหัว)</h2></div>
           <label class="f-check" style="margin-bottom:10px"><input type="checkbox" data-promo-enabled> เปิดใช้งานแบนเนอร์โปรโมชั่น (ถ้าไม่เปิด หน้าแรกจะไม่มีส่วนนี้)</label>
-          <div class="field"><label>หัวข้อโปรโมชั่น</label><input data-promo-title placeholder="เช่น {dd} เริ่มแล้ว! รีบช้อปเลย">
-            <p class="hint" style="margin:4px 0 0;color:#888;font-size:.85em">พิมพ์ <code>{dd}</code> ตรงไหน ระบบจะแทนด้วยเลขโปรซ้ำจาก “วันที่โปรซ้ำ” ด้านล่างให้เอง (เช่น 6.6 / 8.8 / 11.11) — ตั้งครั้งเดียว <b>หัวข้อเปลี่ยนตามวันที่เองไม่ต้องแก้</b> · <code>{date}</code> = วันที่ไทย เช่น “6 มิ.ย.” <span data-promo-titleprev style="color:#16a34a"></span></p>
+          <div class="field"><label>หัวข้อโปรโมชั่น</label><input data-promo-title placeholder="เช่น ลดทั้งร้านต้อนรับหน้าฝน"></div>
+          <div class="field"><label>รายละเอียด</label><textarea data-promo-text rows="2"></textarea></div>
+          <div class="field"><label>รูปโปรโมชั่น (ไม่บังคับ)</label>
+            <div class="img-edit"><div class="img-preview" data-promo-prev></div>
+              <div class="img-edit-controls">
+                <label class="btn btn-ghost btn-sm filebtn">อัปโหลดรูป…<input type="file" accept="image/*" data-promo-file></label>
+                <button type="button" class="btn btn-ghost btn-sm" data-promo-clear>ลบรูป</button>
+              </div></div>
           </div>
-          <div class="field"><label>รายละเอียด (ไม่บังคับ)</label><textarea data-promo-text rows="2"></textarea></div>
-          <div class="field">
-            <label>ลิงก์ร้านค้า (Shopee / Lazada / TikTok ฯลฯ) — แสดงเป็น 📌 ทีละบรรทัดในข้อความ</label>
-            <div data-promo-links></div>
-            <button type="button" class="btn btn-sm" data-promo-link-add style="margin-top:6px">+ เพิ่มลิงก์ร้าน</button>
-          </div>
-          <div class="field"><label>ช่วงวันที่โปร (โชว์ในข้อความ นำหน้าด้วย 👉) — <b>เว้นว่าง = ระบบใส่ให้อัตโนมัติ</b></label><input data-promo-datetext placeholder="ปล่อยว่างได้ ระบบจะใส่ให้เอง เช่น 5 มิ.ย (2 ทุ่ม) – 8 มิ.ย 69"></div>
-          <div class="field"><label>หมายเหตุเงื่อนไข (โชว์ด้วย * นำหน้า)</label><input data-promo-conditions placeholder="เช่น เงื่อนไขเป็นไปตามที่บริษัทกำหนด"></div>
-          <div class="panel-sub" style="background:#fafafa;border:1px solid #eee;border-radius:8px;padding:12px;margin:6px 0">
-            <div style="font-weight:600;margin-bottom:8px">🗓️ โปรวันที่ซ้ำ (เช่น 6.6, 8.8) — แนะนำ</div>
-            <label class="f-check" style="margin-bottom:8px"><input type="checkbox" data-promo-recurring> 🔁 <b>ทำซ้ำเองทุกเดือนอัตโนมัติ</b> (1.1, 2.2, 3.3, … 12.12) — ตั้งครั้งเดียวใช้ตลอด ไม่ต้องเลือกวันที่</label>
-            <div class="row" style="display:flex;gap:12px;flex-wrap:wrap">
-              <div class="field" style="flex:1.6;min-width:160px" data-promo-anchor-wrap><label>วันที่โปรซ้ำ (เฉพาะครั้งเดียว เช่น 6/6)</label><input type="date" data-promo-anchor></div>
-              <div class="field" style="flex:1;min-width:100px"><label>เริ่มก่อน (วัน)</label><input type="number" min="0" max="30" data-promo-before placeholder="1"></div>
-              <div class="field" style="flex:1;min-width:100px"><label>จบหลัง (วัน)</label><input type="number" min="0" max="30" data-promo-after placeholder="2"></div>
-            </div>
-            <p class="hint" style="margin:2px 0 0;color:#888;font-size:.85em">ติ๊ก “ทำซ้ำทุกเดือน” แล้วโปรจะ <b>โผล่เองทุกวันที่ซ้ำเดือน</b> · <b>เริ่ม 2 ทุ่ม</b>ของวันเริ่ม (ก่อนวันโปร) แล้วจบตามจำนวนวันหลัง · <code>{dd}</code> เปลี่ยนตามเดือนให้เอง เช่น มิ.ย.→6.6, ส.ค.→8.8 <span data-promo-windowprev style="color:#16a34a"></span></p>
-          </div>
-          <div class="row" style="display:flex;gap:12px;flex-wrap:wrap">
-            <div class="field" style="flex:1;min-width:140px"><label>วันเริ่มแสดง (ใช้เมื่อไม่ตั้งวันที่โปรซ้ำ)</label><input type="date" data-promo-start></div>
-            <div class="field" style="flex:1;min-width:140px"><label>วันสิ้นสุด</label><input type="date" data-promo-end></div>
-          </div>
-          <p class="hint" style="margin:-2px 0 8px;color:#888;font-size:.85em">ถ้าตั้ง “วันที่โปรซ้ำ” ด้านบนแล้ว ช่องนี้ไม่ต้องกรอก · เว้นว่างทั้งหมด = แสดงตลอด</p>
-          <div class="field"><label>รูปโปรโมชั่น (ใส่ได้หลายรูป — เลื่อนซ้าย-ขวาได้ทั้งบนเว็บและใน LINE)</label>
-            <div class="promo-gallery" data-promo-prev></div>
-            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-              <label class="btn btn-ghost btn-sm filebtn">+ เพิ่มรูป (เลือกหลายรูปได้)…<input type="file" accept="image/*" multiple data-promo-file></label>
-              <button type="button" class="btn btn-ghost btn-sm" data-promo-clear>ลบรูปทั้งหมด</button>
-            </div>
-            <p class="hint" style="margin:6px 0 0;color:#888;font-size:.85em">เห็นรูปทั้งหมดที่มี · กด × บนรูปเพื่อลบทีละใบ · ลูกค้าจะปัดดูทีละใบ · บน LINE ส่งเป็นการ์ดเลื่อนได้สูงสุด 10 รูป</p>
-          </div>
-          <hr style="border:none;border-top:1px solid #eee;margin:14px 0">
-          <label class="f-check" style="margin-bottom:6px"><input type="checkbox" data-promo-broadcast> 📣 ส่งโปรนี้หา <b>เพื่อนทุกคนใน LINE</b> อัตโนมัติเมื่อถึงวันเริ่มโปร</label>
-          <p class="hint" style="margin:0 0 10px;color:#888;font-size:.85em">ระบบจะ broadcast หาเพื่อนทั้งหมดของ LINE OA ครั้งเดียวในวันเริ่มโปร (วันที่โปรซ้ำลบจำนวนวันที่ตั้งไว้ เช่น 6.6 เริ่มก่อน 3 วัน = ส่ง 3 มิ.ย.) · ต้องตั้ง “วันที่โปรซ้ำ” หรือ “วันเริ่มแสดง” ด้านบน · (ช่องทางอื่น เช่น Messenger/IG ยังไม่ได้เชื่อมบอท จึงยังส่งไม่ได้)</p>
-          <button type="button" class="btn btn-ghost btn-sm" data-promo-sendnow>📤 ส่งหาเพื่อนทุกคนเลยตอนนี้</button>
-          <span class="hint" data-promo-sendstatus style="margin-left:8px;color:#888;font-size:.85em"></span>
         </div>
 
         <div class="panel">
@@ -163,25 +133,6 @@
         </div>
 
         <div class="panel">
-          <div class="panel-head"><h2>ภาษีมูลค่าเพิ่ม (VAT) & รับบัตร</h2></div>
-          <label class="f-check" style="margin-bottom:8px"><input type="checkbox" data-vat-on> ร้านจดทะเบียน VAT — คิด VAT กับการขายทุกช่องทาง (แสดงยอด VAT ในบิล)</label>
-          <div class="f2">
-            <div class="field"><label>อัตรา VAT (%)</label><input type="number" min="0" max="30" step="0.5" data-vat-pct placeholder="7"></div>
-            <div class="field"><label>วิธีคิด</label>
-              <select data-vat-mode>
-                <option value="add">ราคายังไม่รวม VAT → บวก VAT เพิ่ม</option>
-                <option value="include">ราคารวม VAT แล้ว → แสดงแยกส่วน VAT</option>
-              </select>
-            </div>
-          </div>
-          <p class="hint" style="margin:2px 0 12px;color:#888;font-size:.85em">⚠️ VAT คือภาษีที่ร้านเก็บแล้วนำส่งกรมสรรพากรเอง (ยื่น ภ.พ.30) ไม่มีใครหักให้อัตโนมัติ · ถ้าราคาสินค้าที่ตั้งไว้รวม VAT อยู่แล้ว ให้เลือก “ราคารวม VAT แล้ว” เพื่อไม่คิดซ้ำ</p>
-          <hr style="border:none;border-top:1px solid #eee;margin:8px 0 12px">
-          <label class="f-check" style="margin-bottom:8px"><input type="checkbox" data-card-on> 💳 รับบัตรเครดิต/ผ่อน (ผ่านเกตเวย์) — โผล่เฉพาะออเดอร์ใหญ่</label>
-          <div class="field"><label>โชว์ปุ่มบัตรเมื่อยอด ≥ (บาท)</label><input type="number" min="0" step="1000" data-card-threshold placeholder="45000"></div>
-          <p class="hint" style="margin:2px 0 0;color:#888;font-size:.85em">ต้องเชื่อมเกตเวย์ (Omise/GB Prime Pay) + ใส่ API key ก่อนปุ่มบัตรถึงใช้ได้จริง — ตอนนี้ตั้งค่าเตรียมไว้ก่อนได้</p>
-        </div>
-
-        <div class="panel">
           <div class="panel-head"><h2>คำถามที่พบบ่อย (FAQ)</h2><button class="btn btn-sm" data-faqadd>+ เพิ่มคำถาม</button></div>
           <div data-faqlist></div>
         </div>
@@ -190,9 +141,9 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260606E"></script>
-  <script src="../assets/store.js?v=20260606E"></script>
-  <script src="../assets/ui.js?v=20260606E"></script>
-  <script src="../assets/admin.js?v=20260606E"></script>
+  <script src="../assets/thai-geo.js?v=20260607a"></script>
+  <script src="../assets/store.js?v=20260607a"></script>
+  <script src="../assets/ui.js?v=20260607a"></script>
+  <script src="../assets/admin.js?v=20260607a"></script>
 </body>
 </html>

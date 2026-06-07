@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>นำเข้าสินค้า — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260606E">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260607a">
   <style>
     .imp-card { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:20px; margin-bottom:16px }
     .imp-card h2 { margin:0 0 6px; font-size:16px }
@@ -159,10 +159,10 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="../assets/thai-geo.js?v=20260606E"></script>
-  <script src="../assets/store.js?v=20260606E"></script>
-  <script src="../assets/ui.js?v=20260606E"></script>
-  <script src="../assets/admin.js?v=20260606E"></script>
+  <script src="../assets/thai-geo.js?v=20260607a"></script>
+  <script src="../assets/store.js?v=20260607a"></script>
+  <script src="../assets/ui.js?v=20260607a"></script>
+  <script src="../assets/admin.js?v=20260607a"></script>
   <script>
   (function () {
     var S = window.MEStore;
@@ -297,7 +297,7 @@
       var body = url ? { url: url } : { text: text };
       var label = url ? url.replace(/^https?:\/\//, "").split("/")[0] : "ข้อความที่วางมา";
       try {
-        var r = await fetch("/api/ai-parse-product", {
+        var r = await fetch("/api/import-products", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
