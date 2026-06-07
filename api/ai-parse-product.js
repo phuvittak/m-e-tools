@@ -113,8 +113,41 @@ const IMPORT_SYSTEM = `คุณคือ AI ช่วยนำเข้าส�
 รับข้อความหน้าเว็บสินค้า (หลังลบ HTML แล้ว) → แยกสินค้าและ return JSON array
 โครงสร้าง product object: { "name","brand","sku","category(drill/saw/grinder/battery/measure/hand/power)","motorType","warrantyYears","price","rentPerDay","desc","specs":[],"shipSize" }
 กฎ: ตอบเป็น JSON array เท่านั้น · ไม่มี markdown · หลายรายการส่งทั้งหมด (สูงสุด 20) · ไม่พบส่ง [] · price/rentPerDay ใส่ 0 ถ้าหาไม่ได้ · category ต้องเป็นหนึ่งใน drill/saw/grinder/battery/measure/hand/power`;
+function normalizeImported(p) {
+  return {
+    name: String(p.name || '').trim(), brand: String(p.brand || '').trim(), sku: String(p.sku || '').trim(),
+    category: ['drill', 'saw', 'grinder', 'battery', 'measure', 'hand', 'power'].includes(p.category) ? p.category : 'power',
+    motorType: String(p.motorType || '').trim(), warrantyYears: Number(p.warrantyYears) || 0,
+    price: Number(p.price) || 0, rentPerDay: Number(p.rentPerDay) || 0, desc: String(p.desc || '').trim(),
+    specs: Array.isArray(p.specs) ? p.specs.map(String).filter(Boolean) : [], shipSize: String(p.shipSize || '').trim(),
+  };
+}
+// ดึงสินค้าด้วย Gemini (ฟรี) — โยน error ถ้าโควต้าเต็ม/ล่ม เพื่อให้ fallback ไป Claude
+async function geminiExtract(pageText) {
+  const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+  const gr = await fetch(endpoint, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ systemInstruction: { parts: [{ text: IMPORT_SYSTEM }] }, contents: [{ role: 'user', parts: [{ text: pageText }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 4096, responseMimeType: 'application/json' } }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!gr.ok) throw new Error('gemini ' + gr.status);
+  const data = await gr.json();
+  return parseJson((data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]').trim(), []);
+}
+// ดึงสินค้าด้วย Claude (ใช้เป็น fallback เมื่อ Gemini ใช้ไม่ได้)
+async function claudeExtract(pageText) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 4096, system: IMPORT_SYSTEM, messages: [{ role: 'user', content: pageText }] }),
+    signal: AbortSignal.timeout(40000),
+  });
+  if (!r.ok) throw new Error('anthropic ' + r.status);
+  const data = await r.json();
+  return parseJson((data?.content?.[0]?.text || '[]').trim(), []);
+}
 async function handleImport(res, url, textIn) {
-  if (!GEMINI_API_KEY) { res.status(500).json({ error: 'no-api-key', message: 'GEMINI_API_KEY ไม่ได้ตั้งค่าใน Vercel' }); return; }
+  if (!GEMINI_API_KEY && !ANTHROPIC_API_KEY) { res.status(500).json({ error: 'no-api-key', message: 'ยังไม่ได้ตั้ง GEMINI_API_KEY หรือ ANTHROPIC_API_KEY ใน Vercel' }); return; }
   try {
     let pageText = String(textIn || '');
     if (url) {
@@ -124,26 +157,23 @@ async function handleImport(res, url, textIn) {
         pageText = stripHtml(await r.text()).slice(0, 20000);
       } catch (e) { res.status(502).json({ error: 'fetch-failed', message: String(e.message || e) }); return; }
     }
-    const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
-    const gr = await fetch(endpoint, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: IMPORT_SYSTEM }] }, contents: [{ role: 'user', parts: [{ text: pageText }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 4096, responseMimeType: 'application/json' } }),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!gr.ok) { const e = await gr.text(); res.status(502).json({ error: 'gemini-error', message: e.slice(0, 200) }); return; }
-    const data = await gr.json();
-    const products = parseJson((data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]').trim(), []);
-    if (!Array.isArray(products)) { res.status(200).json({ ok: true, products: [], warning: 'ไม่พบสินค้าในหน้านี้' }); return; }
-    const normalized = products.map(function (p) {
-      return {
-        name: String(p.name || '').trim(), brand: String(p.brand || '').trim(), sku: String(p.sku || '').trim(),
-        category: ['drill', 'saw', 'grinder', 'battery', 'measure', 'hand', 'power'].includes(p.category) ? p.category : 'power',
-        motorType: String(p.motorType || '').trim(), warrantyYears: Number(p.warrantyYears) || 0,
-        price: Number(p.price) || 0, rentPerDay: Number(p.rentPerDay) || 0, desc: String(p.desc || '').trim(),
-        specs: Array.isArray(p.specs) ? p.specs.map(String).filter(Boolean) : [], shipSize: String(p.shipSize || '').trim(),
-      };
-    }).filter(function (p) { return p.name; });
-    res.status(200).json({ ok: true, products: normalized });
+    if (!pageText.trim()) { res.status(200).json({ ok: true, products: [], warning: 'ไม่พบเนื้อหาในแหล่งนี้' }); return; }
+
+    let products = null, via = '';
+    // 1) ลอง Gemini ก่อน (ฟรี)
+    if (GEMINI_API_KEY) {
+      try { products = await geminiExtract(pageText); via = 'gemini'; }
+      catch (e) { console.warn('[import] gemini failed → fallback claude:', e?.message); }
+    }
+    // 2) Gemini โควต้าเต็ม/ล่ม → ใช้ Claude แทน
+    if (products == null && ANTHROPIC_API_KEY) {
+      try { products = await claudeExtract(pageText); via = 'claude'; }
+      catch (e) { res.status(502).json({ error: 'ai-error', message: 'AI วิเคราะห์ไม่สำเร็จ: ' + String(e.message || e) }); return; }
+    }
+    if (products == null) { res.status(502).json({ error: 'ai-unavailable', message: 'Gemini โควต้าเต็ม และยังไม่ได้ตั้ง ANTHROPIC_API_KEY ไว้สำรอง' }); return; }
+
+    const normalized = (Array.isArray(products) ? products : []).map(normalizeImported).filter(function (p) { return p.name; });
+    res.status(200).json({ ok: true, products: normalized, via });
   } catch (e) { res.status(500).json({ error: 'internal', message: String(e?.message || e) }); }
 }
 
