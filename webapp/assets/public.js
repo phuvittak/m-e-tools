@@ -1768,6 +1768,29 @@
     var sess = S.session();
     var regSel = form.querySelector('[data-w="registrant"]');
     if (regSel && sess && (sess.role === "owner" || sess.role === "employee")) regSel.value = "staff";
+    // สแกนป้ายสินค้า → AI อ่าน รุ่น/Serial ให้อัตโนมัติ
+    var scanInp = form.querySelector("[data-w-scan]");
+    var scanStatus = form.querySelector("[data-scan-status]");
+    var scanHelp = form.querySelector("[data-scan-help]");
+    var scanGuide = form.querySelector("[data-scan-guide]");
+    if (scanHelp && scanGuide) scanHelp.addEventListener("click", function () { scanGuide.hidden = !scanGuide.hidden; });
+    function setW(name, val) { var el = form.querySelector('[data-w="' + name + '"]'); if (el && val && !el.value.trim()) el.value = val; }
+    if (scanInp) scanInp.addEventListener("change", function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return; e.target.value = "";
+      if (scanStatus) { scanStatus.textContent = "⏳ กำลังอ่านป้าย…"; scanStatus.style.color = "#222"; }
+      compressImage(f, function (dataUrl) {
+        fetch("/api/read-product-label", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl }) })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            var p = res && res.parsed;
+            if (!p || (!p.model && !p.serial && !p.brand)) { if (scanStatus) { scanStatus.textContent = "อ่านไม่ชัด — ลองถ่ายใกล้/ชัดขึ้น หรือกรอกเอง"; scanStatus.style.color = "var(--price-red,#e11)"; } return; }
+            setW("model", p.model); setW("serial", p.serial); setW("brand", p.brand); setW("category", p.category);
+            var got = [p.model ? "รุ่น " + p.model : "", p.serial ? "S/N " + p.serial : ""].filter(Boolean).join(" · ");
+            if (scanStatus) { scanStatus.textContent = "✅ กรอกให้แล้ว: " + (got || "ตรวจสอบความถูกต้องอีกครั้ง"); scanStatus.style.color = "#1a7f37"; }
+          })
+          .catch(function () { if (scanStatus) { scanStatus.textContent = "เชื่อมต่อ AI ไม่ได้ — กรอกเอง"; scanStatus.style.color = "var(--price-red,#e11)"; } });
+      });
+    });
     // แนบรูป (ย่อขนาด) + พรีวิว
     form.querySelectorAll("[data-w-file]").forEach(function (inp) {
       var key = inp.getAttribute("data-w-file");
