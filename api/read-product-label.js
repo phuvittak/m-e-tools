@@ -23,7 +23,8 @@ export default async function handler(req, res) {
   const b64 = m ? m[2] : raw.replace(/^data:[^,]*,/, '');
   if (!b64) { res.status(400).json({ error: 'no-image' }); return; }
 
-  const system = `คุณคือผู้ช่วยอ่านป้าย/ฉลากเครื่องมือช่างจากรูปถ่าย
+  const system = `คุณคือผู้ช่วยอ่านป้าย/ฉลากเครื่องมือช่างจากรูปถ่าย — รองรับ "ทุกยี่ห้อ"
+(DEWALT, MAKITA, BOSCH, OSUKA, INGCO, STANLEY, HITACHI/HiKOKI, ฯลฯ) อ่านตามที่เห็นจริงบนป้าย
 ดึงข้อมูลที่อ่านได้จากรูปเป็น JSON เท่านั้น (ห้ามมีข้อความอื่น):
 {
   "model": "รหัสรุ่น/ชื่อรุ่น เช่น OCHD802 / DCD701 / DCB183 (ตามที่เห็นบนป้าย, ถ้าไม่เจอใส่ \\"\\")",
