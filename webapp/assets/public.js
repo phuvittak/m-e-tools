@@ -696,10 +696,17 @@
     function shippingNow() { return (co.fulfillment === "delivery" && co.province) ? S.getShippingFee(co.province) : 0; }
     function updateSummary() {
       var t = S.cartTotals();
+      var vi = S.lineVat(t.lines);
       var ship = shippingNow();
-      var total = S.vatInfo(t.subtotal).gross + t.deposit + ship;
-      var note = root.querySelector("[data-ship-note]");
-      if (note) note.hidden = !(co.fulfillment === "delivery" && co.province);
+      var showShip = co.fulfillment === "delivery" && co.province;
+      var total = vi.gross + t.deposit + (showShip ? ship : 0);
+      // ค่าจัดส่ง — โชว์ใต้ VAT เฉพาะตอนเลือกจัดส่งถึงบ้านและเลือกจังหวัดแล้ว
+      var shipLine = root.querySelector("[data-ship-line]");
+      if (shipLine) {
+        shipLine.hidden = !showShip;
+        var amtEl = shipLine.querySelector("[data-ship-amt]"); if (amtEl) amtEl.textContent = S.money(ship);
+        var provEl = shipLine.querySelector("[data-ship-prov]"); if (provEl) provEl.textContent = showShip ? (" (" + co.province + ")") : "";
+      }
       var tt = root.querySelector("[data-total]"); if (tt) tt.textContent = S.money(total);
       var btn = root.querySelector("[data-checkout]"); if (btn) btn.textContent = "ยืนยันสั่งซื้อ · " + S.money(total);
     }
@@ -716,11 +723,14 @@
         '<div class="cart-grid"><div class="cart-items" data-items></div>' +
         '<div style="display:flex;flex-direction:column;gap:18px">' +
           '<div class="summary"><h3>สรุปคำสั่งซื้อ</h3>' +
-            '<div class="summary-line"><span>ยอดสินค้า/ค่าเช่า</span><span>' + S.money(t.subtotal) + "</span></div>" +
-            (S.vatInfo(t.subtotal).enabled ? '<div class="summary-line"><span>VAT ' + S.vatInfo(t.subtotal).pct + "%</span><span>" + S.money(S.vatInfo(t.subtotal).vat) + "</span></div>" : "") +
-            (t.deposit ? '<div class="summary-line"><span>เงินมัดจำ (คืนภายหลัง)</span><span>' + S.money(t.deposit) + "</span></div>" : "") +
-            '<div class="summary-line" data-ship-note hidden><span>* รวมค่าจัดส่งแล้ว</span><span></span></div>' +
-            '<div class="summary-total"><span>ยอดชำระวันนี้</span><span class="v" data-total>' + S.money(S.vatInfo(t.subtotal).gross + t.deposit) + "</span></div>" +
+            (function () {
+              var vi = S.lineVat(t.lines);
+              return '<div class="summary-line"><span>ยอดสินค้า/ค่าเช่า' + (vi.enabled ? " (ก่อน VAT)" : "") + "</span><span>" + S.money(vi.net) + "</span></div>" +
+                (vi.enabled ? '<div class="summary-line"><span>VAT ' + vi.pct + "%</span><span>" + S.money(vi.vat) + "</span></div>" : "") +
+                '<div class="summary-line" data-ship-line hidden><span>ค่าจัดส่ง<span data-ship-prov></span></span><span data-ship-amt></span></div>' +
+                (t.deposit ? '<div class="summary-line"><span>เงินมัดจำ (คืนภายหลัง)</span><span>' + S.money(t.deposit) + "</span></div>" : "") +
+                '<div class="summary-total"><span>ยอดชำระวันนี้</span><span class="v" data-total>' + S.money(vi.gross + t.deposit) + "</span></div>";
+            })() +
             (t.deposit ? '<p class="note">* เงินมัดจำคืนเต็มจำนวนเมื่อนำเครื่องมือมาส่งคืนในสภาพปกติ</p>' : "") +
           "</div>" +
           '<div class="panel"><h3>ข้อมูลผู้ติดต่อ</h3>' +
@@ -815,7 +825,7 @@
         };
       }
       var t = S.cartTotals();
-      var payable = S.vatInfo(t.subtotal).gross + t.deposit + shipping;
+      var payable = S.lineVat(t.lines).gross + t.deposit + shipping;
       showPayment(payable, t, shipping, { name: co.name, phone: co.phone, fulfillment: co.fulfillment, address: address, shipping: shipping });
     }
 
@@ -831,8 +841,9 @@
         '<div class="me-modal-body"><div class="qr-pp"><b>PromptPay</b> · ' + esc(st.bankInfo || st.company || "M.E.Tools") + "</div>" +
           '<div class="qr-card" data-qrcard>' + qrVisual + '<div class="qr-amount">' + S.money(amount) + '</div><div class="qr-cap">สแกน QR แล้วโอนยอดนี้ให้ครบ · หมดอายุใน <b data-qrtimer>10:00</b></div></div>' +
           '<div class="pay-rows">' +
-            '<div class="r"><span>ยอดสินค้า/ค่าเช่า</span><span>' + S.money(totals.subtotal) + "</span></div>" +
-            (S.vatInfo(totals.subtotal).enabled ? '<div class="r"><span>VAT ' + S.vatInfo(totals.subtotal).pct + "%</span><span>" + S.money(S.vatInfo(totals.subtotal).vat) + "</span></div>" : "") +
+            (function () { var vi = S.lineVat(totals.lines);
+              return '<div class="r"><span>ยอดสินค้า/ค่าเช่า' + (vi.enabled ? " (ก่อน VAT)" : "") + "</span><span>" + S.money(vi.net) + "</span></div>" +
+                (vi.enabled ? '<div class="r"><span>VAT ' + vi.pct + "%</span><span>" + S.money(vi.vat) + "</span></div>" : ""); })() +
             (totals.deposit ? '<div class="r"><span>เงินมัดจำ</span><span>' + S.money(totals.deposit) + "</span></div>" : "") +
             (shipping ? '<div class="r"><span>ค่าจัดส่ง (' + checkout.address.province + ")</span><span>" + S.money(shipping) + "</span></div>" : '<div class="r"><span>รับเองที่ร้าน</span><span>ฟรี</span></div>') +
             '<div class="r total"><span>รวมชำระ</span><span>' + S.money(amount) + "</span></div>" +

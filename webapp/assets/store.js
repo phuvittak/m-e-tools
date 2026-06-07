@@ -934,6 +934,24 @@
     var va = base * pct / 100;
     return { enabled: true, pct: pct, mode: "add", vat: va, net: base, gross: base + va };
   }
+  // หมวดนี้คิด VAT ไหม (ค่าเริ่ม = คิด) — เจ้าของเลือกได้รายหมวดในตั้งค่า
+  function categoryHasVat(key) {
+    var cats = getSettings().categories || [];
+    for (var i = 0; i < cats.length; i++) if (cats[i].key === key) return cats[i].vat !== false;
+    return true;
+  }
+  // คำนวณ VAT จากรายการในตะกร้า โดยคิดเฉพาะหมวดที่ตั้งให้มี VAT
+  //   net = ราคาสินค้าก่อน VAT · vat = ภาษี · gross = รวมที่ลูกค้าจ่าย (ส่วนสินค้า)
+  function lineVat(lines) {
+    lines = lines || [];
+    var s = getSettings(), pct = +s.vatPct || 0;
+    var subtotal = lines.reduce(function (a, l) { return a + (l.lineTotal || 0); }, 0);
+    if (!s.vatEnabled || pct <= 0) return { enabled: false, pct: 0, mode: "", vat: 0, net: subtotal, gross: subtotal, subtotal: subtotal };
+    var vatable = lines.reduce(function (a, l) { return a + (categoryHasVat(l.product && l.product.category) ? (l.lineTotal || 0) : 0); }, 0);
+    if (s.vatMode === "include") { var v = vatable * pct / (100 + pct); return { enabled: true, pct: pct, mode: "include", vat: v, net: subtotal - v, gross: subtotal, subtotal: subtotal }; }
+    var va = vatable * pct / 100;
+    return { enabled: true, pct: pct, mode: "add", vat: va, net: subtotal, gross: subtotal + va, subtotal: subtotal };
+  }
 
   /* ---------- Orders ---------------------------------------------- */
   function getOrders() {
@@ -973,7 +991,7 @@
       var days = mode === "rent" ? (ls[0].days || 1) : 0;
       var thisShip = shippingApplied ? 0 : shipping;
       shippingApplied = true;
-      var vinfo = vatInfo(subtotal); // VAT คิดจากยอดสินค้า/ค่าเช่า
+      var vinfo = lineVat(ls); // VAT คิดต่อรายการ (เฉพาะหมวดที่ตั้งให้มี VAT)
       var order = {
         id: genId("ORD"), createdAt: Date.now(), type: mode,
         customer: customer, userEmail: userEmail, fulfillment: fulfillment,
@@ -1779,7 +1797,7 @@
     startAdminRealtime: startAdminRealtime,
     getCart: getCart, addToCart: addToCart, updateCartItem: updateCartItem,
     removeCartItem: removeCartItem, clearCart: clearCart,
-    cartCount: cartCount, cartLines: cartLines, cartTotals: cartTotals, vatInfo: vatInfo,
+    cartCount: cartCount, cartLines: cartLines, cartTotals: cartTotals, vatInfo: vatInfo, lineVat: lineVat, categoryHasVat: categoryHasVat,
     getOrders: getOrders, placeOrder: placeOrder, setOrderStatus: setOrderStatus, saveOrderMessage: saveOrderMessage, confirmOrderPayment: confirmOrderPayment,
     submitWarranty: submitWarranty, subscribeWarranties: subscribeWarranties, deleteWarranty: deleteWarranty,
     getWarrantyById: getWarrantyById, getMyWarranties: getMyWarranties,
