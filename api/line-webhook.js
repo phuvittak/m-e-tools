@@ -846,14 +846,14 @@ async function logCustomerSticker(userId, message) {
   } catch (e) { console.error('[sticker] store threw', e?.message); }
 }
 
-// วิดีโอจากลูกค้า: เก็บข้อความ + เวลา (วินาที) + ลิงก์ดูผ่าน proxy (/api/line-content)
+// วิดีโอจากลูกค้า: เก็บข้อความ + เวลา (วินาที) + ลิงก์ดูผ่าน proxy (/api/product-image?line=)
 // ไม่ดาวน์โหลดเก็บ base64 (วิดีโอใหญ่เกินขีดจำกัด Firestore) — สตรีมจาก LINE ตอนเปิดดู
 async function logCustomerVideo(userId, message) {
   if (!userId || !message?.id) return;
   const ms = Number(message.duration) || 0;
   const sec = Math.round(ms / 1000);
   const mmss = sec > 0 ? Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0') : '';
-  const proxy = `${SHOP.website}/api/line-content?id=${encodeURIComponent(message.id)}`;
+  const proxy = `${SHOP.website}/api/product-image?line=${encodeURIComponent(message.id)}`;
   const fsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_messages`;
   try {
     await fetch(fsUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: {

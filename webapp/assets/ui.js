@@ -300,7 +300,7 @@
     if (image) doc.image = image;
     fs.addDoc(fs.collection(webchatState.db, "bot_messages"), doc).then(function () {
       // มีข้อความ → ให้บอทตอบกลับ (รูปอย่างเดียวไม่เรียกบอท)
-      if (text) return fetch("/api/web-bot-reply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: webchatState.userId, text: text }) });
+      if (text) return fetch("/api/ai-parse-product", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: webchatState.userId, text: text }) });
     }).catch(function (err) { console.error("[webchat send]", err); });
   }
   function openWebChat() {
@@ -365,7 +365,7 @@
     }).then(function () {
       // เรียก bot ให้ตอบกลับ — server-side คำนวณ reply + เขียน Firestore (role:"bot")
       // ถ้า admin กำลังคุย (human mode) server จะข้าม ไม่ตอบทับ
-      return fetch("/api/web-bot-reply", {
+      return fetch("/api/ai-parse-product", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: webchatState.userId, text: text }),
