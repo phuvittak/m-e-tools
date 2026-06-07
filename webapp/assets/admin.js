@@ -1942,6 +1942,16 @@
     // ----- categories editor (rename / icon / image / reorder) -----
     var CAT_ICONS = ["drill", "driver", "saw", "grinder", "rotary", "battery", "charger", "measure", "wrench", "laser", "compressor", "box", "tool",
       "air", "weld", "engine", "agri", "pump", "car", "office", "clean", "ladder", "lift", "hammer", "bolt", "electric", "bearing", "generator", "safety", "gear", "pipe", "paint"];
+    // ชื่อไอคอนภาษาไทย (โชว์ในเมนูเลือกไอคอน ให้เข้าใจง่าย)
+    var CAT_ICON_TH = {
+      drill: "สว่าน", driver: "ไขควง", saw: "เลื่อย", grinder: "เครื่องเจียร", rotary: "สว่านโรตารี่",
+      battery: "แบตเตอรี่", charger: "ที่ชาร์จ", measure: "เครื่องมือวัด", wrench: "ประแจ", laser: "เลเซอร์วัดระดับ",
+      compressor: "ปั๊มลม", box: "กล่องเครื่องมือ", tool: "เครื่องมือทั่วไป", air: "เครื่องมือลม", weld: "เครื่องเชื่อม",
+      engine: "เครื่องยนต์", agri: "เครื่องมือเกษตร", pump: "ปั๊มน้ำ", car: "อุปกรณ์ยานยนต์", office: "อุปกรณ์สำนักงาน",
+      clean: "ทำความสะอาด", ladder: "บันได", lift: "รอก/ลิฟต์ยก", hammer: "ค้อน", bolt: "น็อต/สกรู",
+      electric: "อุปกรณ์ไฟฟ้า", bearing: "ลูกปืน", generator: "เครื่องปั่นไฟ", safety: "อุปกรณ์เซฟตี้",
+      gear: "เฟือง/อะไหล่", pipe: "ท่อ/ประปา", paint: "สี/งานพ่นสี",
+    };
     var cats = S.getCategories();
     var catList = root.querySelector("[data-catlist]");
     function catPreview(c) {
@@ -1987,8 +1997,9 @@
                 return '<option value="' + x.key + '"' + ((c.parent || "") === x.key ? " selected" : "") + ">" + esc(catPathLocal(x.key)) + "</option>";
               }).join("") + "</select>";
           })() +
-          '<select data-ci="' + i + '"' + (c.image ? " disabled" : "") + ' style="flex:0 0 120px">' +
-            CAT_ICONS.map(function (ic) { return '<option value="' + ic + '"' + ((c.icon || "tool") === ic ? " selected" : "") + ">" + ic + "</option>"; }).join("") + "</select>" +
+          '<span style="font-size:12px;color:#888;white-space:nowrap;align-self:center">ไอคอน:</span>' +
+          '<select data-ci="' + i + '"' + (c.image ? " disabled" : "") + ' title="เลือกรูปไอคอนของหมวดนี้ (รูปการ์ตูนหน้าหมวด)" style="flex:0 0 130px">' +
+            CAT_ICONS.map(function (ic) { return '<option value="' + ic + '"' + ((c.icon || "tool") === ic ? " selected" : "") + ">" + (CAT_ICON_TH[ic] || ic) + "</option>"; }).join("") + "</select>" +
           '<label class="btn btn-sm" style="cursor:pointer;white-space:nowrap">⬆ รูป<input type="file" accept="image/*" data-cimg="' + i + '" style="display:none"></label>' +
           (c.image ? '<button type="button" class="btn btn-sm" data-cimgclr="' + i + '">ลบรูป</button>' : "") +
           '<label class="f-check" style="white-space:nowrap"><input type="checkbox" data-ch="' + i + '"' + (c.hidden ? " checked" : "") + "> ซ่อน</label>" +
