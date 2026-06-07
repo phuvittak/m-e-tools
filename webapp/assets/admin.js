@@ -1837,9 +1837,11 @@
             "<td>" + o.items.map(function (it) { return it.name + " ×" + it.qty; }).join("<br>") + (o.shipping ? '<br><span class="prod-sku">+ ค่าจัดส่ง ' + S.money(o.shipping) + "</span>" : "") + "</td>" +
             '<td class="num">' + S.money(o.total) + "</td>" +
             '<td class="num">' + S.money((o.revenue || 0) - (o.cost || 0)) + "</td>" +
-            "<td>" + adminStatusBadges(o) + (o.staffMessage ? '<br><span class="prod-sku">📩 ' + esc(o.staffMessage) + "</span>" : "") + "</td>" +
+            "<td>" + adminStatusBadges(o) + payInfo(o) + (o.staffMessage ? '<br><span class="prod-sku">📩 ' + esc(o.staffMessage) + "</span>" : "") + "</td>" +
             '<td><div class="ord-act">' + (opts ? '<select class="statussel" data-os="' + o.id + '">' + opts + "</select>" : '<span class="prod-sku">—</span>') +
               '<div class="ord-msg"><input data-msg="' + o.id + '" value="' + esc(o.staffMessage || "") + '" placeholder="ตอบลูกค้า เช่น ของถึงใน 2 วัน"><button class="btn btn-sm" data-sendmsg="' + o.id + '">ส่ง</button></div>' +
+              (o.slip ? '<button class="btn btn-sm btn-ghost" data-viewslip="' + o.id + '">📄 ดูสลิป</button>' : "") +
+              (o.payStatus === "pending" ? '<button class="btn btn-sm" data-confirmpay="' + o.id + '">✓ ยืนยันรับเงิน</button>' : "") +
               '<button class="btn btn-sm" data-printlabel="' + o.id + '">🖨️ พิมพ์ที่อยู่</button>' +
               (S.hasPerm("orders_delete") ? '<button class="btn btn-sm btn-danger" data-delorder="' + o.id + '">ลบคำสั่งซื้อ</button>' : "") +
             "</div></td></tr>";
@@ -1867,8 +1869,30 @@
       tb.querySelectorAll("[data-printlabel]").forEach(function (b) {
         b.onclick = function () { var ord = S.getOrders().filter(function (x) { return x.id === b.dataset.printlabel; })[0]; if (ord) printOrderLabel(ord); };
       });
+      tb.querySelectorAll("[data-viewslip]").forEach(function (b) {
+        b.onclick = function () { var ord = S.getOrders().filter(function (x) { return x.id === b.dataset.viewslip; })[0]; if (ord && ord.slip) viewSlip(ord); };
+      });
+      tb.querySelectorAll("[data-confirmpay]").forEach(function (b) {
+        b.onclick = function () { S.confirmOrderPayment(b.dataset.confirmpay); U.toast("ยืนยันรับเงินแล้ว ✓", "ok"); render(); };
+      });
     }
     render();
+  }
+  // ป้ายสถานะการชำระเงิน (ในตารางคำสั่งซื้อ)
+  function payInfo(o) {
+    if (o.payStatus === "pending") return '<br><span class="pay-chip pending">⏳ รอตรวจสลิป</span>' + (o.payAmount ? ' <span class="prod-sku">โอน ' + S.money(o.payAmount) + "</span>" : "");
+    if (o.slip || o.payStatus === "verified") return '<br><span class="pay-chip ok">✅ ชำระแล้ว' + (o.slipRef ? " · " + esc(o.slipRef) : "") + "</span>";
+    return "";
+  }
+  // แสดงรูปสลิปแบบ overlay
+  function viewSlip(o) {
+    var bg = document.createElement("div");
+    bg.className = "slip-view-bg";
+    bg.innerHTML = '<div class="slip-view"><button class="slip-view-x" aria-label="ปิด">×</button>' +
+      '<div class="slip-view-cap">สลิป · ' + esc(o.id) + (o.slipRef ? " · ref " + esc(o.slipRef) : "") + "</div>" +
+      '<img src="' + esc(o.slip) + '" alt="สลิป"></div>';
+    bg.onclick = function (e) { if (e.target === bg || e.target.classList.contains("slip-view-x")) document.body.removeChild(bg); };
+    document.body.appendChild(bg);
   }
 
   // พิมพ์ใบที่อยู่/ใบจัดส่งของคำสั่งซื้อ → เปิดผ่าน iframe ซ่อน แล้วสั่งพิมพ์ (เลือกเครื่องพิมพ์ในกล่องของระบบ)

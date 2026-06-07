@@ -274,3 +274,13 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
   .panel > .btn:last-child { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation: none !important; transition: none !important; } }
+
+/* ---------- payment / slip (orders) ---------- */
+.pay-chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-top: 3px; }
+.pay-chip.pending { background: #fff3d6; color: #9a6b00; }
+.pay-chip.ok { background: #e6f4ea; color: #1a7f37; }
+.slip-view-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1200; }
+.slip-view { position: relative; max-width: 92vw; max-height: 92vh; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.slip-view img { max-width: 92vw; max-height: 82vh; border-radius: 8px; background: #fff; }
+.slip-view-cap { color: #fff; font-size: 13px; font-family: var(--font-mono, monospace); }
+.slip-view-x { position: absolute; top: -34px; right: 0; background: none; border: none; color: #fff; font-size: 30px; line-height: 1; cursor: pointer; }

@@ -594,6 +594,13 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 .qr-status { font-family: var(--font-body); font-size: 13px; font-weight: 700; padding: 8px 14px; border: 2px solid var(--ink); width: 100%; text-align: center; background: var(--concrete-100); }
 .qr-status.checking { background: var(--dw-yellow-pale); border-color: var(--dw-yellow-deep); }
 .qr-status.ok { background: var(--tape-green); color: #fff; border-color: var(--tape-green); }
+.qr-status.err { background: #fde8e8; color: #c0392b; border-color: #c0392b; }
+.slip-upload { width: 100%; border: 2px dashed var(--ink); padding: 12px; text-align: center; }
+.slip-up-label { font-family: var(--font-body); font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+.slip-pick { margin: 0; }
+.slip-prev { margin-top: 8px; }
+.slip-prev img { max-width: 160px; max-height: 200px; border: 1px solid var(--ink); border-radius: 4px; }
+.slip-manual { margin-top: 6px; background: none; border: none; color: #c0392b; font-weight: 700; text-decoration: underline; cursor: pointer; font-family: var(--font-body); font-size: 13px; }
 .me-modal-foot { padding: 0 22px 22px; display: flex; flex-direction: column; gap: 10px; }
 .pay-rows { width: 100%; display: flex; flex-direction: column; gap: 6px; }
 .pay-rows .r { display: flex; justify-content: space-between; font-family: var(--font-body); font-size: 14px; }

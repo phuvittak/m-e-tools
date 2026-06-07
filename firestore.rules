@@ -158,6 +158,13 @@ service cloud.firestore {
                  && request.resource.data.phone is string;
     }
 
+    // กันสลิปซ้ำ — เก็บแค่ "เลขอ้างอิงรายการโอน" (transRef) ไม่มีข้อมูลส่วนตัว
+    // create/get: เปิด (API ตรวจสลิปเขียน/อ่านโดยไม่ auth) · ห้าม list/แก้/ลบ (กันดึงทั้งหมด)
+    match /slip_refs/{ref} {
+      allow get, create: if true;
+      allow list, update, delete: if false;
+    }
+
     // อื่น ๆ ปิดทั้งหมด
     match /{document=**} {
       allow read, write: if false;

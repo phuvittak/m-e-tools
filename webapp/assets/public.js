@@ -828,42 +828,70 @@
       bg.innerHTML =
         '<div class="me-modal"><div class="me-modal-head"><h3>ชำระเงิน</h3><button class="me-modal-x">×</button></div>' +
         '<div class="me-modal-body"><div class="qr-pp"><b>PromptPay</b> · ' + esc(st.bankInfo || st.company || "M.E.Tools") + "</div>" +
-          '<div class="qr-card" data-qrcard>' + qrVisual + '<div class="qr-amount">' + S.money(amount) + '</div><div class="qr-cap">สแกน QR เพื่อชำระเงิน · หมดอายุใน <b data-qrtimer>10:00</b></div></div>' +
+          '<div class="qr-card" data-qrcard>' + qrVisual + '<div class="qr-amount">' + S.money(amount) + '</div><div class="qr-cap">สแกน QR แล้วโอนยอดนี้ให้ครบ · หมดอายุใน <b data-qrtimer>10:00</b></div></div>' +
           '<div class="pay-rows">' +
             '<div class="r"><span>ยอดสินค้า/ค่าเช่า</span><span>' + S.money(totals.subtotal) + "</span></div>" +
             (totals.deposit ? '<div class="r"><span>เงินมัดจำ</span><span>' + S.money(totals.deposit) + "</span></div>" : "") +
             (shipping ? '<div class="r"><span>ค่าจัดส่ง (' + checkout.address.province + ")</span><span>" + S.money(shipping) + "</span></div>" : '<div class="r"><span>รับเองที่ร้าน</span><span>ฟรี</span></div>') +
             '<div class="r total"><span>รวมชำระ</span><span>' + S.money(amount) + "</span></div>" +
           "</div>" +
-          '<div class="qr-status checking" data-paystatus>⏳ ระบบกำลังตรวจสอบยอดเงินเข้าจากธนาคารอัตโนมัติ…</div>' +
+          '<div class="slip-upload"><div class="slip-up-label">📤 โอนแล้ว — อัปโหลดสลิปเพื่อยืนยันอัตโนมัติ</div>' +
+            '<label class="me-btn me-btn-ghost me-btn-block slip-pick">เลือกรูปสลิป…<input type="file" accept="image/*" data-slipfile hidden></label>' +
+            '<div class="slip-prev" data-slipprev></div></div>' +
+          '<div class="qr-status" data-paystatus>โอนเงินตามยอด แล้วอัปโหลดสลิป ระบบจะตรวจให้อัตโนมัติ</div>' +
         "</div>" +
-        '<div class="me-modal-foot"><button class="me-btn me-btn-block" data-paid disabled>ยืนยันการชำระเงิน</button>' +
+        '<div class="me-modal-foot"><button class="me-btn me-btn-block" data-paid disabled>ยืนยันคำสั่งซื้อ</button>' +
           '<button class="me-btn me-btn-ghost me-btn-block" data-cancel>ยกเลิก</button></div></div>';
       document.body.appendChild(bg);
-      var detected = false, left = 600, poll, timer, elapsed = 0;
-      function cleanup() { clearInterval(poll); clearInterval(timer); }
+      var left = 600, timer;
+      var slip = "", slipRef = "", payStatus = "", payAmount = 0; // ผลตรวจสลิป
+      function cleanup() { clearInterval(timer); }
       function close() { cleanup(); bg.remove(); }
       bg.querySelector(".me-modal-x").onclick = close;
       bg.querySelector("[data-cancel]").onclick = close;
       bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
       var statusEl = bg.querySelector("[data-paystatus]"), paidBtn = bg.querySelector("[data-paid]"), timerEl = bg.querySelector("[data-qrtimer]");
+      var prevEl = bg.querySelector("[data-slipprev]");
       // 10-minute QR countdown
       timer = setInterval(function () {
         left--; var m = Math.floor(left / 60), s = left % 60; timerEl.textContent = m + ":" + (s < 10 ? "0" + s : s);
         if (left <= 0) { cleanup(); bg.querySelector("[data-qrcard]").innerHTML = '<div class="qr-expired">QR หมดอายุแล้ว<br>กรุณาเริ่มสั่งซื้อใหม่</div>'; statusEl.className = "qr-status"; statusEl.textContent = "หมดเวลาชำระเงิน"; }
       }, 1000);
-      // auto bank check — SIMULATED (real needs a payment gateway / bank API + backend)
-      poll = setInterval(function () {
-        elapsed++;
-        if (!detected && elapsed >= 7) {
-          detected = true; clearInterval(poll);
-          statusEl.className = "qr-status ok"; statusEl.textContent = "ธนาคารยืนยันได้รับการชำระเงินแล้ว ✓";
-          paidBtn.removeAttribute("disabled");
-        }
-      }, 1000);
+      function setStatus(cls, msg) { statusEl.className = "qr-status " + (cls || ""); statusEl.innerHTML = msg; }
+      // อัปโหลดสลิป → ตรวจอัตโนมัติผ่าน /api/verify-slip
+      bg.querySelector("[data-slipfile]").addEventListener("change", function (e) {
+        var f = e.target.files && e.target.files[0]; if (!f) return;
+        compressImage(f, function (dataUrl) {
+          slip = dataUrl; if (prevEl) prevEl.innerHTML = '<img src="' + dataUrl + '" alt="สลิป">';
+          payStatus = ""; paidBtn.setAttribute("disabled", "disabled");
+          setStatus("checking", "⏳ กำลังตรวจสอบสลิป…");
+          fetch("/api/verify-slip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl, amount: amount }) })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              if (res.verified) {
+                payStatus = "verified"; slipRef = res.ref || ""; payAmount = res.amount || amount;
+                setStatus("ok", "✅ ยืนยันสลิปสำเร็จ — กด “ยืนยันคำสั่งซื้อ”");
+                paidBtn.removeAttribute("disabled");
+              } else if (res.configured === false) {
+                // ร้านยังไม่เปิดตรวจอัตโนมัติ → ส่งให้ร้านตรวจเอง
+                payStatus = "pending"; slipRef = ""; payAmount = amount;
+                setStatus("", "📄 แนบสลิปแล้ว — ร้านจะตรวจสอบและยืนยันให้ · กด “ยืนยันคำสั่งซื้อ” เพื่อส่ง");
+                paidBtn.removeAttribute("disabled");
+              } else {
+                // ตรวจไม่ผ่าน → ให้แก้ไข หรือส่งให้ร้านตรวจเอง
+                payStatus = "";
+                setStatus("err", "❌ " + esc(res.message || "ตรวจสลิปไม่ผ่าน") + '<br><button type="button" class="slip-manual" data-slipmanual>ส่งสลิปให้ร้านตรวจเอง ▸</button>');
+                var mb = statusEl.querySelector("[data-slipmanual]");
+                if (mb) mb.onclick = function () { payStatus = "pending"; payAmount = amount; setStatus("", "📄 จะส่งสลิปให้ร้านตรวจ · กด “ยืนยันคำสั่งซื้อ”"); paidBtn.removeAttribute("disabled"); };
+              }
+            })
+            .catch(function () { setStatus("err", "เชื่อมต่อระบบตรวจสลิปไม่ได้ ลองใหม่อีกครั้ง"); });
+        });
+      });
       paidBtn.onclick = function () {
-        if (!detected) { U.toast("ระบบยังตรวจไม่พบการชำระเงิน", "err"); return; }
-        var created = S.placeOrder(checkout);
+        if (!payStatus) { U.toast("กรุณาอัปโหลดสลิปให้ตรวจผ่านก่อน", "err"); return; }
+        var co = Object.assign({}, checkout, { slip: slip, slipRef: slipRef, payStatus: payStatus, payAmount: payAmount, payMethod: "promptpay" });
+        var created = S.placeOrder(co);
         close();
         if (created && created.length) {
           var ids = created.map(function (o) { return o.id; }).join(",");

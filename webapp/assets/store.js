@@ -966,6 +966,10 @@
         total: subtotal + deposit + thisShip,
         revenue: subtotal, cost: cost,
         paid: true, received: false, status: "paid",
+        // การชำระเงิน: payStatus = verified (ตรวจสลิปผ่าน) | pending (รอแอดมินตรวจสลิป)
+        payMethod: checkout.payMethod || "promptpay",
+        payStatus: checkout.payStatus || "verified",
+        slip: checkout.slip || "", slipRef: checkout.slipRef || "", payAmount: checkout.payAmount || 0,
         // stockApplied=true เฉพาะตอนผู้สั่งมีสิทธิ์คลัง (ตัดสต๊อก cloud แล้วผ่าน saveProduct)
         // ลูกค้าหน้าร้านไม่มีสิทธิ์ → false → ฝั่งหลังร้านจะตัดสต๊อกให้ตอนรับออเดอร์เข้า
         stockApplied: hasPerm("inventory"),
@@ -1053,6 +1057,24 @@
       break;
     }
     write(KEY.orders, orders);
+  }
+
+  // แอดมินยืนยันรับเงิน (กรณีสลิปรอตรวจเอง) → payStatus = verified + ซิงค์ cloud
+  function confirmOrderPayment(orderId) {
+    var orders = read(KEY.orders, []);
+    for (var i = 0; i < orders.length; i++) {
+      if (orders[i].id !== orderId) continue;
+      orders[i].payStatus = "verified";
+      var o = orders[i];
+      if (o.userId) {
+        loadFirebaseAuthAndDb(isStaff() ? "admin" : undefined).then(ensureCloudAuth).then(function (m) {
+          return m.fsMod.setDoc(m.fsMod.doc(m.db, "orders", o.id), { payStatus: "verified", updatedAtTs: m.fsMod.serverTimestamp() }, { merge: true });
+        }).catch(function (err) { console.warn("[confirm pay]", err && err.message); });
+      }
+      break;
+    }
+    write(KEY.orders, orders);
+    dispatch();
   }
 
   function syncOrderStatusToCloud(o) {
@@ -1740,7 +1762,7 @@
     getCart: getCart, addToCart: addToCart, updateCartItem: updateCartItem,
     removeCartItem: removeCartItem, clearCart: clearCart,
     cartCount: cartCount, cartLines: cartLines, cartTotals: cartTotals,
-    getOrders: getOrders, placeOrder: placeOrder, setOrderStatus: setOrderStatus, saveOrderMessage: saveOrderMessage,
+    getOrders: getOrders, placeOrder: placeOrder, setOrderStatus: setOrderStatus, saveOrderMessage: saveOrderMessage, confirmOrderPayment: confirmOrderPayment,
     submitWarranty: submitWarranty, subscribeWarranties: subscribeWarranties, deleteWarranty: deleteWarranty,
     getWarrantyById: getWarrantyById, getMyWarranties: getMyWarranties,
     getMetrics: getMetrics, revenueByDay: revenueByDay,
