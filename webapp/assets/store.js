@@ -22,6 +22,7 @@
     seeded: "me_seeded_v2",
     cloudProducts: "me_cloud_products", // catalog pulled from Firestore (customers only)
     deletedOrders: "me_deleted_orders", // tombstones: order ids ที่ลบแล้ว (กัน cloud snapshot ดูดกลับ)
+    myWarranties: "me_my_warranties",   // เลขอ้างอิงใบประกันที่ลงจากเครื่องนี้ (ไว้ตรวจสอบสถานะ)
     stockApplied: "me_stock_applied",   // order ids ที่ตัดสต๊อกแล้ว (กันตัดซ้ำตอนรับออเดอร์จาก cloud)
     ratings: "me_ratings",              // ดาวที่เบราว์เซอร์นี้ให้ไว้ { productId: stars }
   };
@@ -1180,19 +1181,51 @@
   /* ---------- Warranty registration (ลงทะเบียนประกันสินค้า) -------- */
   // ลูกค้า/พนักงานกรอกฟอร์มหน้าร้าน → เก็บใน Firestore warranties/{id} (ต้องมี anon auth)
   // หลังร้านอ่านได้ทั้งหมด (rule: read if isAdmin) + ค้น/กรองตามผู้ลงทะเบียน
+  // เลขอ้างอิงสุ่มยาว (เดาไม่ได้) — ใช้เป็น capability token ให้ลูกค้าเปิดดูสถานะของตัวเองได้
+  function warrantyToken() {
+    var c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", s = "";
+    try {
+      var a = new Uint8Array(16); (global.crypto || window.crypto).getRandomValues(a);
+      for (var i = 0; i < a.length; i++) s += c[a[i] % c.length];
+    } catch (e) { for (var j = 0; j < 16; j++) s += c[Math.floor(Math.random() * c.length)]; }
+    return "WR-" + s.slice(0, 4) + "-" + s.slice(4, 8) + "-" + s.slice(8, 12) + "-" + s.slice(12, 16);
+  }
   function submitWarranty(data) {
     return loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
       var fs = m.fsMod;
       var uid = (m.auth && m.auth.currentUser && m.auth.currentUser.uid) || "";
-      var id = genId("WR");
+      var id = warrantyToken();
       var payload = Object.assign({}, data, {
         id: id, userId: uid, status: "pending",
         registrant: data.registrant === "staff" ? "staff" : "customer",
         createdAtTs: fs.serverTimestamp(),
       });
-      return fs.setDoc(fs.doc(m.db, "warranties", id), payload).then(function () { return id; });
+      return fs.setDoc(fs.doc(m.db, "warranties", id), payload).then(function () {
+        // จำเลขอ้างอิงไว้ในเครื่องนี้ → หน้าตรวจสอบโชว์ "ใบประกันของฉัน" ได้โดยไม่ต้องพิมพ์
+        try {
+          var mine = read(KEY.myWarranties, []);
+          mine.unshift({ id: id, name: ((data.firstName || "") + " " + (data.lastName || "")).trim(), brand: data.brand || "", model: data.model || "", at: Date.now() });
+          write(KEY.myWarranties, mine.slice(0, 50), { skipCloud: true });
+        } catch (e) {}
+        return id;
+      });
     });
   }
+  // ดึงใบประกัน 1 ใบด้วยเลขอ้างอิง (REST get เปิดสาธารณะ — รู้เลข = เจ้าของ)
+  function getWarrantyById(id) {
+    id = String(id || "").trim();
+    if (!id) return Promise.resolve(null);
+    var cfg = parseFbConfig(firebaseCfg());
+    if (!cfg || !cfg.projectId) return Promise.resolve(null);
+    var url = "https://firestore.googleapis.com/v1/projects/" + cfg.projectId + "/databases/default/documents/warranties/" + encodeURIComponent(id);
+    return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (doc) {
+      if (!doc || !doc.fields) return null;
+      var out = {}; for (var k in doc.fields) out[k] = unwrapFs(doc.fields[k]);
+      if (!out.id) out.id = id;
+      return out;
+    }).catch(function () { return null; });
+  }
+  function getMyWarranties() { return read(KEY.myWarranties, []); }
   // หลังร้าน: ฟังรายการประกันแบบเรียลไทม์
   function subscribeWarranties(cb) {
     return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
@@ -1709,6 +1742,7 @@
     cartCount: cartCount, cartLines: cartLines, cartTotals: cartTotals,
     getOrders: getOrders, placeOrder: placeOrder, setOrderStatus: setOrderStatus, saveOrderMessage: saveOrderMessage,
     submitWarranty: submitWarranty, subscribeWarranties: subscribeWarranties, deleteWarranty: deleteWarranty,
+    getWarrantyById: getWarrantyById, getMyWarranties: getMyWarranties,
     getMetrics: getMetrics, revenueByDay: revenueByDay,
     provinces: provinces, districtsOf: districtsOf, subdistrictsOf: subdistrictsOf, zipsOf: zipsOf,
     setGeoData: setGeoData,

@@ -148,13 +148,14 @@ service cloud.firestore {
     }
 
     // ลงทะเบียนประกันสินค้า (ลูกค้า/พนักงานกรอกฟอร์มหน้าร้าน)
-    // create: ผู้ที่ผ่านเว็บ (anonymous auth) มีชื่อ + เบอร์ขั้นต่ำ
-    // read/update/delete: แอดมินเท่านั้น (ดูในหน้าหลังร้าน)
+    // get: เปิดสาธารณะ — ลูกค้าตรวจสอบสถานะด้วย "เลขอ้างอิง" (เลขสุ่มยาว เดาไม่ได้)
+    // list/update/delete: เฉพาะแอดมิน (หน้าหลังร้าน) · create: ผู้ที่ผ่านเว็บ + มีชื่อ/เบอร์
     match /warranties/{id} {
+      allow get: if true;
+      allow list, update, delete: if isAdmin();
       allow create: if request.auth != null
                  && request.resource.data.firstName is string
                  && request.resource.data.phone is string;
-      allow read, update, delete: if isAdmin();
     }
 
     // อื่น ๆ ปิดทั้งหมด

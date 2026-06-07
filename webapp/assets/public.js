@@ -148,7 +148,7 @@
   var pageRefresh = null;
   window.addEventListener("me-products-loaded", function () { if (pageRefresh) try { pageRefresh(); } catch (e) {} });
 
-  var routes = { home: initHome, categories: initCategories, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog, warranty: initWarranty };
+  var routes = { home: initHome, categories: initCategories, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog, warranty: initWarranty, "warranty-status": initWarrantyStatus };
 
   // หน้า "หมวดหมู่" — กริดช่องหมวดแบบซ้อนหลายชั้น (เหมือน iToolmart)
   //   ?cat=<key> = ดูหมวดย่อยภายใต้หมวดนั้น. กดหมวดที่มีลูก → ลงลึกต่อ, กดหมวดที่ไม่มีลูก → ดูสินค้า
@@ -1749,11 +1749,20 @@
       S.submitWarranty(data).then(function (id) {
         document.querySelector(".wr-wrap").innerHTML =
           '<div class="wr-card wr-done"><div class="big">✅</div>' +
-          '<h2>ลงทะเบียนประกันเรียบร้อย</h2>' +
-          '<p>เลขที่อ้างอิง: <b>' + esc(id) + "</b></p>" +
-          '<p style="color:#666">ทีมงานได้รับข้อมูลแล้ว เก็บเลขอ้างอิงไว้ตรวจสอบสถานะได้</p>' +
-          '<a class="me-btn" href="index.html">กลับหน้าแรก</a></div>';
+          '<h2 style="color:#1a7f37">ลงทะเบียนสำเร็จ</h2>' +
+          '<p style="color:#555">เราได้รับข้อมูลการลงทะเบียนรับประกันของท่านเรียบร้อยแล้ว เก็บ “เลขอ้างอิง” ไว้ใช้ตรวจสอบสถานะ</p>' +
+          '<div style="background:#fafafa;border:2px dashed #ccc;border-radius:10px;padding:12px;margin:10px 0">' +
+            '<div style="font-size:12px;color:#888">เลขอ้างอิง</div>' +
+            '<div style="font-family:var(--font-mono,monospace);font-weight:800;font-size:18px;letter-spacing:.5px" data-wr-ref>' + esc(id) + "</div>" +
+            '<button type="button" class="me-btn me-btn-sm" data-wr-copy style="margin-top:8px">📋 คัดลอกเลข</button></div>' +
+          '<a class="me-btn me-btn-block" href="warranty-status.html?ref=' + encodeURIComponent(id) + '">🔎 ตรวจสอบสถานะ</a>' +
+          '<a class="me-btn me-btn-block me-btn-ghost" href="warranty.html" style="margin-top:8px">+ ลงทะเบียนสินค้าอื่น</a>' +
+          '<a class="me-btn me-btn-block me-btn-ghost" href="index.html" style="margin-top:8px">กลับหน้าแรก</a></div>';
         window.scrollTo(0, 0);
+        var copyBtn = document.querySelector("[data-wr-copy]");
+        if (copyBtn) copyBtn.addEventListener("click", function () {
+          try { navigator.clipboard.writeText(id); copyBtn.textContent = "✓ คัดลอกแล้ว"; } catch (e) { copyBtn.textContent = "คัดลอกไม่ได้ — จดเลขไว้"; }
+        });
       }).catch(function (err) {
         if (btn) { btn.disabled = false; btn.textContent = "ลงทะเบียน / Submit"; }
         setStatus("บันทึกไม่สำเร็จ: " + (err && err.message ? err.message : "ลองใหม่อีกครั้ง") + " (ต้องตั้งค่า Firebase ให้พร้อม)", "err");
@@ -1761,6 +1770,56 @@
     });
     function setStatus(msg, kind) { if (statusEl) { statusEl.textContent = msg; statusEl.style.color = kind === "err" ? "var(--price-red,#e11)" : "#222"; } }
   }
+
+  /* ---------- warranty status check (ลูกค้าตรวจสอบเลขของตัวเอง) ---------- */
+  function initWarrantyStatus() {
+    var input = document.querySelector("[data-ws-input]");
+    var goBtn = document.querySelector("[data-ws-go]");
+    var resultBox = document.querySelector("[data-ws-result]");
+    var mineBox = document.querySelector("[data-ws-mine]");
+    if (!input) return;
+    var STATUS = {
+      pending: ["รอตรวจสอบ / กำลังดำเนินการ", "pending"],
+      approved: ["อนุมัติแล้ว · รับประกันเรียบร้อย", "approved"],
+      rejected: ["ไม่ผ่าน · กรุณาติดต่อร้าน", "rejected"],
+    };
+    // ใบประกันที่ลงจากเครื่องนี้
+    var mine = (S.getMyWarranties && S.getMyWarranties()) || [];
+    if (mineBox) {
+      mineBox.innerHTML = mine.length ? mine.map(function (w) {
+        return '<div class="ws-mine-item" data-ws-pick="' + esc(w.id) + '">' +
+          '<div><div class="nm">' + (esc(w.name) || "ใบประกัน") + (w.brand || w.model ? " · " + esc((w.brand || "") + " " + (w.model || "")).trim() : "") + "</div>" +
+          '<div class="ref">' + esc(w.id) + "</div></div><span>›</span></div>";
+      }).join("") : '<div class="ws-empty">ยังไม่มีรายการในเครื่องนี้ — กรอกเลขอ้างอิงด้านบนเพื่อตรวจสอบ</div>';
+      mineBox.querySelectorAll("[data-ws-pick]").forEach(function (el) {
+        el.addEventListener("click", function () { input.value = el.getAttribute("data-ws-pick"); lookup(); });
+      });
+    }
+    function lookup() {
+      var id = (input.value || "").trim();
+      if (!id) { resultBox.innerHTML = '<p class="ws-empty">กรุณากรอกเลขอ้างอิง</p>'; return; }
+      resultBox.innerHTML = '<p class="ws-empty">กำลังตรวจสอบ…</p>';
+      S.getWarrantyById(id).then(function (w) {
+        if (!w) { resultBox.innerHTML = '<div style="margin-top:10px;color:var(--price-red,#e11);font-weight:700">❌ ไม่พบเลขอ้างอิงนี้ — ตรวจสอบตัวอักษร/ตัวเลขอีกครั้ง</div>'; return; }
+        var st = STATUS[w.status] || STATUS.pending;
+        var rows = [
+          ["ชื่อ-นามสกุล", (w.firstName || "") + " " + (w.lastName || "")],
+          ["เบอร์โทร", w.phone], ["ยี่ห้อ", w.brand], ["รุ่น", w.model],
+          ["รหัสสินค้า/SN", w.serial], ["วันที่ซื้อ", w.purchaseDate], ["ร้าน/สาขา", (w.retailer || "") + (w.branch ? " · " + w.branch : "")],
+          ["เลขอ้างอิง", w.id],
+        ].filter(function (r) { return (r[1] || "").toString().trim(); });
+        resultBox.innerHTML = '<div class="ws-big">🛡️</div>' +
+          '<div style="text-align:center;margin-bottom:8px"><span class="ws-status-badge ' + st[1] + '">' + esc(st[0]) + "</span></div>" +
+          '<table class="ws-detail">' + rows.map(function (r) { return "<tr><th>" + esc(r[0]) + "</th><td>" + esc(String(r[1])) + "</td></tr>"; }).join("") + "</table>";
+      }).catch(function () { resultBox.innerHTML = '<div style="margin-top:10px;color:var(--price-red,#e11)">ตรวจสอบไม่สำเร็จ ลองใหม่อีกครั้ง</div>'; });
+    }
+    if (goBtn) goBtn.addEventListener("click", lookup);
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); lookup(); } });
+    // เปิดมาพร้อม ?ref= → ตรวจสอบให้เลย
+    var ref = new URLSearchParams(location.search).get("ref");
+    if (ref) { input.value = ref; lookup(); }
+  }
+
   function checkedValues(scope, f) { return Array.prototype.slice.call(scope.querySelectorAll("[data-f=" + f + "]:checked")).map(function (c) { return c.value; }); }
   function clampInt(v, min, max) { v = parseInt(v, 10); if (isNaN(v)) v = min; return Math.max(min, Math.min(max, v)); }
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
