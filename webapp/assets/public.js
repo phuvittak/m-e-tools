@@ -1785,26 +1785,54 @@
     };
     // ใบประกันที่ลงจากเครื่องนี้
     var mine = (S.getMyWarranties && S.getMyWarranties()) || [];
+    function mineItemHtml(w) {
+      var sub = [(w.brand || ""), (w.model || "")].filter(Boolean).join(" ") + (w.serial ? " · SN: " + w.serial : "");
+      return '<div class="ws-mine-item" data-ws-pick="' + esc(w.id) + '">' +
+        '<div><div class="nm">' + (esc(w.name) || "ใบประกัน") + (sub ? " · " + esc(sub) : "") + "</div>" +
+        '<div class="ref">' + esc(w.id) + "</div></div><span>›</span></div>";
+    }
     if (mineBox) {
-      mineBox.innerHTML = mine.length ? mine.map(function (w) {
-        return '<div class="ws-mine-item" data-ws-pick="' + esc(w.id) + '">' +
-          '<div><div class="nm">' + (esc(w.name) || "ใบประกัน") + (w.brand || w.model ? " · " + esc((w.brand || "") + " " + (w.model || "")).trim() : "") + "</div>" +
-          '<div class="ref">' + esc(w.id) + "</div></div><span>›</span></div>";
-      }).join("") : '<div class="ws-empty">ยังไม่มีรายการในเครื่องนี้ — กรอกเลขอ้างอิงด้านบนเพื่อตรวจสอบ</div>';
-      mineBox.querySelectorAll("[data-ws-pick]").forEach(function (el) {
-        el.addEventListener("click", function () { input.value = el.getAttribute("data-ws-pick"); lookup(); });
+      mineBox.innerHTML = mine.length ? mine.map(mineItemHtml).join("")
+        : '<div class="ws-empty">ยังไม่มีรายการในเครื่องนี้ — กรอกเลขอ้างอิง หรือรหัสสินค้า/รุ่น ด้านบนเพื่อตรวจสอบ</div>';
+      bindPicks(mineBox);
+    }
+    function bindPicks(scope) {
+      scope.querySelectorAll("[data-ws-pick]").forEach(function (el) {
+        el.addEventListener("click", function () { input.value = el.getAttribute("data-ws-pick"); showById(el.getAttribute("data-ws-pick")); });
       });
     }
+    // ค้นหาฉลาด: ถ้าเป็นเลขอ้างอิง WR- → ดึงตรง; ไม่งั้นค้นจากใบในเครื่องนี้ด้วย รหัสสินค้า/รุ่น/ชื่อ/แบรนด์
     function lookup() {
-      var id = (input.value || "").trim();
-      if (!id) { resultBox.innerHTML = '<p class="ws-empty">กรุณากรอกเลขอ้างอิง</p>'; return; }
+      var raw = (input.value || "").trim();
+      if (!raw) { resultBox.innerHTML = '<p class="ws-empty">กรุณากรอกเลขอ้างอิง หรือรหัสสินค้า/รุ่น</p>'; return; }
+      if (/^WR-/i.test(raw)) { showById(raw); return; }
+      var ql = raw.toLowerCase();
+      var hits = mine.filter(function (w) {
+        return [w.id, w.serial, w.model, w.brand, w.name, w.category].join(" ").toLowerCase().indexOf(ql) >= 0;
+      });
+      if (hits.length === 1) { showById(hits[0].id); }
+      else if (hits.length > 1) {
+        resultBox.innerHTML = '<p style="font-weight:700;margin:6px 0">พบ ' + hits.length + ' รายการ — แตะเพื่อดูสถานะ</p>' + hits.map(mineItemHtml).join("");
+        bindPicks(resultBox);
+      } else {
+        // ไม่เจอในเครื่องนี้ — ลองถือว่าเป็นเลขอ้างอิงโดยตรง
+        showById(raw, true);
+      }
+    }
+    function showById(id, soft) {
+      id = String(id || "").trim();
       resultBox.innerHTML = '<p class="ws-empty">กำลังตรวจสอบ…</p>';
       S.getWarrantyById(id).then(function (w) {
-        if (!w) { resultBox.innerHTML = '<div style="margin-top:10px;color:var(--price-red,#e11);font-weight:700">❌ ไม่พบเลขอ้างอิงนี้ — ตรวจสอบตัวอักษร/ตัวเลขอีกครั้ง</div>'; return; }
+        if (!w) {
+          resultBox.innerHTML = soft
+            ? '<div style="margin-top:10px;color:var(--price-red,#e11);font-weight:700">❌ ไม่พบในเครื่องนี้<br><span style="font-weight:400;color:#666">ถ้าลงทะเบียนจากเครื่องอื่น/พนักงานลงให้ กรุณากรอก “เลขอ้างอิง WR-...” ที่ได้ตอนลงทะเบียน หรือสอบถามที่ร้าน</span></div>'
+            : '<div style="margin-top:10px;color:var(--price-red,#e11);font-weight:700">❌ ไม่พบเลขอ้างอิงนี้ — ตรวจสอบตัวอักษร/ตัวเลขอีกครั้ง</div>';
+          return;
+        }
         var st = STATUS[w.status] || STATUS.pending;
         var rows = [
           ["ชื่อ-นามสกุล", (w.firstName || "") + " " + (w.lastName || "")],
-          ["เบอร์โทร", w.phone], ["ยี่ห้อ", w.brand], ["รุ่น", w.model],
+          ["เบอร์โทร", w.phone], ["ยี่ห้อ", w.brand], ["ประเภท", w.category], ["รุ่น", w.model],
           ["รหัสสินค้า/SN", w.serial], ["วันที่ซื้อ", w.purchaseDate], ["ร้าน/สาขา", (w.retailer || "") + (w.branch ? " · " + w.branch : "")],
           ["เลขอ้างอิง", w.id],
         ].filter(function (r) { return (r[1] || "").toString().trim(); });

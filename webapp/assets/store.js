@@ -1204,7 +1204,7 @@
         // จำเลขอ้างอิงไว้ในเครื่องนี้ → หน้าตรวจสอบโชว์ "ใบประกันของฉัน" ได้โดยไม่ต้องพิมพ์
         try {
           var mine = read(KEY.myWarranties, []);
-          mine.unshift({ id: id, name: ((data.firstName || "") + " " + (data.lastName || "")).trim(), brand: data.brand || "", model: data.model || "", at: Date.now() });
+          mine.unshift({ id: id, name: ((data.firstName || "") + " " + (data.lastName || "")).trim(), brand: data.brand || "", model: data.model || "", serial: data.serial || "", category: data.category || "", at: Date.now() });
           write(KEY.myWarranties, mine.slice(0, 50), { skipCloud: true });
         } catch (e) {}
         return id;
