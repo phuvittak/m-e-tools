@@ -17,6 +17,29 @@
     return ["", s || ""];
   }
 
+  // จัดรายละเอียดสินค้าให้อ่านง่าย: บรรทัด "• ..." → บูลเล็ต, บรรทัดลงท้าย ":" → หัวข้อ, อื่น ๆ → ย่อหน้า
+  function descToHtml(text) {
+    var raw = String(text || "").trim();
+    if (!raw) return "";
+    // ดึงบูลเล็ตที่ติดกันในบรรทัดเดียว (• …• …) ให้ขึ้นบรรทัดใหม่ ช่วยสินค้าเก่าที่ยังไม่ได้แยกใหม่
+    raw = raw.replace(/\s*[•●·]\s*/g, "\n• ").trim();
+    var lines = raw.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var html = "", inUl = false;
+    function closeUl() { if (inUl) { html += "</ul>"; inUl = false; } }
+    lines.forEach(function (l) {
+      if (/^[•\-*·●]\s*/.test(l)) {
+        if (!inUl) { html += '<ul class="pd-desc-list">'; inUl = true; }
+        html += "<li>" + esc(l.replace(/^[•\-*·●]\s*/, "")) + "</li>";
+      } else if (/[:：]$/.test(l)) {
+        closeUl(); html += '<p class="pd-desc-h">' + esc(l) + "</p>";
+      } else {
+        closeUl(); html += "<p>" + esc(l) + "</p>";
+      }
+    });
+    closeUl();
+    return html;
+  }
+
   /* ---------- ดาวรีวิวสินค้า (rating) ---------- */
   // โชว์คะแนนเฉลี่ย (อ่านอย่างเดียว)
   function starsDisplay(p) {
@@ -572,7 +595,7 @@
           '<div class="pd-rate">' + starsDisplay(p) + "</div>" +
           '<span class="' + (avail > 0 ? "stockpill in" : "stockpill out") + '">' +
             (avail > 0 ? "มีของพร้อมส่ง · เหลือ " + avail + " ชิ้น" : "สินค้าหมดชั่วคราว") + " · " + S.categoryLabel(p.category) + "</span>" +
-          '<p class="pd-desc">' + p.desc + "</p>" +
+          '<div class="pd-desc">' + descToHtml(p.desc) + "</div>" +
           '<div class="pd-prices">' +
             (p.forSale ? '<div class="pd-price-box"><div class="k">ราคาขาย</div><div class="v">' + S.money(p.price) + "</div></div>" : "") +
             (p.forRent ? '<div class="pd-price-box" data-rent-only><div class="k">ค่าเช่า / วัน</div><div class="v rent">' + S.money(p.rentPerDay) + "</div></div>" : "") +
