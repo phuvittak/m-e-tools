@@ -200,6 +200,11 @@
     firebaseConfig: "", // paste Firebase web config JSON to enable real online chat
     qrImage: "",
     bankInfo: "พร้อมเพย์ M.E.Tools",
+    // ภาษีมูลค่าเพิ่ม (ร้านจดทะเบียน VAT) — คิด VAT กับการขายทุกช่องทาง
+    // vatMode: "add" = ราคายังไม่รวม VAT แล้วบวกเพิ่ม · "include" = ราคารวม VAT แล้ว (แสดงแยกส่วน)
+    vatEnabled: true, vatPct: 7, vatMode: "add",
+    // รับบัตรเครดิต/ผ่อน (ผ่านเกตเวย์) — โผล่เมื่อยอด ≥ cardThreshold · ต้องเชื่อมเกตเวย์ก่อนถึงใช้ได้จริง
+    cardPayOn: false, cardThreshold: 45000,
     chatGreeting: "สวัสดีครับ M.E.Tools ยินดีให้บริการ พิมพ์คำถามได้เลยครับ 😊",
     chatFallback: "ขอบคุณสำหรับข้อความครับ เดี๋ยวทีมงานติดต่อกลับ หรือโทร 053-XXX-XXXX / LINE @metools",
     chatRules: [
@@ -918,6 +923,17 @@
     var deposit = lines.reduce(function (s, l) { return s + l.deposit; }, 0);
     return { subtotal: subtotal, deposit: deposit, total: subtotal + deposit, lines: lines };
   }
+  // คำนวณ VAT จากฐานราคา (เช่น ยอดสินค้า/ค่าเช่า) ตามตั้งค่าร้าน
+  //   add     → gross = base + VAT (ราคายังไม่รวม VAT)
+  //   include → vat แยกจาก base (ราคารวม VAT แล้ว, gross = base)
+  function vatInfo(base) {
+    base = +base || 0;
+    var s = getSettings(), pct = +s.vatPct || 0;
+    if (!s.vatEnabled || pct <= 0) return { enabled: false, pct: 0, vat: 0, net: base, gross: base, mode: "" };
+    if (s.vatMode === "include") { var v = base * pct / (100 + pct); return { enabled: true, pct: pct, mode: "include", vat: v, net: base - v, gross: base }; }
+    var va = base * pct / 100;
+    return { enabled: true, pct: pct, mode: "add", vat: va, net: base, gross: base + va };
+  }
 
   /* ---------- Orders ---------------------------------------------- */
   function getOrders() {
@@ -957,14 +973,16 @@
       var days = mode === "rent" ? (ls[0].days || 1) : 0;
       var thisShip = shippingApplied ? 0 : shipping;
       shippingApplied = true;
+      var vinfo = vatInfo(subtotal); // VAT คิดจากยอดสินค้า/ค่าเช่า
       var order = {
         id: genId("ORD"), createdAt: Date.now(), type: mode,
         customer: customer, userEmail: userEmail, fulfillment: fulfillment,
         address: fulfillment === "delivery" ? checkout.address : null,
         items: items, days: days,
         subtotal: subtotal, deposit: deposit, shipping: thisShip,
-        total: subtotal + deposit + thisShip,
-        revenue: subtotal, cost: cost,
+        vat: vinfo.enabled ? Math.round(vinfo.vat * 100) / 100 : 0, vatPct: vinfo.pct, vatMode: vinfo.mode,
+        total: vinfo.gross + deposit + thisShip,
+        revenue: vinfo.net, cost: cost,
         paid: true, received: false, status: "paid",
         // การชำระเงิน: payStatus = verified (ตรวจสลิปผ่าน) | pending (รอแอดมินตรวจสลิป)
         payMethod: checkout.payMethod || "promptpay",
@@ -1761,7 +1779,7 @@
     startAdminRealtime: startAdminRealtime,
     getCart: getCart, addToCart: addToCart, updateCartItem: updateCartItem,
     removeCartItem: removeCartItem, clearCart: clearCart,
-    cartCount: cartCount, cartLines: cartLines, cartTotals: cartTotals,
+    cartCount: cartCount, cartLines: cartLines, cartTotals: cartTotals, vatInfo: vatInfo,
     getOrders: getOrders, placeOrder: placeOrder, setOrderStatus: setOrderStatus, saveOrderMessage: saveOrderMessage, confirmOrderPayment: confirmOrderPayment,
     submitWarranty: submitWarranty, subscribeWarranties: subscribeWarranties, deleteWarranty: deleteWarranty,
     getWarrantyById: getWarrantyById, getMyWarranties: getMyWarranties,

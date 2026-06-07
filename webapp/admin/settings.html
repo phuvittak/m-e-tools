@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ตั้งค่าเว็บไซต์ — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260606x">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260606y">
 </head>
 <body data-admin="settings">
   <div class="admin" data-shell>
@@ -163,6 +163,25 @@
         </div>
 
         <div class="panel">
+          <div class="panel-head"><h2>ภาษีมูลค่าเพิ่ม (VAT) & รับบัตร</h2></div>
+          <label class="f-check" style="margin-bottom:8px"><input type="checkbox" data-vat-on> ร้านจดทะเบียน VAT — คิด VAT กับการขายทุกช่องทาง (แสดงยอด VAT ในบิล)</label>
+          <div class="f2">
+            <div class="field"><label>อัตรา VAT (%)</label><input type="number" min="0" max="30" step="0.5" data-vat-pct placeholder="7"></div>
+            <div class="field"><label>วิธีคิด</label>
+              <select data-vat-mode>
+                <option value="add">ราคายังไม่รวม VAT → บวก VAT เพิ่ม</option>
+                <option value="include">ราคารวม VAT แล้ว → แสดงแยกส่วน VAT</option>
+              </select>
+            </div>
+          </div>
+          <p class="hint" style="margin:2px 0 12px;color:#888;font-size:.85em">⚠️ VAT คือภาษีที่ร้านเก็บแล้วนำส่งกรมสรรพากรเอง (ยื่น ภ.พ.30) ไม่มีใครหักให้อัตโนมัติ · ถ้าราคาสินค้าที่ตั้งไว้รวม VAT อยู่แล้ว ให้เลือก “ราคารวม VAT แล้ว” เพื่อไม่คิดซ้ำ</p>
+          <hr style="border:none;border-top:1px solid #eee;margin:8px 0 12px">
+          <label class="f-check" style="margin-bottom:8px"><input type="checkbox" data-card-on> 💳 รับบัตรเครดิต/ผ่อน (ผ่านเกตเวย์) — โผล่เฉพาะออเดอร์ใหญ่</label>
+          <div class="field"><label>โชว์ปุ่มบัตรเมื่อยอด ≥ (บาท)</label><input type="number" min="0" step="1000" data-card-threshold placeholder="45000"></div>
+          <p class="hint" style="margin:2px 0 0;color:#888;font-size:.85em">ต้องเชื่อมเกตเวย์ (Omise/GB Prime Pay) + ใส่ API key ก่อนปุ่มบัตรถึงใช้ได้จริง — ตอนนี้ตั้งค่าเตรียมไว้ก่อนได้</p>
+        </div>
+
+        <div class="panel">
           <div class="panel-head"><h2>คำถามที่พบบ่อย (FAQ)</h2><button class="btn btn-sm" data-faqadd>+ เพิ่มคำถาม</button></div>
           <div data-faqlist></div>
         </div>
@@ -171,9 +190,9 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260606x"></script>
-  <script src="../assets/store.js?v=20260606x"></script>
-  <script src="../assets/ui.js?v=20260606x"></script>
-  <script src="../assets/admin.js?v=20260606x"></script>
+  <script src="../assets/thai-geo.js?v=20260606y"></script>
+  <script src="../assets/store.js?v=20260606y"></script>
+  <script src="../assets/ui.js?v=20260606y"></script>
+  <script src="../assets/admin.js?v=20260606y"></script>
 </body>
 </html>
