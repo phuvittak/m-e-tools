@@ -282,7 +282,7 @@ img { max-width: 100%; display: block; }
 .tile-grid { position: absolute; inset: 0; background: linear-gradient(var(--ink) 1px,transparent 1px) 0 0/26px 26px, linear-gradient(90deg,var(--ink) 1px,transparent 1px) 0 0/26px 26px; opacity: .07; }
 .tile-icon { color: var(--ink); z-index: 1; }
 .tile-icon svg { stroke: var(--ink); stroke-width: 1.4; }
-.tile-img { position: absolute; inset: 0; z-index: 1; background-size: cover; background-position: center; background-repeat: no-repeat; }
+.tile-img { position: absolute; inset: 0; z-index: 1; background-size: contain; background-position: center; background-repeat: no-repeat; }
 .tile.has-img { background: var(--concrete-100); }
 /* product detail gallery */
 .pd-gallery { display: flex; flex-direction: column; gap: 12px; }
@@ -691,7 +691,11 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 }
 @media (max-width: 520px) {
   .me-brands-strip { grid-template-columns: repeat(2,1fr); }
-  .cards { grid-template-columns: 1fr; }
+  .cards { grid-template-columns: repeat(2,1fr); gap: 10px; }
+  .card-body { padding: 10px; gap: 6px; }
+  .card-name { font-size: 13.5px; min-height: 35px; }
+  .price-buy { font-size: 19px; }
+  .card-actions { padding: 0 10px 10px; gap: 6px; }
   .me-cats-grid { grid-template-columns: repeat(3,1fr); gap: 8px; }
   .me-cat { min-height: 112px; padding: 12px 6px; }
   .me-cat-ic svg, .me-cat-img { width: 40px; height: 40px; }
