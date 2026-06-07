@@ -174,22 +174,27 @@ async function handleImport(res, url, textIn) {
     if (!pageText.trim()) { res.status(200).json({ ok: true, products: [], warning: 'ไม่พบเนื้อหาในแหล่งนี้' }); return; }
 
     let products = null, via = '';
+    const diag = []; // เก็บเหตุผลของแต่ละตัว เพื่อบอกชัดว่าติดตรงไหน
     // 1) ลอง Gemini ก่อน (ฟรี)
     if (GEMINI_API_KEY) {
       try { products = await geminiExtract(pageText); via = 'gemini'; }
-      catch (e) { console.warn('[import] gemini failed → fallback claude:', e?.message); }
-    }
+      catch (e) { diag.push('Gemini ใช้ไม่ได้ (' + (e?.message || e) + ')'); }
+    } else { diag.push('Gemini: ไม่ได้ตั้ง GEMINI_API_KEY'); }
     // 2) Gemini เต็ม/ล่ม → ลอง Groq (ฟรี)
-    if (products == null && GROQ_API_KEY) {
-      try { products = await groqExtract(pageText); via = 'groq'; }
-      catch (e) { console.warn('[import] groq failed → fallback claude:', e?.message); }
+    if (products == null) {
+      if (GROQ_API_KEY) {
+        try { products = await groqExtract(pageText); via = 'groq'; }
+        catch (e) { diag.push('Groq ใช้ไม่ได้ (' + (e?.message || e) + ')'); }
+      } else { diag.push('Groq: ยังไม่เห็น GROQ_API_KEY ใน deployment (อาจลืม Redeploy หลังใส่ค่า)'); }
     }
     // 3) ฟรีทั้งคู่เต็ม/ล่ม → ใช้ Claude (เสียเงิน) เป็นด่านสุดท้าย
-    if (products == null && ANTHROPIC_API_KEY) {
-      try { products = await claudeExtract(pageText); via = 'claude'; }
-      catch (e) { res.status(502).json({ error: 'ai-error', message: 'AI วิเคราะห์ไม่สำเร็จ: ' + String(e.message || e) }); return; }
+    if (products == null) {
+      if (ANTHROPIC_API_KEY) {
+        try { products = await claudeExtract(pageText); via = 'claude'; }
+        catch (e) { diag.push('Claude ใช้ไม่ได้ (' + (e?.message || e) + ')'); }
+      } else { diag.push('Claude: ไม่ได้ตั้ง ANTHROPIC_API_KEY'); }
     }
-    if (products == null) { res.status(502).json({ error: 'ai-unavailable', message: 'AI ฟรีโควต้าเต็มทั้งหมด และไม่มี ANTHROPIC_API_KEY สำรอง — ลองใหม่พรุ่งนี้หรือใส่ GROQ_API_KEY/ANTHROPIC_API_KEY' }); return; }
+    if (products == null) { res.status(502).json({ error: 'ai-unavailable', message: 'นำเข้าด้วย AI ไม่สำเร็จ — ' + diag.join(' · '), diag }); return; }
 
     const normalized = (Array.isArray(products) ? products : []).map(normalizeImported).filter(function (p) { return p.name; });
     res.status(200).json({ ok: true, products: normalized, via });
