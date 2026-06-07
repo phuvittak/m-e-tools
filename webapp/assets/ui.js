@@ -233,7 +233,8 @@
       '<div class="me-chat-panel" data-webchat-panel hidden>' +
         '<div class="me-chat-head"><span>แชทกับ M.E.Tools</span><button data-webchat-close aria-label="ปิด">×</button></div>' +
         '<div class="me-chat-body" data-webchat-body><div class="me-chat-empty">พิมพ์ข้อความด้านล่างเพื่อเริ่มสนทนา</div></div>' +
-        '<form class="me-chat-input" data-webchat-form><button type="button" class="me-chat-imgbtn" data-webchat-imgbtn title="ส่งรูป" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0 4px">📷</button><input type="file" accept="image/*" data-webchat-img style="display:none"><input data-webchat-text placeholder="พิมพ์ข้อความ…" autocomplete="off" maxlength="2000"><button class="me-btn me-btn-sm" type="submit">ส่ง</button></form>' +
+        '<div class="me-chat-stage" data-webchat-stage hidden style="padding:6px 12px 0"></div>' +
+        '<form class="me-chat-input" data-webchat-form><button type="button" class="me-chat-imgbtn" data-webchat-imgbtn title="แนบรูป" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0 4px">📷</button><input type="file" accept="image/*" data-webchat-img style="display:none"><input data-webchat-text placeholder="พิมพ์ข้อความ…" autocomplete="off" maxlength="2000"><button class="me-btn me-btn-sm" type="submit">ส่ง</button></form>' +
       "</div>";
     document.body.appendChild(box);
     box.querySelector("[data-webchat-fab]").addEventListener("click", function () {
@@ -241,13 +242,25 @@
       if (pn.hidden) openWebChat(); else closeWebChat();
     });
     box.querySelector("[data-webchat-close]").addEventListener("click", closeWebChat);
+    var wcStage = box.querySelector("[data-webchat-stage]");
+    function renderWcStage() {
+      if (!wcStage) return;
+      if (!webchatState.pendingImg) { wcStage.hidden = true; wcStage.innerHTML = ""; return; }
+      wcStage.hidden = false;
+      wcStage.innerHTML = '<div style="display:inline-block;position:relative">' +
+        '<img src="' + webchatState.pendingImg + '" style="max-width:110px;max-height:110px;border-radius:8px;border:1px solid #ccc;display:block">' +
+        '<button type="button" data-wc-imgclr style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:#e11;color:#fff;font-size:13px;cursor:pointer">×</button></div>';
+      var clr = wcStage.querySelector("[data-wc-imgclr]");
+      if (clr) clr.onclick = function () { webchatState.pendingImg = ""; renderWcStage(); };
+    }
     box.querySelector("[data-webchat-form]").addEventListener("submit", function (e) {
       e.preventDefault();
       var inp = box.querySelector("[data-webchat-text]");
       var t = (inp.value || "").trim();
-      if (!t) return;
-      inp.value = "";
-      sendWebChat(t);
+      var img = webchatState.pendingImg || "";
+      if (!t && !img) return; // ไม่มีทั้งข้อความและรูป
+      inp.value = ""; webchatState.pendingImg = ""; renderWcStage();
+      sendWebChatMessage(t, img);
     });
     var wcImgBtn = box.querySelector("[data-webchat-imgbtn]");
     var wcImg = box.querySelector("[data-webchat-img]");
@@ -255,7 +268,7 @@
     if (wcImg) wcImg.addEventListener("change", function (e) {
       var f = e.target.files && e.target.files[0]; if (!f) return;
       e.target.value = "";
-      webChatCompress(f, function (dataUrl) { sendWebChatImage(dataUrl); });
+      webChatCompress(f, function (dataUrl) { webchatState.pendingImg = dataUrl; renderWcStage(); }); // เลือกแล้วโชว์พรีวิวก่อน (ยังไม่ส่ง)
     });
   }
   // ย่อรูปก่อนส่ง (ฝั่งลูกค้าเว็บ)
@@ -274,14 +287,21 @@
     };
     fr.readAsDataURL(file);
   }
-  function sendWebChatImage(dataUrl) {
+  function sendWebChatImage(dataUrl) { sendWebChatMessage("", dataUrl); }
+  // ส่งข้อความ + รูป พร้อมกัน (รูปอย่างเดียวก็ได้, ข้อความอย่างเดียวก็ได้)
+  function sendWebChatMessage(text, image) {
     if (!webchatState.initted) { initWebChatFirestore(); return; }
     if (!webchatState.userId || !webchatState.db) return;
     var fs = webchatState.fs;
-    fs.addDoc(fs.collection(webchatState.db, "bot_messages"), {
-      userId: webchatState.userId, role: "user", text: "[ลูกค้าส่งรูป]", image: dataUrl,
-      source: "web", at: fs.serverTimestamp(),
-    }).catch(function () {});
+    var doc = {
+      userId: webchatState.userId, role: "user", source: "web", at: fs.serverTimestamp(),
+      text: text || (image ? "[ลูกค้าส่งรูป]" : ""),
+    };
+    if (image) doc.image = image;
+    fs.addDoc(fs.collection(webchatState.db, "bot_messages"), doc).then(function () {
+      // มีข้อความ → ให้บอทตอบกลับ (รูปอย่างเดียวไม่เรียกบอท)
+      if (text) return fetch("/api/web-bot-reply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: webchatState.userId, text: text }) });
+    }).catch(function (err) { console.error("[webchat send]", err); });
   }
   function openWebChat() {
     var box = document.querySelector("[data-webchat]"); if (!box) return;

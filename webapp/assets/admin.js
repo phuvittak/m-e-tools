@@ -482,43 +482,43 @@
     });
     var replyImg = document.querySelector("[data-reply-img]");
     var replyImgBtn = document.querySelector("[data-reply-img-btn]");
+    var replyStage = document.querySelector("[data-reply-stage]");
+    var pendingReplyImg = ""; // รูปที่เลือกไว้ (ยังไม่ส่ง) — รอกดส่งพร้อมข้อความ
     if (replyImgBtn && replyImg) replyImgBtn.addEventListener("click", function () { replyImg.click(); });
     if (replyImg) replyImg.addEventListener("change", function (e) {
       var f = e.target.files && e.target.files[0]; if (!f) return;
       e.target.value = "";
-      readImageFile(f, function (dataUrl) { sendImage(dataUrl); });
+      readImageFile(f, function (dataUrl) { pendingReplyImg = dataUrl; renderReplyStage(); });
     });
-    load();
-
-    function sendImage(dataUrl) {
-      if (!state.activeUid || !dataUrl) return;
-      if (window.U && U.toast) U.toast("กำลังส่งรูป…", "ok");
-      var getToken = state.getIdToken ? state.getIdToken() : Promise.resolve("");
-      getToken.then(function (token) {
-        return fetch("/api/admin-reply", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-          body: JSON.stringify({ userId: state.activeUid, image: dataUrl }),
-        });
-      }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-        .then(function (r) {
-          if (!r.ok) { if (window.U && U.toast) U.toast("ส่งรูปไม่สำเร็จ: " + (r.body.error || ""), "err"); return; }
-          if (window.U && U.toast) U.toast("ส่งรูปให้ลูกค้าแล้ว ✓", "ok");
-        }).catch(function () { if (window.U && U.toast) U.toast("ส่งรูปไม่สำเร็จ", "err"); });
+    function renderReplyStage() {
+      if (!replyStage) return;
+      if (!pendingReplyImg) { replyStage.style.display = "none"; replyStage.innerHTML = ""; return; }
+      replyStage.style.display = "block";
+      replyStage.innerHTML = '<div style="display:inline-flex;align-items:flex-start;gap:6px;position:relative">' +
+        '<img src="' + pendingReplyImg + '" style="max-width:120px;max-height:120px;border-radius:8px;border:1px solid #ccc;display:block">' +
+        '<button type="button" data-reply-imgclr style="position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;border:none;background:#e11;color:#fff;font-size:14px;cursor:pointer">×</button></div>' +
+        '<div style="font-size:12px;color:#888;margin-top:2px">รูปแนบ — พิมพ์ข้อความแล้วกดส่ง หรือกดส่งรูปอย่างเดียว</div>';
+      var clr = replyStage.querySelector("[data-reply-imgclr]");
+      if (clr) clr.onclick = function () { pendingReplyImg = ""; renderReplyStage(); };
     }
+    load();
 
     function sendReply() {
       if (!state.activeUid) return;
       var text = (replyInput.value || "").trim();
-      if (!text) return;
+      var image = pendingReplyImg;
+      if (!text && !image) return; // ไม่มีทั้งข้อความและรูป
       replySend.disabled = true;
+      var payload = { userId: state.activeUid };
+      if (text) payload.text = text;
+      if (image) payload.image = image;
       // แนบ Firebase ID token เพื่อให้ API ตรวจ admin uid
       var getToken = state.getIdToken ? state.getIdToken() : Promise.resolve("");
       getToken.then(function (token) {
         return fetch("/api/admin-reply", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-          body: JSON.stringify({ userId: state.activeUid, text: text }),
+          body: JSON.stringify(payload),
         });
       })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
@@ -535,6 +535,7 @@
             return;
           }
           replyInput.value = "";
+          pendingReplyImg = ""; renderReplyStage();
           replyInput.focus();
           if (r.body.linePushed && window.U && U.toast) U.toast("ส่งเข้า LINE ลูกค้าแล้ว ✓", "ok");
         })
