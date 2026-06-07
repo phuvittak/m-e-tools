@@ -1489,8 +1489,42 @@
     }
   }
 
+  // หาสินค้าที่ "น่าจะเป็นตัวเดียวกัน" ในคลัง — เทียบรหัส SKU (ที่กรอกเอง) ก่อน แล้วชื่อ+แบรนด์
+  function findInventoryDuplicate(name, rawSku, brand) {
+    var list = S.getProducts();
+    var sku = (rawSku || "").trim().toLowerCase();
+    var nm = (name || "").trim().toLowerCase();
+    var br = (brand || "").trim().toLowerCase();
+    if (sku && !/^sku-/.test(sku)) {
+      var byS = list.filter(function (p) { return (p.sku || "").trim().toLowerCase() === sku; })[0];
+      if (byS) return byS;
+    }
+    if (nm) {
+      var byN = list.filter(function (p) { return (p.name || "").trim().toLowerCase() === nm && (p.brand || "").trim().toLowerCase() === br; })[0];
+      if (byN) return byN;
+    }
+    return null;
+  }
+  // กล่องยืนยัน "พบสินค้าซ้ำ" — 2 ปุ่ม: ใช่ เพิ่มจำนวน / ไม่ใช่ เป็นสินค้าใหม่
+  function confirmDuplicate(html, onYes, onNo) {
+    var bg = document.createElement("div");
+    bg.className = "modal-bg";
+    bg.innerHTML =
+      '<div class="modal"><div class="modal-head"><h3>⚠️ พบสินค้านี้ในคลังแล้ว</h3><button class="modal-x" aria-label="ปิด">×</button></div>' +
+      '<div class="modal-body">' + html + "</div>" +
+      '<div class="modal-foot"><button class="btn btn-ghost" data-no>ไม่ใช่ — เป็นสินค้าใหม่</button>' +
+      '<button class="btn" data-yes>ใช่ — เพิ่มแค่จำนวน</button></div></div>';
+    document.body.appendChild(bg);
+    function close() { bg.remove(); }
+    bg.querySelector(".modal-x").onclick = close;
+    bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
+    bg.querySelector("[data-yes]").onclick = function () { close(); onYes(); };
+    bg.querySelector("[data-no]").onclick = function () { close(); onNo(); };
+  }
+
   function openProductModal(p) {
     var isNew = !p;
+    var forceNew = false; // ผู้ใช้ยืนยันแล้วว่าเป็นสินค้าใหม่ (ข้ามการเช็กซ้ำ)
     p = p || { icon: "drill", category: "drill", brand: "DEWALT", forSale: true, forRent: true, stock: 0, rented: 0, cost: 0, price: 0, rentPerDay: 0, location: "", sku: "", name: "", desc: "", specs: [], images: [], warrantyYears: 1, motorType: "ไร้แปรงถ่าน (Brushless)", shipSize: "", hidden: false };
     // mutable specs array (shared between spec-rows IIFE and AI-parse IIFE)
     var specs = (p.specs || []).map(function (s) {
@@ -1595,6 +1629,35 @@
         data.images = p.images || []; data.image = p.image || "";
         data.frames360 = p.frames360 || []; data.parts = p.parts || [];
         data.model3d = p.model3d || "";
+      }
+      // เพิ่มสินค้าใหม่ → เช็กก่อนว่ามีตัวนี้ในคลังอยู่แล้วไหม
+      if (isNew && !forceNew) {
+        var dup = findInventoryDuplicate(name, val("sku").trim(), val("brand").trim());
+        if (dup) {
+          var addQty = +val("stock") || 0;
+          var newTotal = (dup.stock || 0) + addQty;
+          var productBg = root.closest(".modal-bg");
+          confirmDuplicate(
+            '<div style="font-family:var(--font-body)">' +
+            '<p style="margin:0 0 10px">มีสินค้านี้ในคลังอยู่แล้ว:</p>' +
+            '<div style="border:2px solid var(--ink);border-radius:8px;padding:10px 12px;margin-bottom:12px">' +
+              '<b>' + esc(dup.name) + "</b><br>" +
+              '<span style="color:var(--fg-2);font-size:13px">รหัส: ' + esc(dup.sku || "—") + " · " + esc(dup.brand || "—") + " · คงเหลือ <b>" + (dup.stock || 0) + "</b> ชิ้น</span></div>" +
+            '<p style="margin:0">ต้องการ <b>เพิ่มจำนวนอีก ' + addQty + " ชิ้น</b> ให้สินค้าตัวนี้ใช่ไหม? (รวมเป็น <b>" + newTotal + "</b> ชิ้น)</p>" +
+            '<p style="margin:8px 0 0;color:var(--fg-2);font-size:13px">ถ้าเป็นแค่สินค้าคล้ายกัน (คนละตัว) ให้กด “ไม่ใช่ — เป็นสินค้าใหม่”</p></div>',
+            function onYes() { // เพิ่มจำนวนให้ตัวที่มีอยู่
+              try { S.saveProduct(Object.assign({}, dup, { stock: newTotal })); } catch (e) { U.toast("บันทึกไม่สำเร็จ", "err"); return; }
+              U.toast("เพิ่ม " + addQty + " ชิ้นให้ " + dup.name + " แล้ว (รวม " + newTotal + " ชิ้น)", "ok");
+              if (window.__invRender) window.__invRender();
+              if (productBg) productBg.remove();
+            },
+            function onNo() { // ยืนยันเป็นสินค้าใหม่ → กดบันทึกซ้ำ (ข้ามเช็ก)
+              forceNew = true;
+              if (productBg) { var sb = productBg.querySelector("[data-save]"); if (sb) sb.click(); }
+            }
+          );
+          return false; // คงหน้าต่างสินค้าไว้จนกว่าจะเลือก
+        }
       }
       try { S.saveProduct(data); }
       catch (e) { U.toast("บันทึกไม่สำเร็จ — รูปอาจใหญ่เกินไป ลองใช้รูปเล็กลง", "err"); return false; }
