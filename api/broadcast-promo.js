@@ -66,7 +66,7 @@ async function getPromo() {
         if (u) links.push({ label, url: u });
       });
     }
-    // จำนวนรูปใน promo.images[] (เนื้อหา base64 อ่านผ่าน /api/promo-image?i=N)
+    // จำนวนรูปใน promo.images[] (เนื้อหา base64 อ่านผ่าน /api/product-image?promo=1&i=N)
     let imageCount = 0;
     const imgArr = f.images && f.images.arrayValue && f.images.arrayValue.values;
     if (Array.isArray(imgArr)) imageCount = imgArr.filter((v) => v && v.stringValue).length;

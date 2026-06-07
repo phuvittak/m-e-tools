@@ -558,7 +558,7 @@
     function resumeBotFor(uid) {
       var getToken = state.getIdToken ? state.getIdToken() : Promise.resolve("");
       getToken.then(function (token) {
-        return fetch("/api/admin-resume-bot", {
+        return fetch("/api/admin-reply?action=resume", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
           body: JSON.stringify({ userId: uid }),

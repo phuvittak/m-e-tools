@@ -80,6 +80,19 @@ export default async function handler(req, res) {
   if (!adminUid) return; // response ส่งใน requireAdmin แล้ว
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+
+  // action=resume → เปิดบอท (ลบ bot_sessions[userId]) — รวมจาก admin-resume-bot เดิม
+  if (((req.query && req.query.action) || body.action) === 'resume') {
+    const uid2 = String(body.userId || '').trim();
+    if (!uid2) { res.status(400).json({ error: 'missing-userId' }); return; }
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/bot_sessions/${encodeURIComponent(uid2)}`;
+    try {
+      const r = await fetch(url, { method: 'DELETE' });
+      if (!r.ok && r.status !== 404) { res.status(502).json({ error: 'firestore-delete-failed', status: r.status }); return; }
+    } catch (e) { res.status(502).json({ error: 'delete-threw', message: e?.message }); return; }
+    res.status(200).json({ ok: true }); return;
+  }
+
   const userId = String(body.userId || '').trim();
   const text = String(body.text || '').trim();
   const image = typeof body.image === 'string' ? body.image : '';

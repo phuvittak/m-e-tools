@@ -24,6 +24,21 @@ function sendImg(res, b64) {
 
 export default async function handler(req, res) {
   const q = req.query || {};
+  // โหมดสตรีมเนื้อหาข้อความ LINE (วิดีโอ/รูป) จาก messageId (รวมจาก line-content เดิม)
+  if (q.line) {
+    const mid = String(q.line).replace(/[^0-9]/g, '');
+    if (!mid) { res.status(400).send('bad id'); return; }
+    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!token) { res.status(500).send('no token'); return; }
+    try {
+      const r = await fetch(`https://api-data.line.me/v2/bot/message/${mid}/content`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) { res.status(r.status === 404 ? 410 : 502).send('content unavailable'); return; }
+      res.setHeader('Content-Type', r.headers.get('content-type') || 'application/octet-stream');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.status(200).send(Buffer.from(await r.arrayBuffer()));
+    } catch (e) { res.status(502).send('proxy error'); }
+    return;
+  }
   // โหมดรูปโปรโมชั่น (รวมจาก promo-image เดิม เพื่อประหยัดจำนวนฟังก์ชัน Vercel)
   if (q.promo) {
     const idx = Math.max(0, parseInt(q.i || '0', 10) || 0);
