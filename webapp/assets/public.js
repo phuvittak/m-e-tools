@@ -1050,6 +1050,44 @@
       '<table class="osk-price">' + head + body + "</table>" +
     "</div>";
   }
+  // DEWALT = แบรนด์เน้นขาย → หน้าแคตตาล็อกแบบละเอียด 1 สินค้า/หน้า (เหมือนแคตตาล็อกจริง)
+  function isDewalt(brand) { return /dewalt/i.test(brand || "") || /ดีว/.test(brand || ""); }
+  function catDewaltPageHtml(p) {
+    var imgs = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
+    var main = imgs[0] || "";
+    var photo = main
+      ? '<div class="cat-card-photo" style="' + cssBg(main) + '"></div>'
+      : '<div class="cat-card-photo cat-card-photo-ph">' + U.iconSvg(p.icon || "tool", 90) + "</div>";
+    var inbox = imgs.slice(1, 8);
+    var inboxHtml = inbox.length
+      ? '<div class="cat-inbox-label">สินค้าภายในกล่อง</div><div class="cat-inbox">' +
+        inbox.map(function (im) { return '<span style="' + cssBg(im) + '"></span>'; }).join("") + "</div>"
+      : "";
+    var specs = (p.specs || []).map(specKV).filter(function (kv) { return kv[0] || kv[1]; }).slice(0, 8);
+    var specsHtml = specs.length
+      ? '<div class="cat-sec-label">รายละเอียดสินค้า</div><ul class="cat-specs">' +
+        specs.map(function (kv) { return "<li>" + esc(kv[0]) + (kv[1] ? " : " + esc(kv[1]) : "") + "</li>"; }).join("") + "</ul>"
+      : "";
+    var hl = (p.highlights || []).filter(Boolean).slice(0, 4);
+    var hlHtml = hl.length
+      ? '<div class="cat-sec-label">จุดเด่น</div><ul class="cat-highlights">' +
+        hl.map(function (h) { return "<li>" + esc(h) + "</li>"; }).join("") + "</ul>"
+      : "";
+    var qty = p.qtyPerBox > 0;
+    var head = "<tr><th>รหัสสินค้า</th><th>SRP</th><th>ราคาคุม</th>" + (qty ? "<th>จำนวน/กล่อง</th>" : "") + "</tr>";
+    var body = "<tr><td>" + esc(p.sku || "-") + "</td><td>" + S.money(p.price || 0) + '</td><td class="ctrl">' +
+      (p.priceCtrl ? S.money(p.priceCtrl) : "—") + "</td>" + (qty ? "<td>" + esc(String(p.qtyPerBox)) + " ตัว</td>" : "") + "</tr>";
+    return '<div class="cat-page">' +
+      '<div class="cat-brandbar">DEWALT · ' + esc(p.brand || "DEWALT") + "</div>" +
+      '<div class="cat-page-body"><div class="cat-card">' +
+        '<div class="cat-card-head">' + esc(p.name || "") + "</div>" +
+        '<div class="cat-card-main">' + photo +
+          '<div class="cat-card-side">' + inboxHtml + specsHtml + hlHtml + "</div>" +
+        "</div>" +
+        '<table class="cat-price">' + head + body + "</table>" +
+      "</div></div>" +
+    "</div>";
+  }
   function catProductPageHtml(items, brand) {
     var cards = items.map(function (p) { return catCardHtml(p, brand); });
     while (cards.length < 4) cards.push('<div class="osk-card osk-card-empty"></div>');
@@ -1078,13 +1116,21 @@
     });
     var noBrand = products.filter(function (p) { return !p.brand || brands.indexOf(p.brand) < 0; });
     if (noBrand.length) groups.push({ brand: "อื่นๆ", list: noBrand });
+    // DEWALT มาก่อน (แบรนด์ที่เน้นขาย)
+    groups.sort(function (a, b) { return (isDewalt(b.brand) ? 1 : 0) - (isDewalt(a.brand) ? 1 : 0); });
 
     if (!groups.length) { box.innerHTML = '<div class="catalog-empty">ยังไม่มีสินค้าในแคตตาล็อก</div>'; return; }
 
     var BLANK = '<div class="cat-page cat-blank"></div>';
     var pages = [catCoverHtml(st)];
     groups.forEach(function (g) {
-      for (var i = 0; i < g.list.length; i += 4) pages.push(catProductPageHtml(g.list.slice(i, i + 4), g.brand));
+      if (isDewalt(g.brand)) {
+        // DEWALT: 1 สินค้า/หน้า แบบละเอียด (เน้นขาย)
+        g.list.forEach(function (p) { pages.push(catDewaltPageHtml(p)); });
+      } else {
+        // แบรนด์อื่น: แบบ OSUKA 4 ช่อง/หน้า (เหมือนเดิม)
+        for (var i = 0; i < g.list.length; i += 4) pages.push(catProductPageHtml(g.list.slice(i, i + 4), g.brand));
+      }
     });
     if (pages.length % 2 !== 0) pages.push(BLANK);
 
