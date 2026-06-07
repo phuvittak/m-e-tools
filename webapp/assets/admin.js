@@ -1927,6 +1927,7 @@
       '<div class="ad">' + esc(addr) + '</div></div>' +
       '<div class="sec"><div class="k">รายการสินค้า</div><div class="items">' + (items || "—") + '</div>' +
       '<div class="row"><div>ยอดรวม: <b>' + esc(S.money(o.total)) + '</b></div>' +
+      (o.vat ? '<div>(รวม VAT ' + (o.vatPct || 7) + '% = ' + esc(S.money(o.vat)) + ')</div>' : "") +
       (o.shipping ? '<div>ค่าจัดส่ง: ' + esc(S.money(o.shipping)) + '</div>' : "") +
       (o.type === "rent" ? '<div>เช่า ' + esc(o.days || "") + ' วัน</div>' : "") + '</div></div>' +
       '<div class="frm"><b>ผู้ส่ง:</b> ' + esc(st.company || "M.E.Tools") + " · " + esc(shopPhone) + "<br>" + esc(st.address || "") + "</div>" +
@@ -1982,6 +1983,12 @@
     var root = document.querySelector("[data-setroot]");
     var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
     var openSunEl = root.querySelector("[data-open-sun]"); if (openSunEl) openSunEl.checked = st.openSun !== false;
+    // VAT + การรับบัตร
+    var vatOnEl = root.querySelector("[data-vat-on]"); if (vatOnEl) vatOnEl.checked = st.vatEnabled !== false;
+    var vatPctEl = root.querySelector("[data-vat-pct]"); if (vatPctEl) vatPctEl.value = (st.vatPct != null ? st.vatPct : 7);
+    var vatModeEl = root.querySelector("[data-vat-mode]"); if (vatModeEl) vatModeEl.value = st.vatMode || "add";
+    var cardOnEl = root.querySelector("[data-card-on]"); if (cardOnEl) cardOnEl.checked = !!st.cardPayOn;
+    var cardThrEl = root.querySelector("[data-card-threshold]"); if (cardThrEl) cardThrEl.value = (st.cardThreshold != null ? st.cardThreshold : 45000);
     var sdays = (st.specialDays || []).map(function (d) { return { date: d.date, open: !!d.open, note: d.note || "" }; });
     var sdayList = root.querySelector("[data-sdaylist]");
     function syncSdays() { if (!sdayList) return; sdayList.querySelectorAll("[data-sd]").forEach(function (r) { var i = +r.getAttribute("data-sd"); sdays[i].date = r.querySelector("[data-sd-date]").value; sdays[i].open = r.querySelector("[data-sd-open]").checked; sdays[i].note = r.querySelector("[data-sd-note]").value; }); }
@@ -2355,6 +2362,11 @@
       patch.phone = phones.map(function (p) { return p.trim(); }).filter(Boolean).join(", ");
       patch.categories = cats.filter(function (c) { return (c.label || "").trim(); }).map(function (c) { return { key: c.key, label: c.label.trim(), icon: c.icon || "tool", image: c.image || "", hidden: !!c.hidden, parent: c.parent || "" }; });
       if (openSunEl) patch.openSun = openSunEl.checked;
+      if (vatOnEl) patch.vatEnabled = vatOnEl.checked;
+      if (vatPctEl) patch.vatPct = +vatPctEl.value || 0;
+      if (vatModeEl) patch.vatMode = vatModeEl.value;
+      if (cardOnEl) patch.cardPayOn = cardOnEl.checked;
+      if (cardThrEl) patch.cardThreshold = +cardThrEl.value || 0;
       patch.specialDays = sdays.filter(function (d) { return d.date; });
       patch.heroPhrases = phrasesEl.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
       patch.faq = faq.filter(function (f) { return (f.q || "").trim(); });
