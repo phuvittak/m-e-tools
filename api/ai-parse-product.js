@@ -225,7 +225,7 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   if (body.image) return handleLabel(res, String(body.image));
-  if (body.url) return handleImport(res, String(body.url).trim(), body.text);
+  if (body.url || body.import) return handleImport(res, String(body.url || '').trim(), body.text);
   if (body.userId && body.text) return handleWebChat(res, String(body.userId).trim(), String(body.text).trim());
   const text = String(body.text || '').trim();
   if (!text) { res.status(400).json({ error: 'missing-text' }); return; }
