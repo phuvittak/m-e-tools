@@ -2132,6 +2132,7 @@
       catList.querySelectorAll("[data-ci]").forEach(function (i) { var c = cats[+i.dataset.ci]; if (!c.image) c.icon = i.value; });
       catList.querySelectorAll("[data-cp]").forEach(function (i) { cats[+i.dataset.cp].parent = i.value; });
       catList.querySelectorAll("[data-ch]").forEach(function (i) { cats[+i.dataset.ch].hidden = i.checked; });
+      catList.querySelectorAll("[data-cv]").forEach(function (i) { cats[+i.dataset.cv].vat = i.checked; });
     }
     // เซ็ตลูกหลานของ key (จาก cats ปัจจุบัน) — กันเลือกหมวดแม่เป็นตัวเอง/ลูกตัวเอง (วน loop)
     function catDescLocal(key) {
@@ -2169,6 +2170,7 @@
             CAT_ICONS.map(function (ic) { return '<option value="' + ic + '"' + ((c.icon || "tool") === ic ? " selected" : "") + ">" + (CAT_ICON_TH[ic] || ic) + "</option>"; }).join("") + "</select>" +
           '<label class="btn btn-sm" style="cursor:pointer;white-space:nowrap">⬆ รูป<input type="file" accept="image/*" data-cimg="' + i + '" style="display:none"></label>' +
           (c.image ? '<button type="button" class="btn btn-sm" data-cimgclr="' + i + '">ลบรูป</button>' : "") +
+          '<label class="f-check" style="white-space:nowrap" title="หมวดนี้คิด VAT ไหม"><input type="checkbox" data-cv="' + i + '"' + (c.vat !== false ? " checked" : "") + "> VAT</label>" +
           '<label class="f-check" style="white-space:nowrap"><input type="checkbox" data-ch="' + i + '"' + (c.hidden ? " checked" : "") + "> ซ่อน</label>" +
           '<button type="button" class="btn btn-sm btn-danger" data-cdel="' + i + '">ลบ</button></div>';
       }).join("");
@@ -2361,7 +2363,7 @@
       var patch = {};
       simpleKeys.forEach(function (k) { var el = root.querySelector('[data-set="' + k + '"]'); patch[k] = el ? el.value : st[k]; });
       patch.phone = phones.map(function (p) { return p.trim(); }).filter(Boolean).join(", ");
-      patch.categories = cats.filter(function (c) { return (c.label || "").trim(); }).map(function (c) { return { key: c.key, label: c.label.trim(), icon: c.icon || "tool", image: c.image || "", hidden: !!c.hidden, parent: c.parent || "" }; });
+      patch.categories = cats.filter(function (c) { return (c.label || "").trim(); }).map(function (c) { return { key: c.key, label: c.label.trim(), icon: c.icon || "tool", image: c.image || "", hidden: !!c.hidden, parent: c.parent || "", vat: c.vat !== false }; });
       if (openSunEl) patch.openSun = openSunEl.checked;
       if (vatOnEl) patch.vatEnabled = vatOnEl.checked;
       if (vatPctEl) patch.vatPct = +vatPctEl.value || 0;
