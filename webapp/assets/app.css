@@ -206,9 +206,14 @@ img { max-width: 100%; display: block; }
 .me-brands-inner { max-width: 1280px; margin: 0 auto; }
 .me-brands .me-section-h, .me-brands .me-section-head { color: var(--paper); }
 .me-brands .me-overline { color: var(--dw-yellow); }
-.me-brands-strip { display: flex; gap: 12px; margin-top: 32px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 8px; }
+.me-brands-strip { margin-top: 32px; overflow: hidden; padding-bottom: 8px; }
 .me-brands-strip::-webkit-scrollbar { display: none; }
-.me-brands-strip .me-brand-card { flex: 0 0 clamp(124px, 38vw, 150px); }
+/* แถวแบรนด์เลื่อนเองลื่นๆ ด้วย transform (GPU) วนไม่รู้จบ — หยุดเมื่อชี้/แตะ */
+.me-brands-track { display: flex; width: max-content; animation: brands-marquee 30s linear infinite; will-change: transform; }
+.me-brands-strip:hover .me-brands-track, .me-brands-track:active { animation-play-state: paused; }
+.me-brands-track .me-brand-card { flex: 0 0 clamp(124px, 38vw, 150px); margin-right: 12px; }
+@keyframes brands-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .me-brands-track { animation: none; } .me-brands-strip { overflow-x: auto; } }
 .me-brand-card { background: var(--ink-soft); border: 2px solid var(--concrete-700); padding: 18px 14px; display: flex; flex-direction: column; gap: 4px; text-align: center; position: relative; text-decoration: none; color: var(--paper); cursor: pointer; transition: all 140ms cubic-bezier(.2,.8,.2,1); }
 .me-brand-card:hover { transform: translateY(-3px); border-color: var(--dw-yellow); background: var(--ink); }
 .me-brand-card.is-primary:hover { background: var(--dw-yellow-deep); }
