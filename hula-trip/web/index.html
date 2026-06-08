@@ -65,6 +65,9 @@
   .online{display:flex; align-items:center; gap:8px; justify-content:center; color:#8ef0b8; font-weight:700; font-size:14px}
   .dot{width:10px; height:10px; border-radius:50%; background:#19e08a; box-shadow:0 0 8px #19e08a; animation:pulse 1.6s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .online.off{color:#b9b3d6}
+  .dot.off{background:#8a84b3; box-shadow:none; animation:none}
+  hr{border:0; border-top:1px solid var(--line)}
   .btn-test{width:100%; background:#2b2270; border:1px solid var(--line); color:var(--text); margin-top:10px}
   .btn-orange{background:linear-gradient(90deg,var(--pink),#ff9f43); width:100%; padding:14px; font-size:17px}
   .footer{text-align:center; color:var(--muted); font-size:12px; margin-top:18px; line-height:1.7}
@@ -91,7 +94,7 @@
 
     <div class="card">
       <div class="status">
-        <div class="online"><span class="dot"></span> ออนไลน์</div>
+        <div class="online off" id="connState"><span class="dot off" id="connDot"></span> <span id="connText">ออฟไลน์ — ยังไม่ได้เชื่อม</span></div>
         <button class="btn btn-test" id="testBtn">🔗 ทดสอบการเชื่อมต่อ</button>
         <p class="sub center" id="loginClock"></p>
       </div>
@@ -122,6 +125,17 @@
       <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden">
       <p id="importMsg" class="hidden"></p>
       <button class="btn btn-ghost" id="tplBtn" style="width:100%; margin-top:6px">⬇️ ดาวน์โหลดเทมเพลต Excel</button>
+
+      <hr style="margin:16px 0">
+      <h3 class="grad" style="font-size:16px">🔗 เชื่อมต่อ Google Sheet (โหมดออนไลน์)</h3>
+      <p class="muted" style="margin:6px 0">วางลิงก์ Google Sheet ที่ตั้งแชร์เป็น <b>"ทุกคนที่มีลิงก์ = ผู้อ่าน"</b>
+        และมีแท็บชื่อ <b>Members</b> / <b>Investments</b> — บันทึกครั้งเดียว ระบบจะจำลิงก์ไว้</p>
+      <input id="sheetUrl" placeholder="วางลิงก์ Google Sheet ที่นี่" autocomplete="off">
+      <div class="actions" style="margin-top:10px">
+        <button class="btn btn-ghost" id="saveSheetBtn">💾 บันทึกลิงก์</button>
+        <button class="btn btn-green" id="connectSheetBtn">🔗 เชื่อมต่อตอนนี้</button>
+      </div>
+      <p id="sheetMsg" class="hidden"></p>
       <div class="actions" style="margin-top:10px">
         <button class="btn btn-green" id="exportAllBtn">⬇️ ส่งออกทั้งระบบ</button>
         <button class="btn btn-blue" id="exportRegBtn">⬇️ การลงทะเบียน</button>
@@ -419,15 +433,7 @@ function importExcel(file){
       var iSheet=wb.Sheets['Investments']||wb.Sheets[wb.SheetNames[1]];
       if(!mSheet){ msgBox($('importMsg'),'ไม่พบชีต Members ในไฟล์'); return; }
       var members=XLSX.utils.sheet_to_json(mSheet,{defval:''});
-      var invest=iSheet?XLSX.utils.sheet_to_json(iSheet,{defval:''}):[];
-      // แปลงวันที่/เวลาเป็น string อ่านง่าย
-      invest=invest.map(function(r){
-        var d=toDate(r.Date); var t=r.Time;
-        return { RegCode:r.RegCode,
-          Date: d? (d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())) : String(r.Date||''),
-          Time: (t instanceof Date)? pad(t.getHours())+':'+pad(t.getMinutes()) : String(t||''),
-          Amount: Number(r.Amount)||0 };
-      });
+      var invest=normInvest(iSheet?XLSX.utils.sheet_to_json(iSheet,{defval:''}):[]);
       DB={ members:members, investments:invest, registrations:DB.registrations||[] };
       saveDB(DB);
       msgBox($('importMsg'),'นำเข้าสำเร็จ ✓ สมาชิก '+members.length+' คน · รายการโอน '+invest.length+' รายการ', true);
@@ -442,14 +448,53 @@ function updateStat(){
     DB.investments.length+' · ลงทะเบียน '+(DB.registrations?DB.registrations.length:0);
 }
 
+/* ---------- เชื่อมต่อ Google Sheet (โหมดออนไลน์) ---------- */
+var SHEET_KEY='hula_sheet_url';
+var online=false;
+function setOnline(on, text){
+  online=on;
+  var st=$('connState'), dot=$('connDot'), txt=$('connText'); if(!st) return;
+  if(on){ st.classList.remove('off'); dot.classList.remove('off'); txt.textContent=text||'ออนไลน์'; }
+  else  { st.classList.add('off');  dot.classList.add('off');  txt.textContent=text||'ออฟไลน์ — ยังไม่ได้เชื่อม'; }
+}
+function extractId(s){ var m=String(s||'').match(/\/d\/([a-zA-Z0-9-_]+)/); return m?m[1]:String(s||'').trim(); }
+function gvizUrl(id,sheet){ return 'https://docs.google.com/spreadsheets/d/'+id+'/gviz/tq?tqx=out:csv&sheet='+encodeURIComponent(sheet); }
+function csvToJson(txt){ if(!txt) return []; var wb=XLSX.read(txt,{type:'string'}); return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}); }
+function normInvest(arr){ return arr.map(function(r){ var d=toDate(r.Date); var t=r.Time;
+  return { RegCode:r.RegCode,
+    Date: d?(d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())):String(r.Date||''),
+    Time: (t instanceof Date)?pad(t.getHours())+':'+pad(t.getMinutes()):String(t||''),
+    Amount: Number(r.Amount)||0 }; }); }
+
+function connectSheet(silent){
+  var url=localStorage.getItem(SHEET_KEY);
+  if(!url){ setOnline(false,'ออฟไลน์ — ยังไม่ได้ตั้งลิงก์'); if(!silent) toast('ยังไม่ได้ตั้งลิงก์ Google Sheet → ไปที่ ⚙️ ผู้ดูแล'); return; }
+  var id=extractId(url);
+  setOnline(false,'⏳ กำลังเชื่อมต่อ...');
+  Promise.all([
+    fetch(gvizUrl(id,'Members')).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); }),
+    fetch(gvizUrl(id,'Investments')).then(function(r){ return r.ok?r.text():''; })
+  ]).then(function(res){
+    var members=csvToJson(res[0]);
+    if(!members.length) throw new Error('ไม่พบข้อมูลในแท็บ Members');
+    DB={ members:members, investments:normInvest(csvToJson(res[1])), registrations:DB.registrations||[] };
+    saveDB(DB); setOnline(true,'ออนไลน์ — เชื่อม Google Sheet แล้ว'); tickClock(); updateStat();
+    if(!silent) toast('🟢 เชื่อมต่อสำเร็จ — สมาชิก '+members.length+' คน · โอน '+DB.investments.length+' รายการ');
+  }).catch(function(err){
+    setOnline(false,'ออฟไลน์ — เชื่อมต่อไม่สำเร็จ');
+    if(!silent) toast('❌ เชื่อมต่อไม่ได้: '+err.message+' (ตรวจการแชร์ชีต/ชื่อแท็บ Members,Investments)');
+  });
+}
+
 /* ---------- นาฬิกา/สถานะออนไลน์ + ทดสอบการเชื่อมต่อ ---------- */
 function tickClock(){ var n=new Date(); var el=$('loginClock');
   if(el) el.textContent='อัปเดตข้อมูลล่าสุดเมื่อ: '+pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds())+' น.'; }
 tickClock(); setInterval(tickClock,1000);
+setOnline(false, localStorage.getItem('hula_sheet_url') ? 'ออฟไลน์ — กดปุ่มเพื่อเชื่อม' : 'ออฟไลน์ — ยังไม่ได้ตั้งลิงก์');
 
 /* ---------- ผูกอีเวนต์ ---------- */
 $('minHint').textContent=money(MIN_INVEST);
-$('testBtn').addEventListener('click',function(){ tickClock(); toast('🟢 เชื่อมต่อระบบสำเร็จ — มีสมาชิก '+DB.members.length+' คนในระบบ'); });
+$('testBtn').addEventListener('click',function(){ connectSheet(false); });
 $('loginBtn').addEventListener('click',login);
 $('codeInput').addEventListener('keydown',function(e){ if(e.key==='Enter') login(); });
 $('refreshBtn').addEventListener('click',function(){ DB=loadDB(); renderApp(getMemberData(STATE.code)); toast('อัปเดตข้อมูลล่าสุดแล้ว ✓'); });
@@ -458,7 +503,16 @@ $('excelBtn').addEventListener('click',exportMemberExcel);
 $('pdfBtn').addEventListener('click',function(){ window.print(); });
 $('submitBtn').addEventListener('click',submitReg);
 
-$('toAdminBtn').addEventListener('click',function(){ hide('loginView'); show('adminView'); updateStat(); window.scrollTo(0,0); });
+$('toAdminBtn').addEventListener('click',function(){ hide('loginView'); show('adminView'); updateStat(); $('sheetUrl').value=localStorage.getItem(SHEET_KEY)||''; window.scrollTo(0,0); });
+$('saveSheetBtn').addEventListener('click',function(){
+  var v=$('sheetUrl').value.trim();
+  if(!v){ msgBox($('sheetMsg'),'กรุณาวางลิงก์ Google Sheet ก่อน'); return; }
+  localStorage.setItem(SHEET_KEY,v); msgBox($('sheetMsg'),'บันทึกลิงก์แล้ว ✓ — กด "เชื่อมต่อตอนนี้" เพื่อดึงข้อมูล', true);
+});
+$('connectSheetBtn').addEventListener('click',function(){
+  var v=$('sheetUrl').value.trim(); if(v) localStorage.setItem(SHEET_KEY,v);
+  connectSheet(false); setTimeout(updateStat,1500);
+});
 $('adminBack').addEventListener('click',function(){ hide('adminView'); show('loginView'); window.scrollTo(0,0); });
 $('dropZone').addEventListener('click',function(){ $('fileInput').click(); });
 $('fileInput').addEventListener('change',function(e){ if(e.target.files[0]) importExcel(e.target.files[0]); });
