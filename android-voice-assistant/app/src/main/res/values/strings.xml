@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">ผู้ช่วยเสียง</string>
+    <string name="title">🎙️ ผู้ช่วยเสียง · Voice Assistant</string>
+    <string name="subtitle">เรียก “ผู้ช่วย” หรือ “assistant” แล้วสั่งงาน · พูดไทยหรืออังกฤษก็ได้</string>
+    <string name="start">เริ่มฟัง (Hands-free)</string>
+    <string name="stop">หยุดฟัง</string>
+    <string name="idle">ยังไม่เริ่ม — แตะปุ่มเพื่อให้ผู้ช่วยฟังต่อเนื่อง</string>
+    <string name="hint">ตัวอย่าง: “ผู้ช่วย เปิด YouTube”, “assistant search ราคาทอง”, “ผู้ช่วย โทรหา 0812345678”</string>
+    <string name="notif_title">ผู้ช่วยเสียงกำลังฟัง</string>
+    <string name="notif_text">เรียก “ผู้ช่วย” ตามด้วยคำสั่งได้เลย</string>
+</resources>
