@@ -17,10 +17,19 @@
     background:radial-gradient(1200px 600px at 50% -10%,#16213f,var(--bg));
     color:var(--text);display:flex;flex-direction:column;min-height:100dvh;
   }
-  header{padding:16px 16px 8px;text-align:center}
+  header{padding:16px 16px 6px;text-align:center}
   header h1{font-size:18px;margin:0 0 2px}
   header p{margin:0;color:var(--muted);font-size:12.5px}
-  .lang-badge{display:inline-block;margin-top:8px;font-size:12px;color:var(--accent2)}
+
+  /* hands-free toggle */
+  .hf{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;font-size:13px;color:var(--muted)}
+  .switch{position:relative;width:46px;height:26px;flex:none}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;inset:0;background:#2a3450;border-radius:26px;transition:.2s;cursor:pointer}
+  .slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .switch input:checked + .slider{background:var(--accent2)}
+  .switch input:checked + .slider:before{transform:translateX(20px)}
+  .hf b{color:var(--text)}
 
   #log{flex:1;overflow-y:auto;padding:12px 14px 4px;display:flex;flex-direction:column;gap:10px}
   .msg{max-width:86%;padding:10px 13px;border-radius:16px;font-size:15px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
@@ -31,8 +40,9 @@
 
   .status{padding:4px 16px;text-align:center;color:var(--muted);font-size:13px;min-height:20px}
   .status.live{color:var(--accent2)}
+  .status.wake{color:var(--accent)}
 
-  footer{padding:10px 16px calc(16px + env(safe-area-inset-bottom));display:flex;gap:12px;align-items:center;justify-content:center}
+  footer{padding:8px 16px calc(14px + env(safe-area-inset-bottom));display:flex;gap:12px;align-items:center;justify-content:center}
   .mic{
     width:84px;height:84px;border-radius:50%;border:none;cursor:pointer;
     background:linear-gradient(160deg,var(--accent),#3a6bff);color:#fff;
@@ -57,28 +67,35 @@
 <header>
   <h1>🎙️ ผู้ช่วยเสียง · Voice Assistant</h1>
   <p>พูดภาษาไทยหรืออังกฤษก็ได้ · Speak Thai or English</p>
-  <span class="lang-badge" id="langBadge">โหมดอัตโนมัติ ไทย/EN</span>
+  <div class="hf">
+    <label class="switch">
+      <input type="checkbox" id="hfToggle">
+      <span class="slider"></span>
+    </label>
+    <span>โหมดฟังต่อเนื่อง (Hands-free) — เรียก <b>“ผู้ช่วย”</b> / <b>“assistant”</b></span>
+  </div>
 </header>
 
 <div id="log">
-  <div class="msg sys">แตะปุ่มไมค์ด้านล่างแล้วพูด เช่น “เปิด YouTube” หรือ “open YouTube cat videos”.</div>
+  <div class="msg sys">แตะไมค์แล้วพูด เช่น “เปิด YouTube” — หรือเปิดโหมดฟังต่อเนื่องด้านบนแล้วเรียก “ผู้ช่วย เปิด YouTube”.</div>
 </div>
 
 <div class="status" id="status"></div>
 
 <div class="help">
   <details>
-    <summary>คำสั่งที่ใช้ได้ · Commands</summary>
+    <summary>คำสั่ง & วิธีใช้ · Commands</summary>
+    <p><b>โหมดฟังต่อเนื่อง:</b> เปิดสวิตช์ด้านบน → เปิดหน้านี้ค้างไว้ → พูดคำปลุก <code>ผู้ช่วย</code> / <code>assistant</code> / <code>โอเค</code> ตามด้วยคำสั่ง เช่น “ผู้ช่วย เปิด YouTube”.</p>
     <ul>
-      <li><code>เปิด YouTube</code> / <code>open YouTube</code> — เปิด YouTube</li>
-      <li><code>เปิด YouTube เพลงลูกทุ่ง</code> / <code>play lofi on YouTube</code> — ค้นใน YouTube</li>
-      <li><code>ค้นหา ราคาทอง</code> / <code>search weather Chiang Mai</code> — ค้นหา Google</li>
+      <li><code>เปิด YouTube</code> / <code>open YouTube</code></li>
+      <li><code>เปิด YouTube เพลงลูกทุ่ง</code> / <code>play lofi on YouTube</code></li>
+      <li><code>ค้นหา ราคาทอง</code> / <code>search weather Chiang Mai</code></li>
       <li><code>เปิด Google / Maps / Facebook / Gmail / LINE</code></li>
       <li><code>โทรหา 0812345678</code> / <code>call 0812345678</code></li>
-      <li><code>กี่โมงแล้ว</code> / <code>what time is it</code> · <code>วันนี้วันอะไร</code> / <code>what's the date</code></li>
+      <li><code>กี่โมงแล้ว</code> / <code>what time is it</code> · <code>วันนี้วันอะไร</code></li>
     </ul>
-    <p class="warn">⚠️ หมายเหตุ: เว็บไม่สามารถ “ปลดล็อกหน้าจอ” แทนคุณได้ — ระบบความปลอดภัยของมือถือบล็อกไว้ ต้องปลดล็อกเองก่อน</p>
-    <p>ใช้ได้ดีบน Chrome (Android) และ Safari (iOS). ต้องอนุญาตการใช้ไมโครโฟน.</p>
+    <p class="warn">⚠️ เว็บฟังได้เฉพาะตอน “เปิดหน้านี้ค้างและจอติด” เท่านั้น — ฟังตอนล็อกเครื่อง/ปิดแอปไม่ได้ (ข้อจำกัดความปลอดภัยของมือถือ) และปลดล็อกหน้าจอแทนคุณไม่ได้.</p>
+    <p>ใช้ได้ดีบน Chrome (Android). บน iOS/Safari ความต่อเนื่องจะจำกัดกว่า. ต้องอนุญาตไมโครโฟน.</p>
   </details>
 </div>
 
@@ -92,12 +109,21 @@
   const log = document.getElementById('log');
   const statusEl = document.getElementById('status');
   const micBtn = document.getElementById('mic');
-  const langBadge = document.getElementById('langBadge');
+  const hfToggle = document.getElementById('hfToggle');
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const synth = window.speechSynthesis;
-  let listening = false;
+
   let recog = null;
+  let listening = false;     // engine currently active
+  let handsFree = false;     // continuous mode on
+  let awakened = false;      // wake word heard, waiting for the command
+  let speaking = false;      // TTS is talking (ignore self)
+  let wakeLock = null;
+  let restartTimer = null;
+
+  // Wake words (strip these, then process the remainder as the command)
+  const WAKE = /^(?:โอเค|ok|okay|เฮ้|เฮ|hey|hi|ผู้ช่วย|assistant|จาร์วิส|jarvis|สิริ|siri)[\s,\.]*/i;
 
   function addMsg(text, cls){
     const d = document.createElement('div');
@@ -107,16 +133,16 @@
     log.scrollTop = log.scrollHeight;
     return d;
   }
-  function setStatus(t, live){
+  function setStatus(t, kind){
     statusEl.textContent = t || '';
-    statusEl.classList.toggle('live', !!live);
+    statusEl.className = 'status' + (kind ? ' ' + kind : '');
   }
 
   // --- Language helpers -----------------------------------------------------
   function hasThai(s){ return /[฀-๿]/.test(s); }
 
-  function speak(text, lang){
-    if (!synth) return;
+  function speak(text, lang, after){
+    if (!synth){ if (after) after(); return; }
     try { synth.cancel(); } catch(e){}
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang || (hasThai(text) ? 'th-TH' : 'en-US');
@@ -124,19 +150,27 @@
     const voices = synth.getVoices();
     const v = voices.find(v => v.lang && v.lang.toLowerCase().startsWith(u.lang.slice(0,2)));
     if (v) u.voice = v;
+    speaking = true;
+    u.onend = u.onerror = () => { speaking = false; if (after) after(); };
     synth.speak(u);
   }
 
+  // --- Screen wake lock (keep screen on in hands-free) ----------------------
+  async function requestWakeLock(){
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+  }
+  function releaseWakeLock(){ try { if (wakeLock){ wakeLock.release(); wakeLock = null; } } catch(e){} }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && handsFree) requestWakeLock();
+  });
+
   // --- Command engine -------------------------------------------------------
-  // Each rule: regex (TH or EN), then a handler returning {reply, lang, open?}
   function handle(rawText){
     const t = rawText.trim();
-    const low = t.toLowerCase();
     const th = hasThai(t);
     const L = th ? 'th-TH' : 'en-US';
     const say = (thMsg, enMsg) => ({ reply: th ? thMsg : enMsg, lang: L });
 
-    // ---- YouTube (with optional search query) ----
     let m = t.match(/(?:เปิด|เล่น|play|open)\s*(?:youtube|ยูทูป|ยูทูบ)\s*(.*)$/i);
     if (m){
       const q = (m[1] || '').replace(/^(ให้หน่อย|หน่อย|please|now)\b/i,'').trim();
@@ -150,7 +184,6 @@
       return r;
     }
 
-    // ---- Direct apps / sites ----
     const sites = [
       [/google\s*maps|แผนที่|maps/i, 'https://maps.google.com/', 'Google Maps'],
       [/facebook|เฟส(บุ๊ก|บุ๊ค)?/i, 'https://m.facebook.com/', 'Facebook'],
@@ -158,60 +191,42 @@
       [/line|ไลน์/i, 'https://line.me/', 'LINE'],
       [/google|กูเกิล|กูเกิ้ล/i, 'https://www.google.com/', 'Google'],
     ];
-    if (/^(เปิด|open)\b/i.test(t) || /^(ไป|go to)\b/i.test(t)){
+    if (/^(เปิด|open|ไป|go to)\b/i.test(t)){
       for (const [re, url, name] of sites){
-        if (re.test(t)){
-          const r = say('กำลังเปิด ' + name, 'Opening ' + name);
-          r.open = url; return r;
-        }
+        if (re.test(t)){ const r = say('กำลังเปิด ' + name, 'Opening ' + name); r.open = url; return r; }
       }
     }
 
-    // ---- Phone call ----
     m = t.match(/(?:โทร(?:หา|ไป)?|call|dial)\s*\D*([0-9][0-9\s\-]{4,})/i);
     if (m){
       const num = m[1].replace(/[\s\-]/g,'');
-      const r = say('กำลังโทรหา ' + num, 'Calling ' + num);
-      r.open = 'tel:' + num; return r;
+      const r = say('กำลังโทรหา ' + num, 'Calling ' + num); r.open = 'tel:' + num; return r;
     }
 
-    // ---- Search (generic) ----
     m = t.match(/^(?:ค้นหา|หา|search(?:\s+for)?|google)\s+(.+)$/i);
     if (m){
       const q = m[1].trim();
       const r = say('กำลังค้นหา: ' + q, 'Searching for: ' + q);
-      r.open = 'https://www.google.com/search?q=' + encodeURIComponent(q);
-      return r;
+      r.open = 'https://www.google.com/search?q=' + encodeURIComponent(q); return r;
     }
 
-    // ---- Time ----
     if (/กี่โมง|เวลา|what.*time|time now/i.test(t)){
-      const now = new Date();
-      const hh = now.getHours(), mm = String(now.getMinutes()).padStart(2,'0');
+      const now = new Date(), hh = now.getHours(), mm = String(now.getMinutes()).padStart(2,'0');
       return say(`ตอนนี้ ${hh} นาฬิกา ${mm} นาที`, `It is ${((hh%12)||12)}:${mm} ${hh<12?'AM':'PM'}`);
     }
-
-    // ---- Date ----
     if (/วันอะไร|วันที่เท่าไหร่|วันที่|what.*(date|day)/i.test(t)){
       const now = new Date();
       const thD = now.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
       const enD = now.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
       return say('วันนี้ ' + thD, 'Today is ' + enD);
     }
-
-    // ---- Greeting / smalltalk ----
     if (/^(สวัสดี|ดีจ้า|หวัดดี|hello|hi|hey)\b/i.test(t)){
-      return say('สวัสดีครับ ให้ช่วยอะไรดี? ลองพูด “เปิด YouTube”', 'Hi! How can I help? Try “open YouTube”.');
+      return say('สวัสดีครับ ให้ช่วยอะไรดี?', 'Hi! How can I help?');
     }
-    if (/(ขอบคุณ|thank)/i.test(t)){
-      return say('ยินดีครับ', "You're welcome!");
-    }
+    if (/(ขอบคุณ|thank)/i.test(t)) return say('ยินดีครับ', "You're welcome!");
 
-    // ---- Fallback: offer a web search ----
-    const r = say(
-      'ยังไม่เข้าใจคำสั่งนี้ — ลองค้นหาให้แทนนะครับ: ' + t,
-      "I didn't catch that — let me search the web for: " + t
-    );
+    const r = say('ยังไม่เข้าใจ — ลองค้นหาให้แทนนะครับ: ' + t,
+                  "I didn't catch that — searching the web for: " + t);
     r.open = 'https://www.google.com/search?q=' + encodeURIComponent(t);
     return r;
   }
@@ -226,63 +241,128 @@
     }
     addMsg(html, 'bot');
     speak(res.reply, res.lang);
-    // Try to open automatically (works because triggered by user mic gesture chain)
-    if (res.open){
-      setTimeout(() => { try { window.open(res.open, '_blank'); } catch(e){} }, 350);
-    }
+    if (res.open) setTimeout(() => { try { window.open(res.open, '_blank'); } catch(e){} }, 350);
   }
 
-  // --- Speech recognition setup --------------------------------------------
-  function startListening(){
-    if (!SR){
-      addMsg('เบราว์เซอร์นี้ไม่รองรับการฟังเสียง (ลองใช้ Chrome บน Android หรือ Safari บน iOS)', 'sys');
-      return;
-    }
-    if (listening){ try{ recog.stop(); }catch(e){} return; }
-
-    recog = new SR();
-    // th-TH catches Thai; many engines still transcribe English fine under th-TH.
-    recog.lang = 'th-TH';
-    recog.interimResults = true;
-    recog.maxAlternatives = 3;
-    recog.continuous = false;
-
+  // --- Recognition lifecycle ------------------------------------------------
+  function buildRecog(){
+    const r = new SR();
+    r.lang = 'th-TH';
+    r.interimResults = true;
+    r.maxAlternatives = 3;
+    r.continuous = handsFree;   // continuous only in hands-free
     let finalText = '';
-    recog.onstart = () => { listening = true; micBtn.classList.add('listening'); setStatus('กำลังฟัง… พูดได้เลย', true); };
-    recog.onresult = (e) => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++){
-        const r = e.results[i];
-        if (r.isFinal) finalText += r[0].transcript;
-        else interim += r[0].transcript;
-      }
-      setStatus((finalText || interim) || 'กำลังฟัง…', true);
+
+    r.onstart = () => {
+      listening = true; micBtn.classList.add('listening');
+      if (handsFree) setStatus(awakened ? 'ว่าไงครับ พูดคำสั่งได้เลย…' : 'กำลังรอคำปลุก “ผู้ช่วย”…', awakened ? 'live' : 'wake');
+      else setStatus('กำลังฟัง… พูดได้เลย', 'live');
     };
-    recog.onerror = (e) => {
-      setStatus('เกิดข้อผิดพลาด: ' + e.error);
+
+    r.onresult = (e) => {
+      let interim = '';
+      finalText = '';
+      for (let i = 0; i < e.results.length; i++){
+        const seg = e.results[i];
+        if (seg.isFinal) finalText += seg[0].transcript;
+        else interim += seg[0].transcript;
+      }
+      const shown = (finalText || interim).trim();
+      if (shown) setStatus(shown, 'live');
+
+      if (!handsFree) return;
+      // In hands-free, act as soon as we get a final segment.
+      const seg = e.results[e.results.length - 1];
+      if (seg && seg.isFinal){
+        processHandsFree(finalText.trim());
+        finalText = '';
+        try { r.stop(); } catch(_){}  // restart cleanly via onend
+      }
+    };
+
+    r.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed'){
         addMsg('กรุณาอนุญาตให้ใช้ไมโครโฟนในเบราว์เซอร์', 'sys');
+        handsFree = false; hfToggle.checked = false;
+      }
+      // 'no-speech'/'aborted' are normal in continuous mode — just let onend restart.
+    };
+
+    r.onend = () => {
+      listening = false; micBtn.classList.remove('listening');
+      if (handsFree){
+        // keep the loop alive while page is visible
+        clearTimeout(restartTimer);
+        restartTimer = setTimeout(() => { if (handsFree && !speaking) startRecog(); }, 350);
+      } else {
+        const text = finalText.trim();
+        if (text){ setStatus(''); respond(text); } else setStatus('ไม่ได้ยินเสียง ลองอีกครั้ง');
       }
     };
-    recog.onend = () => {
-      listening = false; micBtn.classList.remove('listening');
-      const text = finalText.trim();
-      if (text){ setStatus(''); respond(text); }
-      else setStatus('ไม่ได้ยินเสียง ลองอีกครั้ง');
-    };
+    return r;
+  }
 
+  function processHandsFree(text){
+    if (!text) return;
+    if (awakened){
+      // already woken — this utterance is the command
+      awakened = false;
+      respond(text);
+      return;
+    }
+    const m = text.match(WAKE);
+    if (!m) return;                       // ignore chatter without wake word
+    const cmd = text.slice(m[0].length).trim();
+    if (cmd){
+      respond(cmd);                       // "ผู้ช่วย เปิด youtube" in one breath
+    } else {
+      awakened = true;                    // just "ผู้ช่วย" — prompt for the command
+      speak('ว่าไงครับ', 'th-TH');
+      setStatus('ว่าไงครับ พูดคำสั่งได้เลย…', 'live');
+    }
+  }
+
+  function startRecog(){
+    if (!SR){
+      addMsg('เบราว์เซอร์นี้ไม่รองรับการฟังเสียง (ลองใช้ Chrome บน Android)', 'sys');
+      return;
+    }
+    if (listening) return;
+    recog = buildRecog();
     try { recog.start(); }
-    catch(e){ setStatus('เริ่มฟังไม่ได้: ' + e.message); }
+    catch(e){ /* start while already starting */ setTimeout(() => { if (!listening) try{recog.start();}catch(_){}}, 300); }
   }
 
-  micBtn.addEventListener('click', startListening);
+  function stopRecog(){
+    handsFree = false;
+    clearTimeout(restartTimer);
+    if (recog){ try { recog.stop(); } catch(e){} }
+  }
 
-  // Preload voices (some browsers load async)
+  // --- UI wiring ------------------------------------------------------------
+  micBtn.addEventListener('click', () => {
+    if (handsFree) return;          // mic button is for one-shot mode
+    if (listening){ try{ recog.stop(); }catch(e){} return; }
+    startRecog();
+  });
+
+  hfToggle.addEventListener('change', () => {
+    if (hfToggle.checked){
+      handsFree = true; awakened = false;
+      requestWakeLock();
+      addMsg('โหมดฟังต่อเนื่องเปิดแล้ว — เรียก “ผู้ช่วย” ตามด้วยคำสั่งได้เลย', 'sys');
+      speak('เปิดโหมดฟังต่อเนื่องแล้วครับ เรียกผู้ช่วยได้เลย', 'th-TH', () => { if (!listening) startRecog(); });
+      if (!synth) startRecog();
+    } else {
+      stopRecog();
+      releaseWakeLock();
+      setStatus('');
+      addMsg('ปิดโหมดฟังต่อเนื่องแล้ว', 'sys');
+    }
+  });
+
   if (synth){ synth.onvoiceschanged = () => synth.getVoices(); synth.getVoices(); }
-
-  if (!SR){
-    setStatus('เบราว์เซอร์นี้อาจไม่รองรับการฟังเสียง');
-  }
+  if (!SR) setStatus('เบราว์เซอร์นี้อาจไม่รองรับการฟังเสียง');
 })();
 </script>
 </body>
