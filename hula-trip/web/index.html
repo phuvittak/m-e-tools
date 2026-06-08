@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ระบบลงทะเบียนทริป Hula Hula</title>
+<meta name="theme-color" content="#1b1147">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg1:#1b1147; --bg2:#241a5e; --card:#2a2168; --card2:#332a7a;
+    --line:#43399a; --text:#eceaff; --muted:#a9a3d6;
+    --pink:#ff5db1; --purple:#8a5cff; --blue:#3a7bff; --green:#1fb877;
+    --red:#ef4565; --gold:#ffcf5c; --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Sarabun",Tahoma,sans-serif;
+    color:var(--text); background:linear-gradient(160deg,var(--bg1),var(--bg2) 60%,#150c38);
+    min-height:100vh; padding:16px calc(16px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:520px; margin:0 auto}
+  h1,h2,h3,h4{margin:0}
+  .grad{background:linear-gradient(90deg,var(--pink),var(--purple));
+    -webkit-background-clip:text; background-clip:text; color:transparent; font-weight:800}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; margin:14px 0;
+    box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .field{background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:10px 0}
+  .field label{display:block; font-size:13px; color:var(--muted); margin-bottom:4px}
+  .field .val{font-size:18px; font-weight:700; word-break:break-word}
+  input,select{width:100%; background:#1d1550; color:var(--text); border:1px solid var(--line);
+    border-radius:10px; padding:12px 14px; font-size:16px; font-family:inherit; outline:none}
+  input:focus,select:focus{border-color:var(--purple)}
+  .btn{border:0; border-radius:12px; padding:12px 16px; font-size:15px; font-weight:700; color:#fff;
+    cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; gap:8px; justify-content:center}
+  .btn-blue{background:var(--blue)} .btn-green{background:var(--green)}
+  .btn-purple{background:var(--purple)} .btn-red{background:var(--red)} .btn-ghost{background:#3a2f86}
+  .btn-pink{background:linear-gradient(90deg,var(--pink),var(--purple)); width:100%; padding:14px; font-size:16px}
+  .btn:disabled{opacity:.55; cursor:not-allowed}
+  .actions{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:6px}
+  .muted{color:var(--muted); font-size:13px}
+  .center{text-align:center}
+  table{width:100%; border-collapse:collapse; margin-top:10px; font-size:14px}
+  th,td{padding:10px 8px; text-align:left; border-bottom:1px solid var(--line)}
+  th{color:var(--muted); font-weight:600}
+  td.amt{text-align:right; color:var(--gold); font-weight:700}
+  .tier{background:linear-gradient(90deg,#5a2a9c,#7b3ac0); border:1px solid #9a6bff; border-radius:12px; padding:14px; margin-top:12px}
+  .warn{background:#3a1f2a; border:1px solid var(--red); border-radius:12px; padding:12px; font-size:13px; color:#ffd0da; margin:10px 0}
+  .ok{background:#16352a; border:1px solid var(--green); color:#bff4dd}
+  .follower{border:1px dashed var(--line); border-radius:12px; padding:12px; margin:10px 0}
+  .hidden{display:none}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#0c0826;
+    border:1px solid var(--purple); color:#fff; padding:12px 18px; border-radius:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,.5); z-index:99; max-width:90%; text-align:center}
+  .sub{font-size:12px; color:var(--muted); margin-top:6px}
+  .toplink{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px}
+  .toplink a{color:var(--muted); font-size:13px; text-decoration:none; cursor:pointer}
+  .drop{border:2px dashed var(--line); border-radius:12px; padding:18px; text-align:center; color:var(--muted); margin:10px 0}
+  @media print{
+    body{background:#fff; color:#000} .noprint{display:none!important}
+    .card{box-shadow:none; border:1px solid #ccc; background:#fff} .grad{color:#7b3ac0;-webkit-text-fill-color:#7b3ac0}
+    .field{background:#f5f5f5} td.amt{color:#000}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== หน้าเข้าระบบ ===== -->
+  <div id="loginView">
+    <div class="card center">
+      <h1 class="grad" style="font-size:24px">🌺 ระบบลงทะเบียนทริป<br>Hula Hula</h1>
+      <p class="muted" style="margin-top:14px">กรอกเลขทะเบียนสมาชิกเพื่อตรวจสอบข้อมูล</p>
+      <input id="codeInput" placeholder="เลขทะเบียนสมาชิก" autocomplete="off" inputmode="text">
+      <div style="height:10px"></div>
+      <button class="btn btn-pink" id="loginBtn">🔍 ตรวจสอบข้อมูลของสมาชิก</button>
+      <p class="sub">สมาชิกที่มียอดลงทุนรวมทุกครั้ง ตั้งแต่ <span id="minHint">1,000.00</span> บาทขึ้นไป
+        จึงสามารถตรวจสอบข้อมูลด้วยเลขทะเบียนได้</p>
+      <p id="loginMsg" class="warn hidden"></p>
+      <p class="sub">ตัวอย่างทดสอบ: เลขทะเบียน <b>1001</b></p>
+    </div>
+    <div class="center noprint">
+      <a class="muted" id="toAdminBtn" style="cursor:pointer; text-decoration:underline">⚙️ ผู้ดูแล — นำเข้า/ส่งออก Excel</a>
+    </div>
+  </div>
+
+  <!-- ===== หน้าผู้ดูแล (นำเข้า/ส่งออก) ===== -->
+  <div id="adminView" class="hidden">
+    <div class="card">
+      <div class="toplink"><h2 class="grad" style="font-size:20px">⚙️ ผู้ดูแลระบบ</h2><a id="adminBack">‹ กลับ</a></div>
+      <p class="muted">นำเข้าข้อมูลสมาชิก/ยอดโอนจากไฟล์ Excel (.xlsx) — ต้องมีชีตชื่อ
+        <b>Members</b> และ <b>Investments</b> ตามเทมเพลต</p>
+      <div class="drop" id="dropZone">📥 แตะเพื่อเลือกไฟล์ Excel<br><span class="sub">หรือลากไฟล์มาวางตรงนี้</span></div>
+      <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden">
+      <p id="importMsg" class="hidden"></p>
+      <button class="btn btn-ghost" id="tplBtn" style="width:100%; margin-top:6px">⬇️ ดาวน์โหลดเทมเพลต Excel</button>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn btn-green" id="exportAllBtn">⬇️ ส่งออกทั้งระบบ</button>
+        <button class="btn btn-blue" id="exportRegBtn">⬇️ การลงทะเบียน</button>
+      </div>
+      <button class="btn btn-red" id="resetBtn" style="width:100%; margin-top:10px">🗑️ ล้างข้อมูล (กลับเป็นตัวอย่าง)</button>
+      <p class="sub" id="dbStat"></p>
+    </div>
+  </div>
+
+  <!-- ===== หน้าข้อมูลสมาชิก ===== -->
+  <div id="appView" class="hidden">
+    <div class="card">
+      <h2 class="grad center" style="font-size:22px">ข้อมูลสมาชิก</h2>
+      <div class="actions noprint" style="margin-top:14px">
+        <button class="btn btn-blue" id="pdfBtn">📄 PDF</button>
+        <button class="btn btn-green" id="excelBtn">📊 Excel</button>
+        <button class="btn btn-purple" id="refreshBtn">🔄 ดึงข้อมูลล่าสุด</button>
+        <button class="btn btn-red" id="logoutBtn">⏏ ออกจากระบบ</button>
+      </div>
+      <p class="sub" id="updatedAt"></p>
+
+      <div class="field"><label>ชื่อ-นามสกุล</label><div class="val" id="fName"></div></div>
+      <div class="field"><label>เลขบัตรประชาชน</label><div class="val" id="fId"></div></div>
+      <div class="field"><label>เบอร์โทรศัพท์</label><div class="val" id="fPhone"></div></div>
+      <div class="field"><label>ข้อมูลบัญชี</label><div class="val" id="fBank"></div></div>
+    </div>
+
+    <div class="card">
+      <h3 class="grad" style="font-size:18px">📈 ประวัติการลงทุน</h3>
+      <div class="field" style="margin-top:12px"><label>จำนวนการลงทุน</label><div class="val" id="fCount"></div></div>
+      <div class="field"><label>ยอดรวมลงทุนทั้งหมด</label><div class="val" id="fTotal"></div></div>
+      <div class="tier">
+        <div style="font-size:14px">🏝️ สิทธิ์แพ็กเกจทริป Hula Hula (ประเมินจากยอดรวมลงทุน)</div>
+        <div style="font-size:18px; font-weight:800; margin-top:6px" id="fTier"></div>
+      </div>
+      <table>
+        <thead><tr><th>วันที่โอน</th><th>เวลาโอน</th><th style="text-align:right">ยอดเงิน (บาท)</th></tr></thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card noprint" id="regCard">
+      <h3 class="grad" style="font-size:18px">🌺 ระบบลงทะเบียนทริป Hula Hula</h3>
+
+      <div class="field" style="margin-top:12px">
+        <label>1. ผู้ลงทะเบียน (เจ้าของรหัส) และประเภทอาหาร</label>
+        <div class="val" id="fOwnerName" style="margin-bottom:8px"></div>
+        <select id="ownerFood"></select>
+      </div>
+
+      <div class="field">
+        <label>2. เมนูเลือกรับโทรศัพท์มือถือรางวัลพิเศษ</label>
+        <select id="phonePrize">
+          <option value="">-- โปรดเลือกชุดของรางวัลโทรศัพท์ท่าน --</option>
+          <option>iPhone 16 Pro Max</option>
+          <option>iPhone 16</option>
+          <option>Samsung Galaxy S25 Ultra</option>
+          <option>Samsung Galaxy A56</option>
+          <option>ไม่รับของรางวัลโทรศัพท์</option>
+        </select>
+      </div>
+
+      <div class="warn">
+        ⚠️ <b>ข้อแนะนำสำคัญ:</b> หากท่านไม่ประสงค์ให้มีผู้ติดตามร่วมเดินทางในโควตาที่มี
+        <b>กรุณาพิมพ์คำว่า "ไม่มีผู้ติดตาม"</b> ลงในช่องกรอกชื่อผู้ติดตาม และจำเป็นต้องเลือกประเภทอาหารไว้ตามปกติด้วย
+      </div>
+
+      <div id="followerArea">
+        <h4 style="margin:8px 0; color:var(--muted)">3. โหวตผู้ติดตามที่ท่านได้รับ (<span id="fMax">0</span> ท่าน)</h4>
+        <div id="followers"></div>
+        <p class="muted hidden" id="noFollower">ยอดลงทุนของท่านยังไม่ถึงเกณฑ์รับสิทธิ์พาผู้ติดตาม</p>
+      </div>
+
+      <button class="btn btn-pink" id="submitBtn" style="margin-top:8px">✅ ยืนยันการลงทะเบียนทริป</button>
+      <p class="sub center">สมาชิกที่มียอดลงทุนรวมทุกครั้ง ตั้งแต่ <span id="minHint2"></span> บาทขึ้นไป จึงสามารถลงทะเบียนได้</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   ระบบลงทะเบียนทริป Hula Hula — เว็บล้วน (ทำงานในเบราว์เซอร์)
+   สายข้อมูล: Excel --นำเข้า--> เว็บ (localStorage) --ส่งออก--> Excel/PDF
+   ============================================================ */
+
+var DB_KEY = 'hula_db_v1';
+var MIN_INVEST = 1000;
+var FOOD_OPTIONS = ['ปกติ', 'อาหารเจ', 'อาหารมังสวิรัติ', 'อาหารมุสลิม'];
+var THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+var TIERS = [
+  { min:30000, room:'Presidential suite', followers:6 },
+  { min:20000, room:'Family suite (Premium)', followers:5 },
+  { min:15000, room:'Family suite', followers:4 },
+  { min:10000, room:'Deluxe room', followers:3 },
+  { min:5000,  room:'Superior room', followers:2 },
+  { min:3000,  room:'Standard room', followers:1 },
+  { min:1000,  room:'Standard room', followers:0 }
+];
+
+/* ---------- ข้อมูลตัวอย่าง (โหลดครั้งแรก) ---------- */
+function sampleDB(){
+  var inv = [
+    ['2026-05-10','11:39',1000],['2026-05-10','17:21',1000],['2026-05-11','10:02',2000],
+    ['2026-05-11','18:39',1000],['2026-05-11','11:36',1000],['2026-05-12','09:15',1000],
+    ['2026-05-12','14:02',1000],['2026-05-13','10:48',2000],['2026-05-14','16:20',1000],
+    ['2026-05-15','08:55',1000],['2026-05-16','19:30',1000],['2026-05-17','12:10',1000],
+    ['2026-05-18','13:45',1000],['2026-05-19','20:05',2000],['2026-05-20','09:40',1000]
+  ].map(function(r){ return {RegCode:'1001', Date:r[0], Time:r[1], Amount:r[2]}; });
+  return {
+    members:[{RegCode:'1001', Name:'นางสาวกนกทิพย์ ปฐมกนกพงศ์', IDCard:'3-7301-00471-39-9',
+      Phone:'098-592-4564', Bank:'ไทยพาณิชย์ (ไทรน้อย จันทบุรี) เลขที่: 854-2-46671-0'}],
+    investments:inv, registrations:[]
+  };
+}
+
+/* ---------- จัดเก็บ ---------- */
+function loadDB(){
+  try{ var d = JSON.parse(localStorage.getItem(DB_KEY)); if(d && d.members) return d; }catch(e){}
+  var s = sampleDB(); saveDB(s); return s;
+}
+function saveDB(d){ localStorage.setItem(DB_KEY, JSON.stringify(d)); }
+var DB = loadDB();
+var STATE = { code:'' };
+
+/* ---------- helpers ---------- */
+function $(id){ return document.getElementById(id); }
+function show(id){ $(id).classList.remove('hidden'); }
+function hide(id){ $(id).classList.add('hidden'); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+function normCode(c){ return String(c==null?'':c).replace(/\s+/g,'').trim(); }
+function money(n){ return (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function pad(n){ return (n<10?'0':'')+n; }
+
+function toDate(v){
+  if(v instanceof Date) return isNaN(v.getTime())?null:v;
+  if(typeof v==='number'){ var d=new Date(Math.round((v-25569)*86400*1000)); return isNaN(d.getTime())?null:d; }
+  if(typeof v==='string'){ var d2=new Date(v); return isNaN(d2.getTime())?null:d2; }
+  return null;
+}
+function thaiDate(v){ var d=toDate(v); if(!d) return String(v||''); return d.getDate()+' '+THAI_MONTHS[d.getMonth()]+' '+(d.getFullYear()+543); }
+function thaiTime(v){
+  if(v instanceof Date && !isNaN(v.getTime())) return pad(v.getHours())+':'+pad(v.getMinutes())+' น.';
+  var s=String(v||'').trim(); if(!s) return '';
+  return /น\.$/.test(s)? s : s+' น.';
+}
+function sortKey(v){ var d=toDate(v); return d?d.getTime():0; }
+
+var toastTimer;
+function toast(msg){
+  var t=document.createElement('div'); t.className='toast'; t.innerHTML=msg; document.body.appendChild(t);
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.remove(); },3200);
+}
+function msgBox(el, text, ok){
+  el.textContent=text; el.className='warn'+(ok?' ok':''); el.classList.remove('hidden');
+}
+
+function computeTier(total){
+  for(var i=0;i<TIERS.length;i++){
+    if(total>=TIERS[i].min){ var t=TIERS[i];
+      return { room:t.room, followers:t.followers,
+        note:'ได้เข้าพักห้อง '+t.room+(t.followers>0?' ผู้ติดตาม '+t.followers+' ท่าน':' (ไม่มีสิทธิ์พาผู้ติดตาม)') }; }
+  }
+  return { room:'-', followers:0, note:'ยอดลงทุนยังไม่ถึงเกณฑ์รับสิทธิ์ทริป' };
+}
+
+/* ---------- อ่านข้อมูลสมาชิก ---------- */
+function getMemberData(code){
+  var c=normCode(code);
+  if(!c) return {found:false, message:'กรุณากรอกเลขทะเบียน'};
+  var member=null;
+  for(var i=0;i<DB.members.length;i++){ if(normCode(DB.members[i].RegCode)===c){ member=DB.members[i]; break; } }
+  if(!member) return {found:false, message:'ไม่พบเลขทะเบียนนี้ในระบบ'};
+
+  var total=0;
+  var transfers=DB.investments.filter(function(r){ return normCode(r.RegCode)===c; })
+    .map(function(r){ var amt=Number(r.Amount)||0; total+=amt;
+      return {date:thaiDate(r.Date), time:thaiTime(r.Time), amount:money(amt), _k:sortKey(r.Date)}; })
+    .sort(function(a,b){ return a._k-b._k; });
+
+  return {
+    found:true, eligible: total>=MIN_INVEST, minInvest:money(MIN_INVEST), code:c,
+    name:String(member.Name||''), idCard:String(member.IDCard||''),
+    phone:String(member.Phone||''), bank:String(member.Bank||''),
+    updatedAt:pad(new Date().getHours())+':'+pad(new Date().getMinutes())+':'+pad(new Date().getSeconds())+' น.',
+    count:transfers.length, total:money(total), tier:computeTier(total), transfers:transfers
+  };
+}
+
+/* ---------- เข้าระบบ + แสดงผล ---------- */
+function login(){
+  var code=$('codeInput').value.trim(); if(!code) return;
+  hide('loginMsg');
+  var res=getMemberData(code);
+  if(!res.found){ msgBox($('loginMsg'),res.message); return; }
+  if(!res.eligible){ msgBox($('loginMsg'),'พบสมาชิก แต่ยอดลงทุนรวมยังไม่ถึง '+res.minInvest+' บาท จึงยังตรวจสอบข้อมูลไม่ได้'); return; }
+  STATE.code=res.code; renderApp(res);
+  hide('loginView'); hide('adminView'); show('appView'); window.scrollTo(0,0);
+}
+
+function renderApp(d){
+  $('fName').textContent=d.name; $('fId').textContent=d.idCard;
+  $('fPhone').textContent=d.phone; $('fBank').textContent=d.bank;
+  $('updatedAt').textContent='อัปเดตข้อมูลล่าสุดเมื่อ: '+d.updatedAt;
+  $('fCount').textContent=d.count+' ครั้ง';
+  $('fTotal').textContent=d.total+' บาท';
+  $('fTier').textContent=d.tier.note;
+  $('fOwnerName').textContent=d.name;
+  $('minHint2').textContent=d.minInvest;
+
+  var tb=$('historyBody'); tb.innerHTML='';
+  d.transfers.forEach(function(t){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td>'+esc(t.date)+'</td><td>'+esc(t.time)+'</td><td class="amt">'+esc(t.amount)+'</td>';
+    tb.appendChild(tr);
+  });
+
+  var optHtml=FOOD_OPTIONS.map(function(f,i){ return '<option'+(i===0?' selected':'')+'>'+f+'</option>'; }).join('');
+  $('ownerFood').innerHTML=optHtml;
+
+  var max=d.tier.followers||0; $('fMax').textContent=max;
+  var box=$('followers'); box.innerHTML='';
+  if(max===0){ show('noFollower'); }
+  else{ hide('noFollower');
+    for(var i=1;i<=max;i++){
+      var div=document.createElement('div'); div.className='follower';
+      div.innerHTML='<label class="muted">ชื่อ-นามสกุล ผู้ติดตามคนที่ '+i+' *</label>'+
+        '<input class="fName" placeholder="ระบุชื่อ หรือพิมพ์ \'ไม่มีผู้ติดตาม\'">'+
+        '<label class="muted" style="margin-top:8px; display:block">ประเภทอาหาร *</label>'+
+        '<select class="fFood">'+optHtml+'</select>';
+      box.appendChild(div);
+    }
+  }
+}
+
+function submitReg(){
+  var d=getMemberData(STATE.code); if(!d.found||!d.eligible){ toast('ไม่สามารถลงทะเบียนได้'); return; }
+  var followers=[];
+  document.querySelectorAll('#followers .follower').forEach(function(row){
+    followers.push({ name:row.querySelector('.fName').value.trim(), food:row.querySelector('.fFood').value });
+  });
+  var rec={ Timestamp:new Date().toISOString(), RegCode:d.code, OwnerName:d.name,
+    OwnerFood:$('ownerFood').value, PhonePrize:$('phonePrize').value };
+  for(var i=0;i<4;i++){ var f=followers[i]||{}; rec['F'+(i+1)+'Name']=f.name||''; rec['F'+(i+1)+'Food']=f.name?f.food:''; }
+  DB.registrations.push(rec); saveDB(DB);
+  toast('บันทึกการลงทะเบียนทริปเรียบร้อยแล้ว ✓ ('+d.tier.room+')');
+}
+
+/* ---------- ส่งออก Excel (SheetJS) ---------- */
+function aoa(ws){ return XLSX.utils.aoa_to_sheet(ws); }
+function exportMemberExcel(){
+  var d=getMemberData(STATE.code); if(!d.found) return;
+  var wb=XLSX.utils.book_new();
+  var info=[['ระบบลงทะเบียนทริป Hula Hula'],[],
+    ['เลขทะเบียน',d.code],['ชื่อ-นามสกุล',d.name],['เลขบัตรประชาชน',d.idCard],
+    ['เบอร์โทรศัพท์',d.phone],['ข้อมูลบัญชี',d.bank],['สิทธิ์แพ็กเกจทริป',d.tier.note],[],
+    ['จำนวนการลงทุน',d.count+' ครั้ง'],['ยอดรวมลงทุนทั้งหมด',d.total+' บาท']];
+  XLSX.utils.book_append_sheet(wb,aoa(info),'ข้อมูลสมาชิก');
+  var hist=[['วันที่โอน','เวลาโอน','ยอดเงิน (บาท)']];
+  d.transfers.forEach(function(t){ hist.push([t.date,t.time,t.amount]); });
+  XLSX.utils.book_append_sheet(wb,aoa(hist),'ประวัติการลงทุน');
+  XLSX.writeFile(wb,'Hula-'+d.code+'.xlsx');
+  toast('ดาวน์โหลด Excel ของฉันแล้ว ✓');
+}
+
+function exportAll(){
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(DB.members),'Members');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(DB.investments),'Investments');
+  XLSX.writeFile(wb,'HulaHula-database.xlsx');
+  toast('ส่งออกทั้งระบบเป็น Excel แล้ว ✓');
+}
+function exportReg(){
+  if(!DB.registrations.length){ toast('ยังไม่มีการลงทะเบียน'); return; }
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(DB.registrations),'Registrations');
+  XLSX.writeFile(wb,'HulaHula-registrations.xlsx');
+  toast('ส่งออกรายการลงทะเบียนแล้ว ✓');
+}
+function downloadTemplate(){
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,aoa([['RegCode','Name','IDCard','Phone','Bank'],
+    ['1001','นางสาวกนกทิพย์ ปฐมกนกพงศ์','3-7301-00471-39-9','098-592-4564','ไทยพาณิชย์ เลขที่: 854-2-46671-0']]),'Members');
+  XLSX.utils.book_append_sheet(wb,aoa([['RegCode','Date','Time','Amount'],
+    ['1001','2026-05-10','11:39',1000]]),'Investments');
+  XLSX.writeFile(wb,'HulaHula-template.xlsx');
+}
+
+/* ---------- นำเข้า Excel ---------- */
+function importExcel(file){
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:'array', cellDates:true});
+      var mSheet=wb.Sheets['Members']||wb.Sheets[wb.SheetNames[0]];
+      var iSheet=wb.Sheets['Investments']||wb.Sheets[wb.SheetNames[1]];
+      if(!mSheet){ msgBox($('importMsg'),'ไม่พบชีต Members ในไฟล์'); return; }
+      var members=XLSX.utils.sheet_to_json(mSheet,{defval:''});
+      var invest=iSheet?XLSX.utils.sheet_to_json(iSheet,{defval:''}):[];
+      // แปลงวันที่/เวลาเป็น string อ่านง่าย
+      invest=invest.map(function(r){
+        var d=toDate(r.Date); var t=r.Time;
+        return { RegCode:r.RegCode,
+          Date: d? (d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())) : String(r.Date||''),
+          Time: (t instanceof Date)? pad(t.getHours())+':'+pad(t.getMinutes()) : String(t||''),
+          Amount: Number(r.Amount)||0 };
+      });
+      DB={ members:members, investments:invest, registrations:DB.registrations||[] };
+      saveDB(DB);
+      msgBox($('importMsg'),'นำเข้าสำเร็จ ✓ สมาชิก '+members.length+' คน · รายการโอน '+invest.length+' รายการ', true);
+      updateStat();
+    }catch(err){ msgBox($('importMsg'),'อ่านไฟล์ไม่สำเร็จ: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function updateStat(){
+  $('dbStat').textContent='ในระบบตอนนี้: สมาชิก '+DB.members.length+' คน · รายการโอน '+
+    DB.investments.length+' · ลงทะเบียน '+(DB.registrations?DB.registrations.length:0);
+}
+
+/* ---------- ผูกอีเวนต์ ---------- */
+$('minHint').textContent=money(MIN_INVEST);
+$('loginBtn').addEventListener('click',login);
+$('codeInput').addEventListener('keydown',function(e){ if(e.key==='Enter') login(); });
+$('refreshBtn').addEventListener('click',function(){ DB=loadDB(); renderApp(getMemberData(STATE.code)); toast('อัปเดตข้อมูลล่าสุดแล้ว ✓'); });
+$('logoutBtn').addEventListener('click',function(){ STATE.code=''; $('codeInput').value=''; hide('appView'); show('loginView'); window.scrollTo(0,0); });
+$('excelBtn').addEventListener('click',exportMemberExcel);
+$('pdfBtn').addEventListener('click',function(){ window.print(); });
+$('submitBtn').addEventListener('click',submitReg);
+
+$('toAdminBtn').addEventListener('click',function(){ hide('loginView'); show('adminView'); updateStat(); window.scrollTo(0,0); });
+$('adminBack').addEventListener('click',function(){ hide('adminView'); show('loginView'); window.scrollTo(0,0); });
+$('dropZone').addEventListener('click',function(){ $('fileInput').click(); });
+$('fileInput').addEventListener('change',function(e){ if(e.target.files[0]) importExcel(e.target.files[0]); });
+$('dropZone').addEventListener('dragover',function(e){ e.preventDefault(); });
+$('dropZone').addEventListener('drop',function(e){ e.preventDefault(); if(e.dataTransfer.files[0]) importExcel(e.dataTransfer.files[0]); });
+$('tplBtn').addEventListener('click',downloadTemplate);
+$('exportAllBtn').addEventListener('click',exportAll);
+$('exportRegBtn').addEventListener('click',exportReg);
+$('resetBtn').addEventListener('click',function(){
+  if(confirm('ล้างข้อมูลทั้งหมดและกลับเป็นข้อมูลตัวอย่าง?')){ DB=sampleDB(); saveDB(DB); updateStat(); toast('รีเซ็ตข้อมูลแล้ว'); }
+});
+</script>
+</body>
+</html>
