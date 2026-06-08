@@ -434,9 +434,12 @@ function importExcel(file){
       if(!mSheet){ msgBox($('importMsg'),'ไม่พบชีต Members ในไฟล์'); return; }
       var members=XLSX.utils.sheet_to_json(mSheet,{defval:''});
       var invest=normInvest(iSheet?XLSX.utils.sheet_to_json(iSheet,{defval:''}):[]);
-      DB={ members:members, investments:invest, registrations:DB.registrations||[] };
-      saveDB(DB);
-      msgBox($('importMsg'),'นำเข้าสำเร็จ ✓ สมาชิก '+members.length+' คน · รายการโอน '+invest.length+' รายการ', true);
+      var beforeM=DB.members.length, beforeI=DB.investments.length;
+      var res=mergeInto(DB, {members:members, investments:invest});
+      DB=res.db; saveDB(DB);
+      var addM=DB.members.length-beforeM, addI=DB.investments.length-beforeI, dup=res.mDup+res.iDup;
+      msgBox($('importMsg'),'นำเข้า+รวมข้อมูลแล้ว ✓ เพิ่มสมาชิกใหม่ '+addM+' คน · รายการโอนใหม่ '+addI+
+        ' · ตัดข้อมูลซ้ำ '+dup+' รายการ (รวมทั้งหมด: สมาชิก '+DB.members.length+' · โอน '+DB.investments.length+')', true);
       updateStat();
     }catch(err){ msgBox($('importMsg'),'อ่านไฟล์ไม่สำเร็จ: '+err.message); }
   };
@@ -466,6 +469,44 @@ function normInvest(arr){ return arr.map(function(r){ var d=toDate(r.Date); var 
     Time: (t instanceof Date)?pad(t.getHours())+':'+pad(t.getMinutes()):String(t||''),
     Amount: Number(r.Amount)||0 }; }); }
 
+/* ---------- ตรวจ/รวมข้อมูลซ้ำ ---------- */
+// สมาชิก: ซ้ำเมื่อ "รหัสเดียวกัน" (ไม่มีรหัสใช้ชื่อ) — ของซ้ำเอามาเติมเฉพาะช่องที่ของเดิมว่าง
+function dedupeMembers(arr){
+  var idx={}, out=[], dup=0;
+  (arr||[]).forEach(function(r){
+    var k=normCode(r.RegCode) || ('n:'+String(r.Name||'').replace(/\s+/g,''));
+    if(k && idx[k]!==undefined){
+      dup++; var e=out[idx[k]];
+      ['Name','IDCard','Phone','Bank'].forEach(function(f){
+        if(!String(e[f]||'').trim() && String(r[f]||'').trim()) e[f]=r[f];
+      });
+    } else { if(k) idx[k]=out.length; out.push(Object.assign({}, r)); }
+  });
+  return { rows:out, dup:dup };
+}
+// รายการโอน: ซ้ำเมื่อ รหัส+วันที่+เวลา+ยอด เหมือนกันทั้งหมด (วันที่/เวลา/ยอดต่าง = คนละรายการ เก็บไว้)
+function dedupeInvest(arr){
+  var seen={}, out=[], dup=0;
+  (arr||[]).forEach(function(r){
+    var k=normCode(r.RegCode)+'|'+String(r.Date)+'|'+String(r.Time)+'|'+(Number(r.Amount)||0);
+    if(seen[k]){ dup++; return; }
+    seen[k]=1; out.push(r);
+  });
+  return { rows:out, dup:dup };
+}
+function cleanDB(db){
+  var m=dedupeMembers(db.members), i=dedupeInvest(db.investments);
+  return { db:{ members:m.rows, investments:i.rows, registrations:db.registrations||[] }, mDup:m.dup, iDup:i.dup };
+}
+// รวมข้อมูลใหม่เข้ากับของเดิม แล้วตัดซ้ำ
+function mergeInto(base, inc){
+  return cleanDB({
+    members:(base.members||[]).concat(inc.members||[]),
+    investments:(base.investments||[]).concat(inc.investments||[]),
+    registrations:base.registrations||[]
+  });
+}
+
 function connectSheet(silent){
   var url=localStorage.getItem(SHEET_KEY);
   if(!url){ setOnline(false,'ออฟไลน์ — ยังไม่ได้ตั้งลิงก์'); if(!silent) toast('ยังไม่ได้ตั้งลิงก์ Google Sheet → ไปที่ ⚙️ ผู้ดูแล'); return; }
@@ -477,9 +518,11 @@ function connectSheet(silent){
   ]).then(function(res){
     var members=csvToJson(res[0]);
     if(!members.length) throw new Error('ไม่พบข้อมูลในแท็บ Members');
-    DB={ members:members, investments:normInvest(csvToJson(res[1])), registrations:DB.registrations||[] };
-    saveDB(DB); setOnline(true,'ออนไลน์ — เชื่อม Google Sheet แล้ว'); tickClock(); updateStat();
-    if(!silent) toast('🟢 เชื่อมต่อสำเร็จ — สมาชิก '+members.length+' คน · โอน '+DB.investments.length+' รายการ');
+    var clean=cleanDB({ members:members, investments:normInvest(csvToJson(res[1])), registrations:DB.registrations });
+    DB=clean.db; saveDB(DB); setOnline(true,'ออนไลน์ — เชื่อม Google Sheet แล้ว'); tickClock(); updateStat();
+    var dup=clean.mDup+clean.iDup;
+    if(!silent) toast('🟢 เชื่อมต่อสำเร็จ — สมาชิก '+DB.members.length+' คน · โอน '+DB.investments.length+
+      ' รายการ'+(dup?(' · ตัดซ้ำ '+dup):''));
   }).catch(function(err){
     setOnline(false,'ออฟไลน์ — เชื่อมต่อไม่สำเร็จ');
     if(!silent) toast('❌ เชื่อมต่อไม่ได้: '+err.message+' (ตรวจการแชร์ชีต/ชื่อแท็บ Members,Investments)');
