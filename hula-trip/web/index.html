@@ -57,6 +57,18 @@
   .toplink{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px}
   .toplink a{color:var(--muted); font-size:13px; text-decoration:none; cursor:pointer}
   .drop{border:2px dashed var(--line); border-radius:12px; padding:18px; text-align:center; color:var(--muted); margin:10px 0}
+  .pills{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:4px 0 14px}
+  .pill2{border-radius:999px; padding:7px 14px; font-size:13px; font-weight:700; color:#fff; white-space:nowrap}
+  .p-purple{background:#6b3fd4} .p-green{background:#1f9d57} .p-pink{background:#e0457e}
+  .subtitle{color:var(--pink); font-weight:700; margin:6px 0 0; text-align:center}
+  .status{background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:14px; margin:0 0 14px}
+  .online{display:flex; align-items:center; gap:8px; justify-content:center; color:#8ef0b8; font-weight:700; font-size:14px}
+  .dot{width:10px; height:10px; border-radius:50%; background:#19e08a; box-shadow:0 0 8px #19e08a; animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .btn-test{width:100%; background:#2b2270; border:1px solid var(--line); color:var(--text); margin-top:10px}
+  .btn-orange{background:linear-gradient(90deg,var(--pink),#ff9f43); width:100%; padding:14px; font-size:17px}
+  .footer{text-align:center; color:var(--muted); font-size:12px; margin-top:18px; line-height:1.7}
+  .footer b{color:#cdbfff}
   @media print{
     body{background:#fff; color:#000} .noprint{display:none!important}
     .card{box-shadow:none; border:1px solid #ccc; background:#fff} .grad{color:#7b3ac0;-webkit-text-fill-color:#7b3ac0}
@@ -69,20 +81,35 @@
 
   <!-- ===== หน้าเข้าระบบ ===== -->
   <div id="loginView">
-    <div class="card center">
-      <h1 class="grad" style="font-size:24px">🌺 ระบบลงทะเบียนทริป<br>Hula Hula</h1>
-      <p class="muted" style="margin-top:14px">กรอกเลขทะเบียนสมาชิกเพื่อตรวจสอบข้อมูล</p>
-      <input id="codeInput" placeholder="เลขทะเบียนสมาชิก" autocomplete="off" inputmode="text">
-      <div style="height:10px"></div>
-      <button class="btn btn-pink" id="loginBtn">🔍 ตรวจสอบข้อมูลของสมาชิก</button>
-      <p class="sub">สมาชิกที่มียอดลงทุนรวมทุกครั้ง ตั้งแต่ <span id="minHint">1,000.00</span> บาทขึ้นไป
-        จึงสามารถตรวจสอบข้อมูลด้วยเลขทะเบียนได้</p>
-      <p id="loginMsg" class="warn hidden"></p>
-      <p class="sub">ตัวอย่างทดสอบ: เลขทะเบียน <b>1001</b></p>
+    <div class="pills">
+      <span class="pill2 p-purple">⭐ โปรความสุขของความสำเร็จ</span>
+      <span class="pill2 p-green">🌴 ทริป Hula Hula</span>
+      <span class="pill2 p-pink">🎉 ธีมฮาวายปาร์ตี้</span>
     </div>
+    <h1 class="grad center" style="font-size:25px; line-height:1.25">เข้าสู่ระบบเพื่อเรียกดูข้อมูลสมาชิก</h1>
+    <p class="subtitle">(Membership Login &amp; Dashboard)</p>
+
+    <div class="card">
+      <div class="status">
+        <div class="online"><span class="dot"></span> ออนไลน์</div>
+        <button class="btn btn-test" id="testBtn">🔗 ทดสอบการเชื่อมต่อ</button>
+        <p class="sub center" id="loginClock"></p>
+      </div>
+
+      <div class="field">
+        <label>รหัสสมาชิก</label>
+        <input id="codeInput" placeholder="กรอกรหัสสมาชิก 7 หลัก" autocomplete="off" inputmode="text">
+      </div>
+      <button class="btn btn-orange" id="loginBtn">เข้าสู่ระบบ</button>
+      <p id="loginMsg" class="warn hidden"></p>
+      <p class="sub center">สมาชิกที่มียอดลงทุนรวมตั้งแต่ <span id="minHint">1,000.00</span> บาทขึ้นไป จึงเข้าระบบได้
+        · ตัวอย่างทดสอบ: <b>1001</b></p>
+    </div>
+
     <div class="center noprint">
       <a class="muted" id="toAdminBtn" style="cursor:pointer; text-decoration:underline">⚙️ ผู้ดูแล — นำเข้า/ส่งออก Excel</a>
     </div>
+    <p class="footer">© 2026 ระบบฐานข้อมูลของสมาชิกออนไลน์<br>ผู้พัฒนา <b>นายภูวิศทักษ์ ฐิติฤทธินันท์</b></p>
   </div>
 
   <!-- ===== หน้าผู้ดูแล (นำเข้า/ส่งออก) ===== -->
@@ -415,8 +442,14 @@ function updateStat(){
     DB.investments.length+' · ลงทะเบียน '+(DB.registrations?DB.registrations.length:0);
 }
 
+/* ---------- นาฬิกา/สถานะออนไลน์ + ทดสอบการเชื่อมต่อ ---------- */
+function tickClock(){ var n=new Date(); var el=$('loginClock');
+  if(el) el.textContent='อัปเดตข้อมูลล่าสุดเมื่อ: '+pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds())+' น.'; }
+tickClock(); setInterval(tickClock,1000);
+
 /* ---------- ผูกอีเวนต์ ---------- */
 $('minHint').textContent=money(MIN_INVEST);
+$('testBtn').addEventListener('click',function(){ tickClock(); toast('🟢 เชื่อมต่อระบบสำเร็จ — มีสมาชิก '+DB.members.length+' คนในระบบ'); });
 $('loginBtn').addEventListener('click',login);
 $('codeInput').addEventListener('keydown',function(e){ if(e.key==='Enter') login(); });
 $('refreshBtn').addEventListener('click',function(){ DB=loadDB(); renderApp(getMemberData(STATE.code)); toast('อัปเดตข้อมูลล่าสุดแล้ว ✓'); });
