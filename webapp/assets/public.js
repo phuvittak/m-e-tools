@@ -1639,32 +1639,10 @@
         (b.primary ? '<div class="me-brand-stamp">ศูนย์แท้</div>' : "") + "</a>";
     }
     var one = list.map(card).join("");
-    // วน 3 ชุด เพื่อเลื่อนวนไม่รู้จบ (เลยขวาสุดต่ออันแรกเอง / ปัดซ้ายก็วน) — ไม่ตันปลายทาง
-    box.innerHTML = list.length ? (one + one + one) : "";
-    setupBrandsAutoScroll(box, list.length);
-  }
-  // แบรนด์เรียงแนวยาว เลื่อนหาได้ + เลื่อนเองอัตโนมัติช้าๆ (หยุดเมื่อผู้ใช้แตะ/เลื่อนเอง วนกลับเมื่อสุด)
-  function setupBrandsAutoScroll(box, n) {
-    if (box._brandTimer) { clearInterval(box._brandTimer); box._brandTimer = null; }
-    if (!n) return;
-    var paused = false, resumeT = null;
-    function pause() { paused = true; if (resumeT) { clearTimeout(resumeT); resumeT = null; } }
-    function resumeSoon() { if (resumeT) clearTimeout(resumeT); resumeT = setTimeout(function () { paused = false; }, 1500); }
-    box.addEventListener("mouseenter", pause);
-    box.addEventListener("mouseleave", function () { paused = false; });
-    box.addEventListener("touchstart", pause, { passive: true });
-    box.addEventListener("touchend", resumeSoon, { passive: true });
-    box.addEventListener("wheel", function () { pause(); resumeSoon(); }, { passive: true });
-    function third() { return box.scrollWidth / 3; }
-    // เริ่มที่ชุดกลาง เพื่อให้ปัดได้ทั้งซ้าย-ขวาแบบไม่มีขอบ
-    (function init() { var t = third(); if (t > 0) box.scrollLeft = t; else requestAnimationFrame(init); })();
-    box._brandTimer = setInterval(function () {
-      var t = third();
-      if (t <= 0) return;
-      if (!paused) box.scrollLeft += 0.6;                  // เลื่อนเองช้าๆ
-      if (box.scrollLeft >= 2 * t) box.scrollLeft -= t;    // เลยชุดที่ 2 → วาร์ปถอย 1 ชุด (เนียน)
-      else if (box.scrollLeft <= 0) box.scrollLeft += t;   // ปัดซ้ายเลยต้น → วาร์ปไป 1 ชุด
-    }, 16);
+    // 2 ชุดต่อกันใน track เดียว แล้วเลื่อนด้วย CSS transform (-50% = พอดี 1 ชุด) → วนไม่รู้จบแบบลื่นๆ
+    // ความเร็วคงที่ตามจำนวนแบรนด์ (ยิ่งเยอะ duration ยิ่งมาก) — แตะค้าง/ชี้เพื่อหยุด
+    var dur = Math.max(18, list.length * 4);
+    box.innerHTML = list.length ? ('<div class="me-brands-track" style="animation-duration:' + dur + 's">' + one + one + '</div>') : "";
   }
   // วันนี้ในรูปแบบ YYYY-MM-DD (เวลาท้องถิ่น) — เทียบกับช่วงวันที่ของโปร
   function todayStr() {
