@@ -543,9 +543,24 @@
       // หมวดที่กรอง = หมวดที่เลือก + หมวดย่อยทุกชั้นใต้มัน (กดหมวดแม่เห็นสินค้าทั้งซับทรี)
       var acceptCats = null;
       if (state.cats.length) { acceptCats = {}; state.cats.forEach(function (k) { var d = S.catDescendants(k); for (var x in d) acceptCats[x] = 1; }); }
+      // คำสแลง/ภาษาปากของช่าง → จับคู่กับคำมาตรฐาน (พิมพ์ "ลูกหมู" เจอ "เครื่องเจียร" ฯลฯ)
+      var SLANG = [
+        { a: "ลูกหมู", k: ["เจียร", "grinder"] }, { a: "หินเจียร", k: ["เจียร", "grinder"] },
+        { a: "หินไฟ", k: ["เจียร", "grinder"] }, { a: "ไฟเบอร์", k: ["ตัด", "เจียร", "cut"] },
+        { a: "แท่นตัด", k: ["ตัด", "cut"] }, { a: "โรตารี่", k: ["สว่าน", "drill", "โรตาร"] },
+        { a: "สว่านโรตารี่", k: ["สว่าน", "drill"] }, { a: "บล็อก", k: ["ขันน็อต", "impact", "บล็อก"] },
+        { a: "บล็อค", k: ["ขันน็อต", "impact"] }, { a: "จิ๊กซอว์", k: ["เลื่อย", "saw", "jig"] },
+        { a: "ตู้เชื่อม", k: ["เชื่อม", "weld"] }, { a: "เป่าลม", k: ["เป่า", "blower"] },
+        { a: "ไขควงไฟฟ้า", k: ["ไขควง", "screwdriver"] }, { a: "แบต", k: ["แบตเตอร", "battery"] },
+      ];
+      function expandSlang(hay) {
+        var add = "";
+        for (var i = 0; i < SLANG.length; i++) { for (var j = 0; j < SLANG[i].k.length; j++) { if (hay.indexOf(SLANG[i].k[j]) >= 0) { add += " " + SLANG[i].a; break; } } }
+        return hay + add;
+      }
       var list = S.getProducts().filter(function (p) {
         if (p.hidden) return false;
-        if (state.q) { var hay = (p.name + " " + p.brand + " " + p.sku + " " + S.categoryLabel(p.category)).toLowerCase(); if (hay.indexOf(state.q.toLowerCase()) < 0) return false; }
+        if (state.q) { var hay = expandSlang((p.name + " " + p.brand + " " + p.sku + " " + S.categoryLabel(p.category)).toLowerCase()); if (hay.indexOf(state.q.toLowerCase()) < 0) return false; }
         if (acceptCats && !acceptCats[p.category]) return false;
         if (state.brands.length && state.brands.indexOf(p.brand) < 0) return false;
         if (state.mode === "buy" && !p.forSale) return false;

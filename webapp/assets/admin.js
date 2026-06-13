@@ -1566,6 +1566,13 @@
       '<div class="field"><label>ที่จัดเก็บในคลัง (เห็นเฉพาะหลังร้าน · ลูกค้าไม่เห็น)</label><input data-f="location" value="' + esc(p.location) + '" placeholder="เช่น โซน A-1 · ชั้น 2"></div>' +
       '<div class="f2"><div class="field"><label>การรับประกัน (ปี · 0 = ตามเงื่อนไข)</label><input data-f="warrantyYears" type="number" min="0" value="' + (p.warrantyYears || 0) + '"></div>' +
       '<div class="field"><label>ระบบมอเตอร์</label><input data-f="motorType" value="' + esc(p.motorType || "") + '" placeholder="ไร้แปรงถ่าน / มีแปรงถ่าน / —"></div></div>' +
+      '<div class="field"><label>วัสดุที่เจาะ/ตัด/ใช้งานได้ (ขึ้นป้ายไอคอนหน้าสินค้า)</label><div style="display:flex;gap:14px;flex-wrap:wrap">' +
+        '<label class="check"><input type="checkbox" data-f="mat_concrete"' + ((p.materials || []).indexOf("concrete") >= 0 ? " checked" : "") + "> 🧱 ปูน/อิฐ</label>" +
+        '<label class="check"><input type="checkbox" data-f="mat_steel"' + ((p.materials || []).indexOf("steel") >= 0 ? " checked" : "") + "> ⚙️ เหล็ก/โลหะ</label>" +
+        '<label class="check"><input type="checkbox" data-f="mat_wood"' + ((p.materials || []).indexOf("wood") >= 0 ? " checked" : "") + "> 🪵 ไม้</label>" +
+        '<label class="check"><input type="checkbox" data-f="mat_tile"' + ((p.materials || []).indexOf("tile") >= 0 ? " checked" : "") + "> 🔲 กระเบื้อง</label>" +
+      "</div></div>" +
+      '<div class="field"><label class="check"><input type="checkbox" data-f="safety"' + (p.safety ? " checked" : "") + "> ⚠️ ต้องใช้อุปกรณ์ป้องกัน (แว่น/ถุงมือ) — ขึ้นป้ายเตือนหน้าสินค้า</label></div>" +
       '<div class="field"><label>ขนาด/น้ำหนักสำหรับจัดส่ง</label><input data-f="shipSize" value="' + esc(p.shipSize || "") + '" placeholder="เช่น 32 × 9 × 24 ซม. · ~2 กก."></div>' +
       '<div class="f2"><div class="field"><label>ต้นทุน/ชิ้น (บาท)</label><input data-f="cost" type="number" min="0" value="' + p.cost + '"></div>' +
       '<div class="field"><label>ราคาขาย / SRP (บาท)</label><input data-f="price" type="number" min="0" value="' + p.price + '"></div></div>' +
@@ -1618,6 +1625,7 @@
         stock: +val("stock") || 0, forSale: chk("forSale"), forRent: chk("forRent"), hidden: chk("hidden"),
         desc: val("desc").trim(), specs: savedSpecs, rented: p.rented || 0,
         warrantyYears: +val("warrantyYears") || 0, motorType: val("motorType").trim() || "—", shipSize: val("shipSize").trim(),
+        materials: ["concrete", "steel", "wood", "tile"].filter(function (m) { return chk("mat_" + m); }), safety: chk("safety"),
         priceCtrl: +val("priceCtrl") || 0, qtyPerBox: +val("qtyPerBox") || 0,
         highlights: val("highlights").split("\n").map(function (s) { return s.trim(); }).filter(Boolean),
       };
