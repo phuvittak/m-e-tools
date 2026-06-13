@@ -399,6 +399,15 @@
         feat.innerHTML = S.getProducts().filter(function (p) { return !p.hidden; }).slice(0, 6).map(cardHtml).join("");
         wireCards(feat);
       }
+      // สินค้าใหม่ล่าสุด — เรียงตามวันที่เพิ่ม (createdAt) โชว์เฉพาะที่มี createdAt
+      var na = document.querySelector("[data-newarrivals]");
+      if (na) {
+        var newest = S.getProducts().filter(function (p) { return !p.hidden && p.createdAt; })
+          .sort(function (a, b) { return b.createdAt - a.createdAt; }).slice(0, 6);
+        var sec = document.querySelector("[data-newarrivals-sec]");
+        if (newest.length >= 3) { na.innerHTML = newest.map(cardHtml).join(""); wireCards(na); if (sec) sec.hidden = false; }
+        else if (sec) sec.hidden = true;
+      }
     }
     paintHomeProducts();
     pageRefresh = paintHomeProducts; // วาดใหม่เมื่อแคตตาล็อก cloud มาถึง
