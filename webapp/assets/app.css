@@ -581,6 +581,11 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 .addr-cascade { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .addr-cascade .full { grid-column: 1 / -1; }
 .addr-cascade[hidden] { display: none; }
+/* กล่องกรอกข้อมูลใบกำกับภาษี (ช่าง/บริษัท) */
+.tax-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; border: 2px dashed var(--border-3, #d8d2c4); border-radius: 8px; padding: 14px; margin: 4px 0 12px; }
+.tax-fields .full { grid-column: 1 / -1; }
+.tax-fields[hidden] { display: none; }
+@media (max-width: 860px) { .tax-fields { grid-template-columns: 1fr; } }
 .req-note { font-family: var(--font-body); font-size: 12px; color: var(--price-red); }
 
 /* ---------- payment / QR modal ---------- */
