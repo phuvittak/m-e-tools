@@ -610,6 +610,7 @@
           '<div class="pd-rate">' + starsDisplay(p) + "</div>" +
           '<span class="' + (avail > 0 ? "stockpill in" : "stockpill out") + '">' +
             (avail > 0 ? "มีของพร้อมส่ง · เหลือ " + avail + " ชิ้น" : "สินค้าหมดชั่วคราว") + " · " + S.categoryLabel(p.category) + "</span>" +
+          '<div class="pd-viewing">👀 มีช่างอีก <b>' + viewersFor(p.id) + "</b> คนกำลังสนใจสินค้านี้</div>" +
           '<div class="pd-desc">' + descToHtml(p.desc) + "</div>" +
           '<div class="pd-prices">' +
             (p.forSale ? '<div class="pd-price-box"><div class="k">ราคาขาย</div><div class="v">' + S.money(p.price) + "</div></div>" : "") +
@@ -625,10 +626,24 @@
       '<section class="pd-reviews" id="reviews"><h2 class="me-section-h">รีวิว<span class="me-hl">จากลูกค้า</span></h2>' +
         '<div class="pd-rev-summary" data-rev-summary></div>' +
         '<div class="pd-rev-list" data-rev-list><div class="rv-empty">กำลังโหลดรีวิว…</div></div>' +
-        reviewFormHtml() + "</section>";
+        reviewFormHtml() + "</section>" +
+      '<section class="pd-cross" data-cross hidden><h2 class="me-section-h">มัก<span class="me-hl">ซื้อคู่กัน</span></h2><div class="cards" data-cross-list></div></section>';
 
     wireViewer(root, p);
     wireRating(root);
+    // แนะนำสินค้าที่มักใช้/ซื้อคู่กัน — หมวดเดียวกันก่อน เติมด้วยแบรนด์เดียวกัน
+    (function renderCross() {
+      var sec = root.querySelector("[data-cross]"); var box = root.querySelector("[data-cross-list]"); if (!sec || !box) return;
+      var all = S.getProducts().filter(function (x) { return !x.hidden && x.id !== p.id; });
+      var same = all.filter(function (x) { return x.category === p.category; });
+      var brand = all.filter(function (x) { return x.brand === p.brand && x.category !== p.category; });
+      var rel = same.concat(brand);
+      var seen = {}, picked = [];
+      rel.forEach(function (x) { if (!seen[x.id] && picked.length < 4) { seen[x.id] = 1; picked.push(x); } });
+      if (!picked.length) return;
+      box.innerHTML = picked.map(cardHtml).join("");
+      wireCards(box); sec.hidden = false;
+    })();
     function loadAndRenderReviews() {
       S.loadReviews(p.id).then(function (list) {
         var listBox = root.querySelector("[data-rev-list]"); if (listBox) listBox.innerHTML = reviewsHtml(list);
@@ -1357,6 +1372,12 @@
     renderStatic(); updateNav();
   }
 
+  // ตัวเลข "กำลังดู" แบบ pseudo-random นิ่งต่อสินค้า เปลี่ยนทุก 5 นาที (สร้างความรู้สึกแย่งของ)
+  function viewersFor(id) {
+    var w = Math.floor(Date.now() / (5 * 60000)), s = 0, str = String(id) + "|" + w;
+    for (var i = 0; i < str.length; i++) s = (s * 31 + str.charCodeAt(i)) >>> 0;
+    return 2 + (s % 8);
+  }
   function cardHtml(p) {
     var avail = S.available(p);
     var low = avail > 0 && avail <= 3;
