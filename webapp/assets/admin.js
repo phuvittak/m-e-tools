@@ -1971,7 +1971,11 @@
     function build() {
       var rates = S.getShipRates();
       var provs = S.provinces();
+      var stNow = S.getSettings();
       var body =
+        '<div class="f2" style="grid-template-columns:1fr 140px;align-items:center;gap:10px;background:#eefaf0;border:1px solid #b8e6c4;border-radius:8px;padding:10px 12px;margin-bottom:12px">' +
+          '<div style="font-family:var(--font-body);font-size:14px;font-weight:600">🚚 ส่งฟรีเมื่อซื้อครบ (บาท)<br><span style="font-weight:400;color:var(--fg-2);font-size:12px">0 = ปิด · ลูกค้าเห็นป้าย “ซื้ออีก X รับส่งฟรี”</span></div>' +
+          '<input type="number" min="0" data-freeship-over value="' + (stNow.freeShipOver || 0) + '"></div>' +
         '<p style="font-family:var(--font-body);font-size:13px;color:var(--fg-2);margin:0 0 6px">ค่าจัดส่งต่อ 1 คำสั่งซื้อ (บาท) — ปรับได้ตามระยะทางของแต่ละจังหวัด (ลูกค้าจะไม่เห็นค่าส่งแยก ระบบรวมในยอดให้)</p>' +
         provs.map(function (p) {
           return '<div class="f2" style="grid-template-columns:1fr 120px;align-items:center;gap:10px">' +
@@ -1980,6 +1984,7 @@
         }).join("");
       openModal("ตั้งค่าค่าจัดส่งรายจังหวัด (" + provs.length + " จังหวัด)", body, function (root) {
         root.querySelectorAll("[data-ship-prov]").forEach(function (i) { S.setShipRate(i.getAttribute("data-ship-prov"), i.value); });
+        var fsEl = root.querySelector("[data-freeship-over]"); if (fsEl) S.saveSettings({ freeShipOver: +fsEl.value || 0 });
         U.toast("บันทึกค่าจัดส่งแล้ว", "ok");
         return true;
       });

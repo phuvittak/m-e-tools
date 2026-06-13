@@ -708,7 +708,14 @@
 
     // shipping is computed from province but NEVER shown to the customer — it is
     // silently bundled into the single payable total.
-    function shippingNow() { return (co.fulfillment === "delivery" && co.province) ? S.getShippingFee(co.province) : 0; }
+    function freeShipThreshold() { return +(S.getSettings().freeShipOver) || 0; }
+    function goodsTotal() { var t = S.cartTotals(); return S.lineVat(t.lines).gross; }
+    function freeShipMet() { var th = freeShipThreshold(); return th > 0 && goodsTotal() >= th; }
+    function shippingNow() {
+      if (co.fulfillment !== "delivery" || !co.province) return 0;
+      if (freeShipMet()) return 0; // ส่งฟรีเมื่อซื้อครบเกณฑ์
+      return S.getShippingFee(co.province);
+    }
     function updateSummary() {
       var t = S.cartTotals();
       var vi = S.lineVat(t.lines);
@@ -719,8 +726,16 @@
       var shipLine = root.querySelector("[data-ship-line]");
       if (shipLine) {
         shipLine.hidden = !showShip;
-        var amtEl = shipLine.querySelector("[data-ship-amt]"); if (amtEl) amtEl.textContent = S.money(ship);
+        var amtEl = shipLine.querySelector("[data-ship-amt]"); if (amtEl) amtEl.innerHTML = (showShip && freeShipMet()) ? '<b style="color:#1f9d4d">ฟรี 🎉</b>' : S.money(ship);
         var provEl = shipLine.querySelector("[data-ship-prov]"); if (provEl) provEl.textContent = showShip ? (" (" + co.province + ")") : "";
+      }
+      // ป้ายกระตุ้น "ซื้ออีก X รับส่งฟรี"
+      var fsNote = root.querySelector("[data-freeship-note]");
+      if (fsNote) {
+        var th = freeShipThreshold();
+        if (th > 0 && !freeShipMet()) { fsNote.hidden = false; fsNote.innerHTML = "🚚 ซื้ออีก <b>" + S.money(th - goodsTotal()) + "</b> รับส่งฟรี!"; }
+        else if (th > 0 && freeShipMet()) { fsNote.hidden = false; fsNote.innerHTML = "🎉 คุณได้รับ <b>ส่งฟรี</b> แล้ว!"; }
+        else fsNote.hidden = true;
       }
       var tt = root.querySelector("[data-total]"); if (tt) tt.textContent = S.money(total);
       var btn = root.querySelector("[data-checkout]"); if (btn) btn.textContent = "ยืนยันสั่งซื้อ · " + S.money(total);
@@ -743,6 +758,7 @@
               return '<div class="summary-line"><span>ยอดสินค้า/ค่าเช่า' + (vi.enabled ? " (ก่อน VAT)" : "") + "</span><span>" + S.money(vi.net) + "</span></div>" +
                 (vi.enabled ? '<div class="summary-line"><span>VAT ' + vi.pct + "%</span><span>" + S.money(vi.vat) + "</span></div>" : "") +
                 '<div class="summary-line" data-ship-line hidden><span>ค่าจัดส่ง<span data-ship-prov></span></span><span data-ship-amt></span></div>' +
+                '<div class="summary-line" data-freeship-note hidden style="color:#1f9d4d;font-size:13px"></div>' +
                 (t.deposit ? '<div class="summary-line"><span>เงินมัดจำ (คืนภายหลัง)</span><span>' + S.money(t.deposit) + "</span></div>" : "") +
                 '<div class="summary-total"><span>ยอดชำระวันนี้</span><span class="v" data-total>' + S.money(vi.gross + t.deposit) + "</span></div>";
             })() +
@@ -850,7 +866,7 @@
         if (!co.province || !co.district || !co.subdistrict || !co.zip || !(co.detail || "").trim()) {
           U.toast("กรุณากรอกที่อยู่จัดส่งให้ครบทุกช่อง", "err"); return;
         }
-        shipping = S.getShippingFee(co.province);
+        shipping = freeShipMet() ? 0 : S.getShippingFee(co.province);
         address = {
           province: co.province, district: co.district, subdistrict: co.subdistrict, zip: co.zip, detail: co.detail.trim(),
           text: co.detail.trim() + " ต." + co.subdistrict + " อ." + co.district + " จ." + co.province + " " + co.zip,
@@ -1025,12 +1041,26 @@
           (o.deposit ? '<div class="order-line" style="color:var(--fg-2)"><span>เงินมัดจำ (คืนเมื่อส่งคืน)</span><span>' + S.money(o.deposit) + "</span></div>" : "") +
           (o.staffMessage ? '<div class="order-msg">📩 ข้อความจากร้าน: ' + esc(o.staffMessage) + "</div>" : "") +
           (o.status === "cancelled" ? '<div class="order-cancelled">ยกเลิกแล้ว · คืนเงิน ' + S.money(o.total) + " เรียบร้อย" + (o.cancelReason ? " · เหตุผล: " + esc(o.cancelReason) : "") + "</div>" : "") +
-          (canCancel ? '<div class="order-actions"><button class="linkbtn" data-cancel-order="' + o.id + '">ยกเลิกคำสั่งซื้อ & ขอคืนเงิน</button></div>' : "") +
+          '<div class="order-actions">' +
+            '<button class="me-btn me-btn-sm" data-reorder="' + o.id + '">🛒 สั่งซื้อรายการนี้อีกครั้ง</button>' +
+            (canCancel ? '<button class="linkbtn" data-cancel-order="' + o.id + '">ยกเลิกคำสั่งซื้อ & ขอคืนเงิน</button>' : "") +
+          "</div>" +
           "</div>"
         );
       }).join("");
       root.querySelectorAll("[data-cancel-order]").forEach(function (b) {
         b.addEventListener("click", function () { openCancelModal(b.getAttribute("data-cancel-order"), render); });
+      });
+      // ปุ่มซื้อซ้ำ — ดึงสินค้าในออเดอร์กลับเข้าตะกร้าในคลิกเดียว
+      root.querySelectorAll("[data-reorder]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var o = S.getOrders().filter(function (x) { return x.id === b.getAttribute("data-reorder"); })[0];
+          if (!o) return;
+          var n = 0;
+          o.items.forEach(function (it) { if (it.productId && S.getProduct(it.productId)) { S.addToCart(it.productId, it.qty, o.type, it.days); n++; } });
+          if (n) { U.toast("เพิ่ม " + n + " รายการเข้าตะกร้าแล้ว", "ok"); setTimeout(function () { location.href = "cart.html"; }, 700); }
+          else U.toast("สินค้าในออเดอร์นี้ไม่มีขายแล้ว", "err");
+        });
       });
       wireRating(root);
     }
