@@ -996,6 +996,7 @@
         id: genId("ORD"), createdAt: Date.now(), type: mode,
         customer: customer, userEmail: userEmail, fulfillment: fulfillment,
         address: fulfillment === "delivery" ? checkout.address : null,
+        taxInvoice: checkout.taxInvoice || null,
         items: items, days: days,
         subtotal: subtotal, deposit: deposit, shipping: thisShip,
         vat: vinfo.enabled ? Math.round(vinfo.vat * 100) / 100 : 0, vatPct: vinfo.pct, vatMode: vinfo.mode,

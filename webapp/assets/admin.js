@@ -1831,10 +1831,11 @@
         orders.map(function (o) {
           var opts = statusOptions(o);
           var addr = o.fulfillment === "delivery" && o.address ? "<br><span class=prod-sku>" + o.address.text + "</span>" : "";
+          var taxLine = o.taxInvoice ? '<br><span class="chip" style="background:#fff3cd;border-color:#ffe08a;color:#8a6d00">🧾 ใบกำกับภาษี</span><br><span class=prod-sku>' + esc(o.taxInvoice.name) + " · เลขผู้เสียภาษี " + esc(o.taxInvoice.taxId) + "<br>" + esc(o.taxInvoice.address) + "</span>" : "";
           return "<tr><td><b>" + o.id + '</b> <span class="chip ' + o.type + '">' + S.typeLabel(o.type) + "</span> " +
             '<span class="chip ' + (o.fulfillment === "delivery" ? "rent" : "new") + '">' + S.fulfillmentLabel(o.fulfillment) + "</span>" +
             "<br><span class=prod-sku>" + S.fmtDate(o.createdAt) + (o.type === "rent" ? " · " + o.days + " วัน" : "") + "</span></td>" +
-            "<td>" + o.customer.name + "<br><span class=prod-sku>" + o.customer.phone + "</span>" + addr + "</td>" +
+            "<td>" + o.customer.name + "<br><span class=prod-sku>" + o.customer.phone + "</span>" + addr + taxLine + "</td>" +
             "<td>" + o.items.map(function (it) { return it.name + " ×" + it.qty; }).join("<br>") + (o.shipping ? '<br><span class="prod-sku">+ ค่าจัดส่ง ' + S.money(o.shipping) + "</span>" : "") + "</td>" +
             '<td class="num">' + S.money(o.total) + "</td>" +
             '<td class="num">' + S.money((o.revenue || 0) - (o.cost || 0)) + "</td>" +
@@ -1931,6 +1932,7 @@
       (o.vat ? '<div>(รวม VAT ' + (o.vatPct || 7) + '% = ' + esc(S.money(o.vat)) + ')</div>' : "") +
       (o.shipping ? '<div>ค่าจัดส่ง: ' + esc(S.money(o.shipping)) + '</div>' : "") +
       (o.type === "rent" ? '<div>เช่า ' + esc(o.days || "") + ' วัน</div>' : "") + '</div></div>' +
+      (o.taxInvoice ? '<div class="sec"><div class="k">🧾 ออกใบกำกับภาษีในนาม</div><div class="to">' + esc(o.taxInvoice.name) + '</div><div class="ad">เลขประจำตัวผู้เสียภาษี: ' + esc(o.taxInvoice.taxId) + '<br>' + esc(o.taxInvoice.address) + '</div></div>' : "") +
       '<div class="frm"><b>ผู้ส่ง:</b> ' + esc(st.company || "M.E.Tools") + " · " + esc(shopPhone) + "<br>" + esc(st.address || "") + "</div>" +
       '</div></body></html>';
     var ifr = document.createElement("iframe");

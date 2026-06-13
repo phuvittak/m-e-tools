@@ -666,7 +666,7 @@
   function initCart() {
     var root = document.querySelector("[data-cart]");
     // checkout state lives here so re-rendering item rows doesn't reset the form
-    var co = { name: "", phone: "", fulfillment: "", province: "", district: "", subdistrict: "", zip: "", detail: "" };
+    var co = { name: "", phone: "", fulfillment: "", province: "", district: "", subdistrict: "", zip: "", detail: "", taxInv: false, taxName: "", taxId: "", taxAddr: "" };
 
     function renderItems() {
       var t = S.cartTotals();
@@ -747,6 +747,12 @@
               '<div class="field"><label>รหัสไปรษณีย์ *</label><select data-zip disabled></select></div>' +
               '<div class="field full"><label>บ้านเลขที่ / หมู่ / ถนน *</label><textarea data-detail placeholder="เช่น 99/1 หมู่ 5 ถ.เชียงใหม่-ดอยสะเก็ด">' + esc(co.detail) + "</textarea></div>" +
             "</div>" +
+            '<div class="field" style="margin-top:4px"><label class="check"><input type="checkbox" data-taxinv' + (co.taxInv ? " checked" : "") + "> ออกใบกำกับภาษี (สำหรับช่าง/บริษัท)</label></div>" +
+            '<div class="tax-fields" data-taxbox' + (co.taxInv ? "" : " hidden") + ">" +
+              '<div class="field"><label>ชื่อบริษัท / ผู้เสียภาษี *</label><input data-taxname placeholder="เช่น บริษัท รับเหมาก่อสร้าง จำกัด" value="' + esc(co.taxName) + '"></div>' +
+              '<div class="field"><label>เลขประจำตัวผู้เสียภาษี (13 หลัก) *</label><input data-taxid inputmode="numeric" maxlength="13" placeholder="0 0000 00000 00 0" value="' + esc(co.taxId) + '"></div>' +
+              '<div class="field full"><label>ที่อยู่ออกใบกำกับภาษี *</label><textarea data-taxaddr placeholder="ที่อยู่ตามที่จดทะเบียนภาษี">' + esc(co.taxAddr) + "</textarea></div>" +
+            "</div>" +
             '<button class="me-btn me-btn-block" data-checkout>ยืนยันสั่งซื้อ</button>' +
             '<a class="me-btn me-btn-ghost me-btn-block" href="shop.html">เลือกซื้อเพิ่ม</a>' +
           "</div></div></div>";
@@ -802,6 +808,17 @@
       subSel.addEventListener("change", function () { co.subdistrict = subSel.value; co.zip = ""; fillZips(); });
       zipSel.addEventListener("change", function () { co.zip = zipSel.value; });
 
+      // ใบกำกับภาษี — เปิด/ปิดช่องกรอกตาม checkbox
+      var taxChk = root.querySelector("[data-taxinv]");
+      var taxBox = root.querySelector("[data-taxbox]");
+      if (taxChk) {
+        taxChk.addEventListener("change", function () { co.taxInv = taxChk.checked; if (taxBox) taxBox.hidden = !taxChk.checked; });
+        var tnI = root.querySelector("[data-taxname]"), tiI = root.querySelector("[data-taxid]"), taI = root.querySelector("[data-taxaddr]");
+        if (tnI) tnI.addEventListener("input", function () { co.taxName = tnI.value; });
+        if (tiI) tiI.addEventListener("input", function () { co.taxId = tiI.value.replace(/\D/g, "").slice(0, 13); tiI.value = co.taxId; });
+        if (taI) taI.addEventListener("input", function () { co.taxAddr = taI.value; });
+      }
+
       root.querySelector("[data-checkout]").addEventListener("click", confirmOrder);
     }
 
@@ -824,9 +841,17 @@
           text: co.detail.trim() + " ต." + co.subdistrict + " อ." + co.district + " จ." + co.province + " " + co.zip,
         };
       }
+      var taxInvoice = null;
+      if (co.taxInv) {
+        var tid = (co.taxId || "").replace(/\D/g, "");
+        if (!(co.taxName || "").trim() || tid.length !== 13 || !(co.taxAddr || "").trim()) {
+          U.toast("กรอกข้อมูลใบกำกับภาษีให้ครบ (เลขผู้เสียภาษีต้อง 13 หลัก)", "err"); return;
+        }
+        taxInvoice = { name: co.taxName.trim(), taxId: tid, address: co.taxAddr.trim() };
+      }
       var t = S.cartTotals();
       var payable = S.lineVat(t.lines).gross + t.deposit + shipping;
-      showPayment(payable, t, shipping, { name: co.name, phone: co.phone, fulfillment: co.fulfillment, address: address, shipping: shipping });
+      showPayment(payable, t, shipping, { name: co.name, phone: co.phone, fulfillment: co.fulfillment, address: address, shipping: shipping, taxInvoice: taxInvoice });
     }
 
     function showPayment(amount, totals, shipping, checkout) {
