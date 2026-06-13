@@ -1574,6 +1574,7 @@
       "</div></div>" +
       '<div class="field"><label class="check"><input type="checkbox" data-f="safety"' + (p.safety ? " checked" : "") + "> ⚠️ ต้องใช้อุปกรณ์ป้องกัน (แว่น/ถุงมือ) — ขึ้นป้ายเตือนหน้าสินค้า</label></div>" +
       '<div class="field"><label>ขนาด/น้ำหนักสำหรับจัดส่ง</label><input data-f="shipSize" value="' + esc(p.shipSize || "") + '" placeholder="เช่น 32 × 9 × 24 ซม. · ~2 กก."></div>' +
+      '<div class="field"><label>ลิงก์คู่มือ PDF (ไม่บังคับ) — โชว์ปุ่มดาวน์โหลดหน้าสินค้า</label><input data-f="manualUrl" value="' + esc(p.manualUrl || "") + '" placeholder="https://... (วางลิงก์ไฟล์คู่มือ)"></div>' +
       '<div class="f2"><div class="field"><label>ต้นทุน/ชิ้น (บาท)</label><input data-f="cost" type="number" min="0" value="' + p.cost + '"></div>' +
       '<div class="field"><label>ราคาขาย / SRP (บาท)</label><input data-f="price" type="number" min="0" value="' + p.price + '"></div></div>' +
       '<div class="f2"><div class="field"><label>ค่าเช่า/วัน (บาท)</label><input data-f="rentPerDay" type="number" min="0" value="' + p.rentPerDay + '"></div>' +
@@ -1625,7 +1626,7 @@
         stock: +val("stock") || 0, forSale: chk("forSale"), forRent: chk("forRent"), hidden: chk("hidden"),
         desc: val("desc").trim(), specs: savedSpecs, rented: p.rented || 0,
         warrantyYears: +val("warrantyYears") || 0, motorType: val("motorType").trim() || "—", shipSize: val("shipSize").trim(),
-        materials: ["concrete", "steel", "wood", "tile"].filter(function (m) { return chk("mat_" + m); }), safety: chk("safety"),
+        materials: ["concrete", "steel", "wood", "tile"].filter(function (m) { return chk("mat_" + m); }), safety: chk("safety"), manualUrl: val("manualUrl").trim(),
         priceCtrl: +val("priceCtrl") || 0, qtyPerBox: +val("qtyPerBox") || 0,
         highlights: val("highlights").split("\n").map(function (s) { return s.trim(); }).filter(Boolean),
       };

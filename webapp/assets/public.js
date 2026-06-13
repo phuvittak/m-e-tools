@@ -631,7 +631,9 @@
             (p.motorType && p.motorType !== "—" ? "<tr><th>ระบบมอเตอร์</th><td>" + p.motorType + "</td></tr>" : "") +
             (p.shipSize ? "<tr><th>ขนาด/น้ำหนักสำหรับจัดส่ง</th><td>" + p.shipSize + "</td></tr>" : "") +
             (p.specs || []).map(function (s) { var kv = specKV(s); return "<tr><th>" + kv[0] + "</th><td>" + kv[1] + "</td></tr>"; }).join("") +
-          "</tbody></table></div></div>" +
+          "</tbody></table>" +
+          (p.manualUrl ? '<a class="me-btn me-btn-ghost me-btn-block" style="margin-top:12px" href="' + esc(p.manualUrl) + '" target="_blank" rel="noopener">📄 ดาวน์โหลดคู่มือการใช้งาน (PDF)</a>' : "") +
+          "</div></div>" +
       '<section class="pd-reviews" id="reviews"><h2 class="me-section-h">รีวิว<span class="me-hl">จากลูกค้า</span></h2>' +
         '<div class="pd-rev-summary" data-rev-summary></div>' +
         '<div class="pd-rev-list" data-rev-list><div class="rv-empty">กำลังโหลดรีวิว…</div></div>' +
