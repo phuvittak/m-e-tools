@@ -1368,7 +1368,8 @@
         '<div class="card-price">' +
           (p.forSale ? '<span class="price-buy">' + S.money(p.price) + "</span>" : "") +
           (p.forRent ? '<span class="price-rent" data-rent-only>เช่า ' + S.money(p.rentPerDay) + "/วัน</span>" : "") + "</div>" +
-        '<span class="card-stock ' + (avail <= 0 || low ? "low" : "") + '">' + (avail <= 0 ? "สินค้าหมด" : "มีสินค้าพร้อมส่ง · เหลือ " + avail + " ชิ้น") + "</span></div>" +
+        '<span class="card-stock ' + (avail <= 0 || low ? "low" : "") + '">' + (avail <= 0 ? "สินค้าหมด" : "มีสินค้าพร้อมส่ง · เหลือ " + avail + " ชิ้น") + "</span>" +
+        '<label class="card-cmp"><input type="checkbox" data-cmp="' + p.id + '"> เปรียบเทียบ</label>' + "</div>" +
       '<div class="card-actions"><a class="me-btn me-btn-sm me-btn-ghost" href="product.html?id=' + p.id + '">รายละเอียด</a>' +
         (avail > 0 ? '<button class="me-btn me-btn-sm" data-quickadd="' + p.id + '" data-mode="' + (p.forSale ? "buy" : "rent") + '">' + (p.forSale ? "ใส่ตะกร้า" : "เช่าสินค้า") + "</button>" : '<button class="me-btn me-btn-sm" disabled>หมด</button>') +
       "</div></div>"
@@ -1672,6 +1673,60 @@
         U.toast("เพิ่ม <b>" + p.name + "</b> ลงตะกร้าแล้ว", "ok");
       });
     });
+    // เปรียบเทียบสินค้า
+    var cmp = getCompare();
+    scope.querySelectorAll("[data-cmp]").forEach(function (ch) {
+      ch.checked = cmp.indexOf(ch.getAttribute("data-cmp")) >= 0;
+      ch.addEventListener("change", function () {
+        if (ch.checked && getCompare().length >= 4 && getCompare().indexOf(ch.getAttribute("data-cmp")) < 0) {
+          ch.checked = false; U.toast("เปรียบเทียบได้สูงสุด 4 รายการ", "err"); return;
+        }
+        toggleCompare(ch.getAttribute("data-cmp"), ch.checked); renderCompareBar();
+      });
+    });
+    renderCompareBar();
+  }
+  /* ===================== COMPARE TOOL ===================== */
+  function getCompare() { try { return JSON.parse(localStorage.getItem("me_compare") || "[]"); } catch (e) { return []; } }
+  function setCompare(a) { try { localStorage.setItem("me_compare", JSON.stringify(a.slice(0, 4))); } catch (e) {} }
+  function toggleCompare(id, on) {
+    var a = getCompare(), i = a.indexOf(id);
+    if (on && i < 0) a.push(id); else if (!on && i >= 0) a.splice(i, 1);
+    setCompare(a);
+  }
+  function renderCompareBar() {
+    var a = getCompare();
+    var bar = document.querySelector("[data-compare-bar]");
+    if (!a.length) { if (bar) bar.remove(); return; }
+    if (!bar) { bar = document.createElement("div"); bar.setAttribute("data-compare-bar", ""); bar.className = "cmp-bar"; document.body.appendChild(bar); }
+    bar.innerHTML = '<span class="cmp-bar-n">⚖️ เปรียบเทียบ ' + a.length + " รายการ</span>" +
+      '<button class="me-btn me-btn-sm" data-cmp-open' + (a.length < 2 ? " disabled" : "") + ">เปรียบเทียบเลย</button>" +
+      '<button class="linkbtn" data-cmp-clear>ล้าง</button>';
+    var ob = bar.querySelector("[data-cmp-open]"); if (ob) ob.onclick = openCompareModal;
+    bar.querySelector("[data-cmp-clear]").onclick = function () { setCompare([]); renderCompareBar(); document.querySelectorAll("[data-cmp]").forEach(function (c) { c.checked = false; }); };
+  }
+  function openCompareModal() {
+    var prods = getCompare().map(S.getProduct).filter(Boolean);
+    if (prods.length < 2) { U.toast("เลือกอย่างน้อย 2 รายการ", "err"); return; }
+    function specKey(s) { return Array.isArray(s) ? s[0] : String(s).split(":")[0]; }
+    function specV(s) { return Array.isArray(s) ? s[1] : String(s).split(":").slice(1).join(":").trim(); }
+    var keys = []; prods.forEach(function (p) { (p.specs || []).forEach(function (s) { var k = specKey(s); if (k && keys.indexOf(k) < 0) keys.push(k); }); });
+    function specVal(p, k) { var f = (p.specs || []).filter(function (s) { return specKey(s) === k; })[0]; return f ? esc(specV(f)) : "—"; }
+    var rows = '<tr><th></th>' + prods.map(function (p) { return '<td class="cmp-img">' + U.productTile(p) + "</td>"; }).join("") + "</tr>";
+    function row(label, fn) { rows += "<tr><th>" + esc(label) + "</th>" + prods.map(function (p) { return "<td>" + fn(p) + "</td>"; }).join("") + "</tr>"; }
+    row("ชื่อ", function (p) { return '<a href="product.html?id=' + p.id + '">' + esc(p.name) + "</a>"; });
+    row("แบรนด์", function (p) { return esc(p.brand); });
+    row("ราคา", function (p) { return p.forSale ? S.money(p.price) : (p.forRent ? "เช่า " + S.money(p.rentPerDay) + "/วัน" : "—"); });
+    row("มอเตอร์", function (p) { return esc(p.motorType || "—"); });
+    row("รับประกัน", function (p) { return p.warrantyYears ? p.warrantyYears + " ปี" : "—"; });
+    row("คงเหลือ", function (p) { return S.available(p) + " ชิ้น"; });
+    keys.forEach(function (k) { row(k, function (p) { return specVal(p, k); }); });
+    var bg = document.createElement("div"); bg.className = "me-modal-bg";
+    bg.innerHTML = '<div class="me-modal cmp-modal"><div class="me-modal-head"><h3>เปรียบเทียบสินค้า</h3><button class="me-modal-x" aria-label="ปิด">×</button></div><div class="cmp-wrap"><table class="cmp-table">' + rows + "</table></div></div>";
+    document.body.appendChild(bg);
+    function close() { bg.remove(); }
+    bg.querySelector(".me-modal-x").onclick = close;
+    bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
   }
 
   // deterministic decorative QR (demo) — looks like a PromptPay QR, offline
