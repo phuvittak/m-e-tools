@@ -743,3 +743,8 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 .cmp-table a { color: var(--ink); text-decoration: none; font-weight: 700; }
 .cmp-table a:hover { background: var(--dw-yellow); }
 @media (max-width: 520px) { .cmp-bar { width: 92vw; justify-content: space-between; gap: 8px; } .cmp-table th, .cmp-table td { min-width: 100px; font-size: 13px; } }
+
+/* หน้าสินค้า: ป้าย "กำลังดู" + ส่วนซื้อคู่กัน */
+.pd-viewing { font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--safety-orange); background: var(--dw-yellow-pale); border: 1.5px solid var(--dw-yellow-deep); border-radius: 6px; padding: 6px 10px; align-self: flex-start; }
+.pd-cross { margin-top: 48px; }
+.pd-cross .me-section-h { margin-bottom: 20px; }
