@@ -34,6 +34,12 @@
   if (S.ensureAdminRegistered) S.ensureAdminRegistered().then(function (uid) { if (uid) subscribeOrdersGlobal(); });
   // เรียลไทม์: settings/staff/สินค้า อัปเดตเองทุกหน้าหลังร้านเมื่อมีการแก้จากอีกเครื่อง
   if (S.startAdminRealtime) S.startAdminRealtime();
+  // เปิด/สลับกลับมาที่แท็บ → ดึงข้อมูลล่าสุดจาก cloud ซ้ำ (เห็นล่าสุดเสมอ แม้เครื่องอื่นเพิ่งแก้)
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") return;
+    if (S.cloudLoadAdminData) S.cloudLoadAdminData();
+    if (S.cloudLoadProducts) S.cloudLoadProducts().then(function () { if (S.autoCatchUpSync) S.autoCatchUpSync(); });
+  });
   ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, warranty: initWarranty, quotes: initQuotes, import: function(){} }[view] || function () {})();
 
   // subscribe orders/{id} จาก Firestore แบบเรียลไทม์ → S.absorbCloudOrders() เขียนลง local me_orders
@@ -244,6 +250,29 @@
     document.querySelector("[data-add]").addEventListener("click", function () { openProductModal(null); });
     var syncBtn = document.querySelector("[data-sync-bot]");
     if (syncBtn) syncBtn.addEventListener("click", function () { syncCatalogToCloud(syncBtn); });
+    var expBtn = document.querySelector("[data-export-xlsx]");
+    if (expBtn) expBtn.addEventListener("click", function () {
+      if (!window.XLSX) { U.toast("ตัวสร้างไฟล์ Excel ยังโหลดไม่เสร็จ ลองอีกครั้ง", "err"); return; }
+      var rows = S.getProducts().map(function (p) {
+        return {
+          "ชื่อสินค้า": p.name || "", "รหัส SKU": p.sku || "", "แบรนด์": p.brand || "",
+          "หมวดหมู่": (S.categoryLabel ? S.categoryLabel(p.category) : p.category) || "",
+          "คงเหลือ": (p.stock || 0), "กำลังเช่า": (p.rented || 0),
+          "ราคาขาย": (p.price || 0), "ต้นทุน": (p.cost || 0), "ค่าเช่า/วัน": (p.rentPerDay || 0),
+          "ที่จัดเก็บ": p.location || "", "ระบบมอเตอร์": p.motorType || "",
+          "แพลตฟอร์มแบต": p.batteryPlatform || "", "รับประกัน(ปี)": (p.warrantyYears || 0),
+        };
+      });
+      if (!rows.length) { U.toast("ยังไม่มีสินค้าในคลัง", "err"); return; }
+      try {
+        var ws = XLSX.utils.json_to_sheet(rows);
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "สต๊อกสินค้า");
+        var d = new Date(), z = function (n) { return (n < 10 ? "0" : "") + n; };
+        XLSX.writeFile(wb, "metools-stock-" + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + ".xlsx");
+        U.toast("ดาวน์โหลด Excel แล้ว (" + rows.length + " รายการ)", "ok");
+      } catch (e) { U.toast("สร้างไฟล์ไม่สำเร็จ: " + (e && e.message), "err"); }
+    });
     var restoreBtn = document.querySelector("[data-restore-cloud]");
     if (restoreBtn) restoreBtn.addEventListener("click", function () {
       var orig = restoreBtn.textContent; restoreBtn.disabled = true; restoreBtn.textContent = "⏳ กำลังกู้คืน…";
@@ -1874,6 +1903,31 @@
     ts.addEventListener("change", function () { state.type = ts.value; render(); });
     cs.addEventListener("input", function () { state.q = cs.value.trim().toLowerCase(); render(); });
     document.querySelector("[data-shipcfg]").addEventListener("click", openShipEditor);
+    var ordExp = document.querySelector("[data-export-orders]");
+    if (ordExp) ordExp.addEventListener("click", function () {
+      if (!window.XLSX) { U.toast("ตัวสร้างไฟล์ Excel ยังโหลดไม่เสร็จ ลองอีกครั้ง", "err"); return; }
+      var rows = S.getOrders().filter(function (o) { return o.status !== "cancelled"; }).map(function (o) {
+        var c = o.customer || {};
+        return {
+          "เลขออเดอร์": o.id || "", "วันที่": S.fmtDate(o.createdAt), "ลูกค้า": c.name || "", "เบอร์โทร": c.phone || "",
+          "ประเภท": S.typeLabel(o.type), "รับสินค้า": S.fulfillmentLabel(o.fulfillment),
+          "รายการ": (o.items || []).map(function (it) { return it.name + " ×" + it.qty; }).join(", "),
+          "ยอดรวม": (o.total || 0), "ค่าจัดส่ง": (o.shipping || 0), "VAT": (o.vat || 0),
+          "การชำระเงิน": o.payStatus === "verified" ? "ยืนยันแล้ว" : (o.payStatus === "pending" ? "รอตรวจสลิป" : (o.payStatus || "")),
+          "สถานะ": S.statusLabel ? S.statusLabel(o.status) : (o.status || ""),
+          "ที่อยู่จัดส่ง": (o.address && o.address.text) || (o.fulfillment === "pickup" ? "รับที่ร้าน" : ""),
+          "ใบกำกับภาษี": o.taxInvoice ? (o.taxInvoice.name + " · " + o.taxInvoice.taxId) : "",
+        };
+      });
+      if (!rows.length) { U.toast("ยังไม่มีคำสั่งซื้อ", "err"); return; }
+      try {
+        var ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "คำสั่งซื้อ");
+        var d = new Date(), z = function (n) { return (n < 10 ? "0" : "") + n; };
+        XLSX.writeFile(wb, "metools-orders-" + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + ".xlsx");
+        U.toast("ดาวน์โหลดคำสั่งซื้อแล้ว (" + rows.length + " รายการ)", "ok");
+      } catch (e) { U.toast("สร้างไฟล์ไม่สำเร็จ: " + (e && e.message), "err"); }
+    });
 
     // ออเดอร์จาก cloud ถูกดูดลง local me_orders โดย subscribeOrdersGlobal() แล้ว (ทำงานทุกหน้าหลังร้าน)
     // จึงอ่านจาก S.getOrders() ได้เลย และ re-render เมื่อมีข้อมูลใหม่เข้ามา (dispatch จาก absorbCloudOrders)
