@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ใบเสนอราคา — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css?v=20260607m">
+  <style>
+    .wl-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px }
+    .wl-tabs { display:flex; gap:6px; flex-wrap:wrap }
+    .wl-tab { background:#fff; border:2px solid var(--ink); border-radius:20px; padding:6px 14px; font-weight:700; font-size:13px; cursor:pointer }
+    .wl-tab.on { background:var(--dw-yellow); }
+    .wl-count { font-size:13px; color:var(--fg-2); margin-bottom:10px }
+    .wl-list { display:flex; flex-direction:column; gap:10px }
+    .wl-item { display:flex; align-items:flex-start; gap:10px; background:#fff; border:2px solid var(--border-3,#e6e6e6); border-radius:10px; padding:12px 14px }
+    .wl-item-main { flex:1; min-width:0 }
+    .wl-item-name { font-weight:800; font-size:15px; display:flex; align-items:center; gap:8px; flex-wrap:wrap }
+    .wl-item-sub { font-size:13px; color:var(--fg-2); margin-top:2px }
+    .wl-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px; white-space:nowrap }
+    .wl-badge.cust { background:#e6f4ea; color:#1a7f37 }
+    .wl-badge.staff { background:#fff3d6; color:#9a6b00 }
+    .wl-empty { padding:30px; text-align:center; color:var(--fg-2); font-size:14px }
+  </style>
+</head>
+<body data-admin="quotes">
+  <div class="admin" data-shell>
+    <main class="main">
+      <div class="topbar">
+        <div><h1>ใบเสนอราคา</h1><div class="sub">คำขอใบเสนอราคาจากลูกค้าองค์กร/ผู้รับเหมา (ซื้อจำนวนมาก) — โทรกลับแล้วอัปเดตสถานะได้</div></div>
+      </div>
+      <div data-quotes-root>
+        <div class="wl-bar">
+          <div class="wl-tabs">
+            <button class="wl-tab on" data-q-tab="all">ทั้งหมด</button>
+            <button class="wl-tab" data-q-tab="new">ใหม่</button>
+            <button class="wl-tab" data-q-tab="quoted">เสนอราคาแล้ว</button>
+            <button class="wl-tab" data-q-tab="closed">ปิดงาน</button>
+          </div>
+        </div>
+        <div class="wl-count" data-q-count></div>
+        <div class="wl-list" data-q-list><div class="wl-empty">กำลังโหลด…</div></div>
+      </div>
+    </main>
+  </div>
+  <script src="../assets/thai-geo.js?v=20260607m"></script>
+  <script src="../assets/store.js?v=20260607m"></script>
+  <script src="../assets/ui.js?v=20260607m"></script>
+  <script src="../assets/admin.js?v=20260607m"></script>
+</body>
+</html>

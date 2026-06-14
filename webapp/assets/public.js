@@ -811,6 +811,7 @@
               '<div class="field full"><label>ที่อยู่ออกใบกำกับภาษี *</label><textarea data-taxaddr placeholder="ที่อยู่ตามที่จดทะเบียนภาษี">' + esc(co.taxAddr) + "</textarea></div>" +
             "</div>" +
             '<button class="me-btn me-btn-block" data-checkout>ยืนยันสั่งซื้อ</button>' +
+            '<button class="me-btn me-btn-ghost me-btn-block" data-quote>📋 ขอใบเสนอราคา (ซื้อจำนวนมาก)</button>' +
             '<a class="me-btn me-btn-ghost me-btn-block" href="shop.html">เลือกซื้อเพิ่ม</a>' +
           "</div></div></div>";
 
@@ -877,6 +878,7 @@
       }
 
       root.querySelector("[data-checkout]").addEventListener("click", confirmOrder);
+      var qb = root.querySelector("[data-quote]"); if (qb) qb.addEventListener("click", openQuoteModal);
     }
 
     function confirmOrder() {
@@ -1091,6 +1093,42 @@
       wireRating(root);
     }
     render();
+  }
+
+  // ขอใบเสนอราคา — จากตะกร้า (B2B/ซื้อจำนวนมาก)
+  function openQuoteModal() {
+    var lines = S.cartLines();
+    if (!lines.length) { U.toast("ตะกร้ายังว่าง — เลือกสินค้าก่อนขอใบเสนอราคา", "err"); return; }
+    var sess = S.session();
+    var itemsHtml = lines.map(function (l) { return "<li>" + esc(l.product.name) + " × " + l.qty + "</li>"; }).join("");
+    var bg = document.createElement("div"); bg.className = "me-modal-bg";
+    bg.innerHTML = '<div class="me-modal"><div class="me-modal-head"><h3>ขอใบเสนอราคา</h3><button class="me-modal-x" aria-label="ปิด">×</button></div>' +
+      '<div class="quote-form">' +
+        '<p class="note">กรอกข้อมูลติดต่อ — ทางร้านจะติดต่อกลับพร้อมใบเสนอราคา (เหมาะกับองค์กร/ผู้รับเหมาที่ซื้อจำนวนมาก)</p>' +
+        '<div class="field"><label>ชื่อผู้ติดต่อ *</label><input data-q-name value="' + esc((sess && sess.name) || "") + '"></div>' +
+        '<div class="field"><label>บริษัท / หน่วยงาน</label><input data-q-company placeholder="เช่น หจก. รับเหมาก่อสร้าง"></div>' +
+        '<div class="field"><label>เบอร์โทร *</label><input data-q-phone type="tel" placeholder="08X-XXX-XXXX"></div>' +
+        '<div class="field"><label>อีเมล</label><input data-q-email type="email" value="' + esc((sess && sess.email) || "") + '"></div>' +
+        '<div class="field"><label>รายการที่ขอราคา</label><ul class="quote-items">' + itemsHtml + "</ul></div>" +
+        '<div class="field"><label>หมายเหตุ (จำนวน/เงื่อนไข/กำหนดส่ง)</label><textarea data-q-note placeholder="เช่น ต้องการ 50 ชุด ส่งภายในเดือนนี้ ขอราคาโครงการ"></textarea></div>' +
+        '<button class="me-btn me-btn-block" data-q-send>ส่งคำขอใบเสนอราคา</button>' +
+      "</div></div>";
+    document.body.appendChild(bg);
+    function close() { bg.remove(); }
+    bg.querySelector(".me-modal-x").onclick = close;
+    bg.addEventListener("click", function (e) { if (e.target === bg) close(); });
+    bg.querySelector("[data-q-send]").addEventListener("click", function () {
+      var name = bg.querySelector("[data-q-name]").value.trim();
+      var phone = bg.querySelector("[data-q-phone]").value.trim();
+      if (!name || phone.replace(/\D/g, "").length < 9) { U.toast("กรอกชื่อและเบอร์โทรให้ครบ", "err"); return; }
+      var btn = bg.querySelector("[data-q-send]"); btn.disabled = true; btn.textContent = "กำลังส่ง…";
+      S.submitQuote({
+        contactName: name, company: bg.querySelector("[data-q-company]").value.trim(),
+        phone: phone, email: bg.querySelector("[data-q-email]").value.trim(), note: bg.querySelector("[data-q-note]").value.trim(),
+        items: lines.map(function (l) { return { name: l.product.name, sku: l.product.sku || "", qty: l.qty, productId: l.product.id }; }),
+      }).then(function (id) { close(); U.toast("✅ ส่งคำขอแล้ว · เลขอ้างอิง " + id + " — ร้านจะติดต่อกลับ", "ok"); })
+        .catch(function () { btn.disabled = false; btn.textContent = "ส่งคำขอใบเสนอราคา"; U.toast("ส่งไม่สำเร็จ ลองใหม่อีกครั้ง", "err"); });
+    });
   }
 
   function openCancelModal(orderId, onDone) {
