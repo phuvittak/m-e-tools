@@ -20,7 +20,14 @@
   // ถ้า cloud ใหม่กว่า localStorage จะอัปเดต local แล้ว dispatch ให้ทุกหน้า re-render
   if (S.cloudLoadAdminData) S.cloudLoadAdminData();
   // โหลดแคตตาล็อกสินค้าจาก cloud → เจ้าของ/พนักงานเห็นสินค้าครบบนทุกอุปกรณ์ (แม้เครื่องนี้ยังไม่มี master)
-  if (S.cloudLoadProducts) S.cloudLoadProducts();
+  if (S.cloudLoadProducts) S.cloudLoadProducts().then(function () {
+    // ซิงค์ขึ้น cloud อัตโนมัติ "เฉพาะที่ยังไม่ขึ้น/ใหม่กว่า" — ไม่ต้องกดปุ่ม ไม่อัปซ้ำทั้งหมด
+    if (!S.autoCatchUpSync) return;
+    S.autoCatchUpSync().then(function (n) {
+      if (n && window.U) U.toast("ซิงค์ขึ้นออนไลน์อัตโนมัติแล้ว " + n + " รายการ", "ok");
+      if (n && window.__invRender) { try { window.__invRender(); } catch (e) {} }
+    });
+  });
   window.addEventListener("me-products-loaded", function () { if (window.__invRender) { try { window.__invRender(); } catch (e) {} } });
   // ลงทะเบียนเครื่องนี้เป็น admin แล้ว subscribe ออเดอร์จาก cloud (ทุกหน้าหลังร้าน) → ดูดลง local
   // ให้ทุกหน้า (แดชบอร์ด/คำสั่งซื้อ/ERP) เห็นออเดอร์ครบเหมือนกันทุกเครื่อง ผ่าน getOrders()
