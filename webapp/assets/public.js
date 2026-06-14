@@ -619,7 +619,7 @@
           '<div class="pd-rate">' + starsDisplay(p) + "</div>" +
           '<span class="' + (avail > 0 ? "stockpill in" : "stockpill out") + '">' +
             (avail > 0 ? "มีของพร้อมส่ง · เหลือ " + avail + " ชิ้น" : "สินค้าหมดชั่วคราว") + " · " + S.categoryLabel(p.category) + "</span>" +
-          '<div class="pd-viewing">👀 มีช่างอีก <b>' + viewersFor(p.id) + "</b> คนกำลังสนใจสินค้านี้</div>" +
+          (p.views ? '<div class="pd-viewing">👀 มีช่าง <b>' + p.views + "</b> คนสนใจสินค้านี้แล้ว</div>" : "") +
           '<div class="pd-desc">' + descToHtml(p.desc) + "</div>" +
           '<div class="pd-prices">' +
             (p.forSale ? '<div class="pd-price-box"><div class="k">ราคาขาย</div><div class="v">' + S.money(p.price) + "</div></div>" : "") +
@@ -644,15 +644,22 @@
 
     wireViewer(root, p);
     wireRating(root);
-    // แนะนำสินค้าที่มักใช้/ซื้อคู่กัน — หมวดเดียวกันก่อน เติมด้วยแบรนด์เดียวกัน
+    // นับยอดดูจริง — 1 ครั้งต่อเครื่องต่อสินค้า (กันรีโหลดให้ตัวเลขเฟ้อ)
+    try { var pvk = "me_pv_" + p.id; if (!localStorage.getItem(pvk)) { localStorage.setItem(pvk, "1"); S.cloudBumpView(p.id); } } catch (e) {}
+    // "มักซื้อคู่กัน": (1) ที่แอดมินตั้งเอง relatedIds → (2) เรียนรู้จากลูกค้าซื้อจริง coBought → (3) หมวด/แบรนด์
     (function renderCross() {
       var sec = root.querySelector("[data-cross]"); var box = root.querySelector("[data-cross-list]"); if (!sec || !box) return;
-      var all = S.getProducts().filter(function (x) { return !x.hidden && x.id !== p.id; });
-      var same = all.filter(function (x) { return x.category === p.category; });
-      var brand = all.filter(function (x) { return x.brand === p.brand && x.category !== p.category; });
-      var rel = same.concat(brand);
-      var seen = {}, picked = [];
-      rel.forEach(function (x) { if (!seen[x.id] && picked.length < 4) { seen[x.id] = 1; picked.push(x); } });
+      var byId = {}; S.getProducts().forEach(function (x) { byId[x.id] = x; });
+      var picked = [], seen = {};
+      function add(id) { var x = byId[id]; if (x && !x.hidden && x.id !== p.id && !seen[id] && picked.length < 4) { seen[id] = 1; picked.push(x); } }
+      (p.relatedIds || []).forEach(add);                                  // 1) แอดมินตั้งเอง
+      var cob = p.coBought || {};                                          // 2) เรียนรู้จากออเดอร์จริง (เรียงตามความถี่)
+      Object.keys(cob).sort(function (x, y) { return (cob[y] || 0) - (cob[x] || 0); }).forEach(add);
+      if (picked.length < 4) {                                            // 3) สำรอง: หมวด/แบรนด์เดียวกัน
+        var all = S.getProducts().filter(function (x) { return !x.hidden && x.id !== p.id; });
+        all.filter(function (x) { return x.category === p.category; }).forEach(function (x) { add(x.id); });
+        all.filter(function (x) { return x.brand === p.brand; }).forEach(function (x) { add(x.id); });
+      }
       if (!picked.length) return;
       box.innerHTML = picked.map(cardHtml).join("");
       wireCards(box); sec.hidden = false;
