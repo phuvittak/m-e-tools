@@ -1065,7 +1065,15 @@
         root.innerHTML = '<div class="empty"><h3>ยังไม่มีคำสั่งซื้อ</h3><p>เมื่อคุณสั่งซื้อหรือเช่า รายการจะแสดงที่นี่</p><a class="me-btn" href="shop.html">เริ่มเลือกซื้อ</a></div>';
         return;
       }
-      root.innerHTML = orders.map(function (o) {
+      // แต้มสะสมช่าง — คำนวณจากยอดซื้อสะสม (1 แต้ม / 100 บาท) + ระดับสมาชิก
+      var spend = orders.filter(function (o) { return o.status !== "cancelled"; }).reduce(function (s, o) { return s + (o.total || 0); }, 0);
+      var points = Math.floor(spend / 100);
+      var tier = spend >= 100000 ? { n: "ช่างทอง 🥇", c: "#caa12a" } : spend >= 30000 ? { n: "ช่างเงิน 🥈", c: "#8a8a8a" } : { n: "ช่างทั่วไป 🔧", c: "var(--ink)" };
+      var loyalty = '<div class="loyalty-card"><div><div class="loyalty-tier" style="color:' + tier.c + '">' + tier.n + "</div>" +
+        '<div class="loyalty-sub">ยอดซื้อสะสม ' + S.money(spend) + "</div></div>" +
+        '<div class="loyalty-pts"><span class="loyalty-pts-n">' + points.toLocaleString() + '</span><span class="loyalty-pts-l">แต้มสะสม</span></div></div>' +
+        '<p class="note" style="margin:-6px 0 18px">สะสม 1 แต้มทุกการซื้อ 100 บาท — แลกของช่าง (ถุงมือ/เสื้อช็อป/ดอกสว่าน) หรือส่วนลดค่าอะไหล่ ที่หน้าร้าน</p>';
+      root.innerHTML = loyalty + orders.map(function (o) {
         var isNew = newIds.indexOf(o.id) >= 0;
         var canCancel = o.status === "paid";
         return (
