@@ -1645,9 +1645,10 @@
   // Firebase config used by the chat: per-browser override (back office) wins,
   // else the committed FIREBASE_CONFIG (shared by every visitor → real online chat).
   function firebaseCfg() {
-    var s = (getSettings().firebaseConfig || "").trim();
-    if (s) return s;
-    return FIREBASE_CONFIG ? JSON.stringify(FIREBASE_CONFIG) : "";
+    // ใช้การเชื่อมต่อที่ "ฝังมาในแอป" เสมอ → ทุกเครื่อง (คอม/มือถือ/ลูกค้า) ต่อ cloud เดียวกัน
+    // อัตโนมัติ ไม่ต้องตั้งค่า Firebase ต่อเครื่อง · สิทธิ์ดูจากบัญชีที่ล็อกอินเท่านั้น
+    if (FIREBASE_CONFIG && FIREBASE_CONFIG.projectId) return JSON.stringify(FIREBASE_CONFIG);
+    return (getSettings().firebaseConfig || "").trim(); // สำรอง: เผื่อไม่มีค่าฝัง
   }
   // live open/closed based on current time + opening hours + special days
   function isOpenNow() {
