@@ -255,7 +255,7 @@
       if (!window.XLSX) { U.toast("ตัวสร้างไฟล์ Excel ยังโหลดไม่เสร็จ ลองอีกครั้ง", "err"); return; }
       var rows = S.getProducts().map(function (p) {
         return {
-          "ชื่อสินค้า": p.name || "", "รหัส SKU": p.sku || "", "แบรนด์": p.brand || "",
+          "id": p.id || "", "ชื่อสินค้า": p.name || "", "รหัส SKU": p.sku || "", "แบรนด์": p.brand || "",
           "หมวดหมู่": (S.categoryLabel ? S.categoryLabel(p.category) : p.category) || "",
           "คงเหลือ": (p.stock || 0), "กำลังเช่า": (p.rented || 0),
           "ราคาขาย": (p.price || 0), "ต้นทุน": (p.cost || 0), "ค่าเช่า/วัน": (p.rentPerDay || 0),
@@ -341,7 +341,7 @@
       tb.querySelectorAll("[data-del]").forEach(function (b) {
         b.onclick = function () {
           var p = S.getProduct(b.dataset.del);
-          if (confirm("ลบสินค้า \"" + p.name + "\" ?")) { S.deleteProduct(p.id); U.toast("ลบสินค้าแล้ว", "ok"); render(); }
+          if (confirm("ลบสินค้า \"" + p.name + "\" ?")) { S.deleteProduct(p.id); if (S.pushSheetDelete) S.pushSheetDelete(p.id); U.toast("ลบสินค้าแล้ว", "ok"); render(); }
         };
       });
     }

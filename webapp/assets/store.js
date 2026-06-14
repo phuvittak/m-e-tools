@@ -813,19 +813,24 @@
   // ลูกค้า/คนทั่วไป = อ่านแคตตาล็อกที่ดึงมาจาก cloud (me_cloud_products) ถ้ามี
   //   ถ้ายังไม่มา (เปิดครั้งแรก/ออฟไลน์) ใช้ local เป็น fallback แล้ว re-render เมื่อ cloud มา
   // เหตุผล: ห้ามให้ cloud มาทับ me_products ของเจ้าของ (อาจมีของที่ยังไม่ได้ซิงค์)
-  // ส่งสินค้า 1 ตัวไปอัปเดตใน Google Sheet (ผ่าน Apps Script Web App) — ฝั่งเว็บ → ชีต
+  // ส่งข้อมูลไป Google Sheet (ผ่าน Apps Script Web App) — ฝั่งเว็บ → ชีต
   // ใช้ text/plain เพื่อเลี่ยง CORS preflight (Apps Script รับใน e.postData.contents)
-  function pushProductToSheet(p) {
+  function _sheetPost(payload) {
     try {
       var url = (getSettings().sheetWebAppUrl || "").trim();
-      if (!url || !p) return;
-      var payload = { action: "upsert", product: {
-        sku: p.sku || "", id: p.id || "", name: p.name || "", brand: p.brand || "", category: p.category || "",
-        stock: (p.stock || 0), price: (p.price || 0), cost: (p.cost || 0), rentPerDay: (p.rentPerDay || 0), location: p.location || "",
-      } };
+      if (!url) return;
       fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) }).catch(function () {});
     } catch (e) {}
   }
+  function pushProductToSheet(p) {
+    if (!p) return;
+    _sheetPost({ action: "upsert", product: {
+      id: p.id || "", sku: p.sku || "", name: p.name || "", brand: p.brand || "", category: p.category || "",
+      motorType: p.motorType || "", batteryPlatform: p.batteryPlatform || "", warrantyYears: (p.warrantyYears || 0),
+      cost: (p.cost || 0), price: (p.price || 0), rentPerDay: (p.rentPerDay || 0), stock: (p.stock || 0), location: p.location || "",
+    } });
+  }
+  function pushSheetDelete(id) { if (id) _sheetPost({ action: "delete", id: String(id) }); }
   function getProducts() {
     var local = read(KEY.products, []);
     var tomb = read(KEY.deletedProducts, []) || [];
@@ -1959,7 +1964,7 @@
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
     getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,
     saveProduct: saveProduct, deleteProduct: deleteProduct, adjustStock: adjustStock,
-    cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, autoCatchUpSync: autoCatchUpSync, cloudPushProduct: cloudPushProduct, restoreProductsFromCloud: restoreProductsFromCloud, pushProductToSheet: pushProductToSheet,
+    cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, autoCatchUpSync: autoCatchUpSync, cloudPushProduct: cloudPushProduct, restoreProductsFromCloud: restoreProductsFromCloud, pushProductToSheet: pushProductToSheet, pushSheetDelete: pushSheetDelete,
     startAdminRealtime: startAdminRealtime,
     getCart: getCart, addToCart: addToCart, updateCartItem: updateCartItem,
     removeCartItem: removeCartItem, clearCart: clearCart,
