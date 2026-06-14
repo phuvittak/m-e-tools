@@ -22,6 +22,7 @@
     seeded: "me_seeded_v2",
     cloudProducts: "me_cloud_products", // catalog pulled from Firestore (customers only)
     deletedOrders: "me_deleted_orders", // tombstones: order ids ที่ลบแล้ว (กัน cloud snapshot ดูดกลับ)
+    deletedProducts: "me_deleted_products", // tombstones: product ids ที่ลบแล้ว (กัน merge cloud ดูดกลับ)
     myWarranties: "me_my_warranties",   // เลขอ้างอิงใบประกันที่ลงจากเครื่องนี้ (ไว้ตรวจสอบสถานะ)
     myQuotes: "me_my_quotes",           // เลขอ้างอิงใบขอเสนอราคาที่ส่งจากเครื่องนี้
     stockApplied: "me_stock_applied",   // order ids ที่ตัดสต๊อกแล้ว (กันตัดซ้ำตอนรับออเดอร์จาก cloud)
@@ -762,17 +763,25 @@
   // เหตุผล: ห้ามให้ cloud มาทับ me_products ของเจ้าของ (อาจมีของที่ยังไม่ได้ซิงค์)
   function getProducts() {
     var local = read(KEY.products, []);
+    var tomb = read(KEY.deletedProducts, []) || [];
+    var cloud = read(KEY.cloudProducts, null) || [];
     if (!isOwner()) {
-      var cloud = read(KEY.cloudProducts, null);
-      if (cloud && cloud.length) return cloud;
+      if (cloud.length) return cloud.filter(function (p) { return p && p.id && tomb.indexOf(p.id) < 0; });
       return local;
     }
-    // เจ้าของ = master ในเครื่อง (เห็นการแก้ล่าสุดทันที) — แต่ถ้าเครื่องนี้ยังว่าง
-    // (เพิ่งล็อกอินบนอุปกรณ์ใหม่ ของจริงอยู่ใน cloud) ให้ดึงแคตตาล็อก cloud มาแสดงแทน ไม่ให้เห็นร้านว่าง
-    if (local.length) return local;
-    var ownerCloud = read(KEY.cloudProducts, null);
-    if (ownerCloud && ownerCloud.length) return ownerCloud;
-    return local;
+    // เจ้าของ: รวมสินค้าจากเครื่องนี้ (local) + เครื่องอื่น (cloud) → ตัวที่ updatedAt ใหม่กว่าชนะ
+    // ทำให้เพิ่ม/แก้สต๊อกจากคอมร้านขึ้นบนมือถือ (และทุกอุปกรณ์ของเจ้าของ) แบบเรียลไทม์
+    if (!cloud.length) return local.filter(function (p) { return tomb.indexOf(p.id) < 0; });
+    var byId = {};
+    local.forEach(function (p) { if (p && p.id) byId[p.id] = p; });
+    cloud.forEach(function (c) {
+      if (!c || !c.id) return;
+      var ex = byId[c.id];
+      if (!ex) { byId[c.id] = c; return; }
+      var tl = Date.parse(ex.updatedAt) || 0, tc = Date.parse(c.updatedAt) || 0;
+      if (tc > tl) byId[c.id] = c; // cloud ใหม่กว่า → ใช้ของ cloud (เครื่องอื่นแก้ล่าสุด)
+    });
+    return Object.keys(byId).filter(function (k) { return tomb.indexOf(k) < 0; }).map(function (k) { return byId[k]; });
   }
   // เฉพาะข้อมูลในเครื่องเจ้าของ (ไม่สน cloud) — ใช้ตอนซิงค์ขึ้น cloud
   function getLocalProducts() { return read(KEY.products, []); }
@@ -883,6 +892,7 @@
       }
       if (!found) { list.push(p); saved = p; }
     }
+    saved.updatedAt = new Date().toISOString(); // เครื่องนี้แก้ล่าสุด → ใช้เทียบกับ cloud (merge ชนะ)
     write(KEY.products, list);
     // auto-sync ขึ้น cloud — ใครก็ตามที่มีสิทธิ์ "คลัง/สต็อก" (เจ้าของ + พนักงานที่ได้รับสิทธิ์)
     // ลูกค้า/คนไม่มีสิทธิ์ไม่เข้าเงื่อนไขนี้ จึงไม่เขียนทับแคตตาล็อกบน cloud
@@ -893,6 +903,8 @@
     // กันลบโดยไม่มีสิทธิ์ — ป้องกันเชิงลึกเผื่อปุ่มบน UI หลุด (เจ้าของผ่านเสมอ)
     if (!hasPerm("inventory_delete")) return false;
     write(KEY.products, getLocalProducts().filter(function (p) { return p.id !== id; }));
+    // tombstone: กัน merge cloud ดูดสินค้าที่เพิ่งลบกลับมา (ระหว่างรอ cloud ลบเสร็จ)
+    var tomb = read(KEY.deletedProducts, []) || []; if (tomb.indexOf(id) < 0) { tomb.push(id); write(KEY.deletedProducts, tomb, { skipCloud: true }); }
     if (hasPerm("inventory")) { cloudDeleteProductDoc(id); scheduleCatalogSync(); }
     return true;
   }
