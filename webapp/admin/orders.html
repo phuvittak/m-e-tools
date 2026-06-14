@@ -4,14 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>คำสั่งซื้อ / เช่า — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260608a">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260608b">
 </head>
 <body data-admin="orders">
   <div class="admin" data-shell>
     <main class="main">
       <div class="topbar">
         <div><h1>คำสั่งซื้อ / เช่า</h1><div class="sub" data-osum></div></div>
-        <a class="btn btn-ghost" href="dashboard.html">← แดชบอร์ด</a>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost" data-export-orders title="ดาวน์โหลดคำสั่งซื้อทั้งหมดเป็นไฟล์ Excel (.xlsx) — แยกไฟล์ลูกค้า/ออเดอร์ ออกจากสต๊อก">📥 ดาวน์โหลดคำสั่งซื้อ (Excel)</button>
+          <a class="btn btn-ghost" href="dashboard.html">← แดชบอร์ด</a>
+        </div>
       </div>
 
       <div class="panel">
@@ -35,9 +38,10 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260608a"></script>
-  <script src="../assets/store.js?v=20260608a"></script>
-  <script src="../assets/ui.js?v=20260608a"></script>
-  <script src="../assets/admin.js?v=20260608a"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="../assets/thai-geo.js?v=20260608b"></script>
+  <script src="../assets/store.js?v=20260608b"></script>
+  <script src="../assets/ui.js?v=20260608b"></script>
+  <script src="../assets/admin.js?v=20260608b"></script>
 </body>
 </html>
