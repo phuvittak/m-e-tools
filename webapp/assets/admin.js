@@ -2631,6 +2631,13 @@
       };
     }
     render();
+    // เรียลไทม์: ข้อมูลพนักงานจาก cloud เปลี่ยน (อีกเครื่องบันทึก) → วาดใหม่
+    // เว้นถ้ากำลังพิมพ์อยู่ในฟอร์ม (กันค่าที่พิมพ์หาย)
+    S.onChange(function () {
+      var a = document.activeElement;
+      if (a && root.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+      render();
+    });
   }
 
   /* ===================== CHAT INBOX (LINE-OA style, real-time) ===================== */
