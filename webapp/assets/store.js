@@ -21,6 +21,7 @@
     chats: "me_chats",
     seeded: "me_seeded_v2",
     cloudProducts: "me_cloud_products", // catalog pulled from Firestore (customers only)
+    catalogVer: "me_catalog_ver",       // updatedAt ของ products/catalog ที่ดึงล่าสุด (กันอ่านซ้ำ = ประหยัด quota)
     deletedOrders: "me_deleted_orders", // tombstones: order ids ที่ลบแล้ว (กัน cloud snapshot ดูดกลับ)
     deletedProducts: "me_deleted_products", // tombstones: product ids ที่ลบแล้ว (กัน merge cloud ดูดกลับ)
     myWarranties: "me_my_warranties",   // เลขอ้างอิงใบประกันที่ลงจากเครื่องนี้ (ไว้ตรวจสอบสถานะ)
@@ -468,7 +469,8 @@
     if (size() > 950000 && clean.images && clean.images.length > 1) clean.images = [clean.images[0]];
     if (size() > 950000) { clean.images = []; clean.image = ""; } // รูปใหญ่เกิน — เก็บแค่ข้อความ
     clean.available = available(p);
-    clean.updatedAt = new Date().toISOString();
+    // เก็บ updatedAt เดิมของสินค้าให้ตรงกับเอกสารรวม (catalog) — ใช้เทียบว่า "เปลี่ยนไหม" ตอนดึงเฉพาะตัวที่เปลี่ยน
+    clean.updatedAt = p.updatedAt || new Date().toISOString();
     return clean;
   }
   // เอกสารรวมสำหรับบอท LINE (ตัดรูป/มีเดียออก ให้เล็ก)
@@ -530,6 +532,16 @@
   // ซิงค์อัตโนมัติแบบ "เฉพาะที่ยังไม่ขึ้น/ใหม่กว่า cloud" (incremental) — ไม่อัปซ้ำทั้งหมด
   // เรียกเองตอนเปิดหลังร้าน + วนทุก 30 วิ → ดันตัวที่ค้างขึ้นเองจนครบ (ไม่ต้องกดปุ่ม)
   var _autoSyncing = false;
+  // หลัง push สินค้าขึ้น cloud สำเร็จ → อัปเดต cache cloudProducts ในเครื่องให้ตรง
+  // เพื่อให้รอบถัดไปของ autoCatchUpSync เห็นว่า "ซิงค์แล้ว" จะได้ไม่ดันซ้ำทุก 30 วิ (เปลือง quota เขียน)
+  function markSynced(list) {
+    if (!list || !list.length) return;
+    var cloud = read(KEY.cloudProducts, []) || [];
+    var byId = {}; cloud.forEach(function (c) { if (c && c.id) byId[c.id] = c; });
+    list.forEach(function (p) { if (p && p.id) byId[p.id] = p; }); // เก็บข้อมูลเต็ม (ตรงกับที่ cloudLoadProducts เก็บ) กันรายการขาดฟิลด์
+    var merged = Object.keys(byId).map(function (k) { return byId[k]; });
+    try { localStorage.setItem(KEY.cloudProducts, JSON.stringify(merged)); } catch (e) {}
+  }
   function autoCatchUpSync(progressCb) {
     if (!hasPerm("inventory")) return Promise.resolve(0);
     if (_autoSyncing) return Promise.resolve(0); // กันรันซ้อน
@@ -544,81 +556,112 @@
     });
     if (!pending.length) return Promise.resolve(0);
     _autoSyncing = true;
+    var pushed = [];
     return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
       var fs = m.fsMod, i = 0;
       function next() {
         if (i >= pending.length) return Promise.resolve();
         var p = pending[i++];
         if (progressCb) { try { progressCb(i, pending.length); } catch (e) {} }
-        return fs.setDoc(fs.doc(m.db, "products", String(p.id)), cleanProductDoc(p)).then(next, next);
+        return fs.setDoc(fs.doc(m.db, "products", String(p.id)), cleanProductDoc(p))
+          .then(function () { pushed.push(p); }, function () {}).then(next);
       }
       return next().then(function () {
         var items = buildCatalogItems();
         return fs.setDoc(fs.doc(m.db, "products", "catalog"), { items: items, count: items.length, updatedAt: fs.serverTimestamp() });
-      }).then(function () { _autoSyncing = false; return pending.length; });
-    }).catch(function (e) { _autoSyncing = false; console.warn("[autosync]", e && e.message); return 0; });
+      }).then(function () { _autoSyncing = false; markSynced(pushed); return pending.length; });
+    }).catch(function (e) { _autoSyncing = false; markSynced(pushed); console.warn("[autosync]", e && e.message); return 0; });
   }
   // โหลดแคตตาล็อกจาก cloud → เก็บใน key แยก (ไม่ทับ me_products ของเจ้าของ)
   // ใช้ REST (public read) — ลูกค้าไม่ต้อง auth. ข้าม doc "catalog" (อันนั้นของบอท)
-  function cloudLoadProducts() {
+  // โหลดสินค้าจาก cloud แบบ "ประหยัด quota":
+  //   1) อ่านเอกสารรวม products/catalog เพียง 1 ครั้ง (1 read) → ได้ version (updatedAt) + รายการ id+updatedAt
+  //   2) ถ้า version เท่าเดิม + มี cache อยู่แล้ว → ใช้ cache เลย ไม่ต้องอ่าน doc สินค้าซ้ำ (0 read เพิ่ม)
+  //   3) ถ้า version เปลี่ยน → ดึง "เฉพาะตัวที่ใหม่/เปลี่ยน" ทีละ doc (ได้รูปครบ) ตัวที่เดิมใช้ cache
+  // เดิมทีระบบ list สินค้าทุก doc ทุกครั้ง (≈ จำนวนสินค้า reads ต่อการเปิด 1 หน้า) → quota หมดเร็วมาก
+  // force=true เพื่อบังคับดึงใหม่ทั้งหมด (เช่น ปุ่มกู้คืน)
+  function cloudLoadProducts(force) {
     var cfg = parseFbConfig(firebaseCfg());
     if (!cfg || !cfg.projectId) return Promise.resolve(false);
     var base = "https://firestore.googleapis.com/v1/projects/" + cfg.projectId + "/databases/default/documents/products";
-    var out = [];
-    function page(token) {
-      var url = base + "?pageSize=300" + (token ? "&pageToken=" + encodeURIComponent(token) : "");
-      return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
-        if (!data) return;
-        (data.documents || []).forEach(function (doc) {
-          var id = (doc.name || "").split("/").pop();
-          if (id === "catalog" || /_reviews$/.test(id) || /^chatimg-/.test(id)) return; // ข้าม doc รวม + รีวิว + รูปแชท
-          var obj = {}, f = doc.fields || {};
-          for (var k in f) obj[k] = unwrapFs(f[k]);
-          if (!obj.id) obj.id = id;
-          out.push(obj);
-        });
-        if (data.nextPageToken) return page(data.nextPageToken);
-      });
-    }
-    // สำรอง: ถ้า list สินค้าทีละ doc ไม่ได้ (เช่น Firestore rules ยังไม่อนุญาต list)
-    // → อ่านเอกสารรวม products/catalog (get เดี่ยว เปิดสาธารณะ) เอา "รายชื่อ id" มา
-    //   แล้วอ่าน per-product doc ทีละชิ้นด้วย GET (กฎ allow get ใช้ได้แม้ list ถูกปิด) เพื่อ "ดึงรูป"
-    //   ถ้าชิ้นไหนยังไม่มี doc (ยังไม่ซิงค์) ใช้ข้อมูลจากเอกสารรวมแทน (ไม่มีรูป)
-    function fallbackCatalog() {
-      if (out.length) return Promise.resolve();
-      return fetch(base + "/catalog").then(function (r) { return r.ok ? r.json() : null; }).then(function (doc) {
-        if (!doc || !doc.fields) return;
-        var items = unwrapFs(doc.fields.items) || [];
-        var results = new Array(items.length);
-        return Promise.all(items.map(function (o, idx) {
-          if (!o || !o.id) { return Promise.resolve(); }
-          return fetch(base + "/" + encodeURIComponent(o.id)).then(function (r) {
-            return r.ok ? r.json() : null;
-          }).then(function (pdoc) {
-            if (pdoc && pdoc.fields) {
-              var full = {}; for (var k in pdoc.fields) full[k] = unwrapFs(pdoc.fields[k]);
-              if (!full.id) full.id = o.id;
-              results[idx] = full;        // มีรูปครบจาก per-product doc
-            } else {
-              results[idx] = o;           // ยังไม่มี doc → ใช้ข้อมูลรวม (ไม่มีรูป)
-            }
-          }).catch(function () { results[idx] = o; });
-        })).then(function () {
-          results.forEach(function (r) { if (r && r.id) out.push(r); });
-        });
-      }).catch(function () {});
-    }
-    return page(null).then(fallbackCatalog).then(function () {
+
+    function finish(out, ver) {
       try { localStorage.setItem(KEY.cloudProducts, JSON.stringify(out)); } catch (e) {}
+      try { if (ver) localStorage.setItem(KEY.catalogVer, ver); } catch (e) {}
       dispatch();
       try { global.dispatchEvent(new CustomEvent("me-products-loaded")); } catch (e) {}
       return out.length;
+    }
+    function useCache() {
+      dispatch();
+      try { global.dispatchEvent(new CustomEvent("me-products-loaded")); } catch (e) {}
+      return (read(KEY.cloudProducts, []) || []).length;
+    }
+
+    // สำรองสุดท้าย: ถ้าไม่มีเอกสารรวมเลย → list สินค้าทุก doc (วิธีเดิม) ให้ยังทำงานได้
+    function fullList() {
+      var out = [];
+      function page(token) {
+        var url = base + "?pageSize=300" + (token ? "&pageToken=" + encodeURIComponent(token) : "");
+        return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+          if (!data) return;
+          (data.documents || []).forEach(function (doc) {
+            var id = (doc.name || "").split("/").pop();
+            if (id === "catalog" || /_reviews$/.test(id) || /^chatimg-/.test(id)) return;
+            var obj = {}, f = doc.fields || {};
+            for (var k in f) obj[k] = unwrapFs(f[k]);
+            if (!obj.id) obj.id = id;
+            out.push(obj);
+          });
+          if (data.nextPageToken) return page(data.nextPageToken);
+        });
+      }
+      return page(null).then(function () { return finish(out, ""); });
+    }
+
+    return fetch(base + "/catalog").then(function (r) { return r.ok ? r.json() : null; }).then(function (catDoc) {
+      if (!catDoc || !catDoc.fields) return fullList(); // ไม่มีเอกสารรวม → วิธีเดิม
+      var ver = unwrapFs(catDoc.fields.updatedAt) || "";
+      var items = unwrapFs(catDoc.fields.items) || [];
+      var cached = read(KEY.cloudProducts, null) || [];
+      var prevVer = ""; try { prevVer = localStorage.getItem(KEY.catalogVer) || ""; } catch (e) {}
+
+      // version เท่าเดิม + เคยโหลดแล้ว → ไม่ต้องอ่านอะไรเพิ่ม
+      if (!force && ver && prevVer && ver === prevVer && cached.length) return useCache();
+      if (!items.length) {
+        // เอกสารรวมว่าง (ยังไม่ซิงค์) → ลอง list ทุก doc เผื่อมี per-product doc อยู่
+        return fullList();
+      }
+
+      // version เปลี่ยน → ดึงเฉพาะตัวที่ใหม่/เปลี่ยน ทีละ doc (ได้รูป) ที่เหลือใช้ cache เดิม
+      var cachedById = {}; cached.forEach(function (c) { if (c && c.id) cachedById[c.id] = c; });
+      var out = new Array(items.length);
+      return Promise.all(items.map(function (it, idx) {
+        if (!it || !it.id) return Promise.resolve();
+        var c = cachedById[it.id];
+        var tNew = Date.parse(it.updatedAt) || 0, tOld = c ? (Date.parse(c.updatedAt) || 0) : 0;
+        if (!force && c && tOld >= tNew) { out[idx] = c; return Promise.resolve(); } // ไม่เปลี่ยน → ใช้ cache (0 read)
+        return fetch(base + "/" + encodeURIComponent(it.id)).then(function (r) {
+          return r.ok ? r.json() : null;
+        }).then(function (pdoc) {
+          if (pdoc && pdoc.fields) {
+            var full = {}; for (var k in pdoc.fields) full[k] = unwrapFs(pdoc.fields[k]);
+            if (!full.id) full.id = it.id;
+            out[idx] = full;     // มีรูปครบจาก per-product doc
+          } else {
+            out[idx] = c || it;  // ยังไม่มี doc → ใช้ cache เดิม หรือข้อมูลรวม (ไม่มีรูป)
+          }
+        }).catch(function () { out[idx] = c || it; });
+      })).then(function () {
+        var list = out.filter(function (r) { return r && r.id; });
+        return finish(list, ver);
+      });
     }).catch(function (err) { console.warn("[cloud products load]", err && err.message); return false; });
   }
   // กู้คืน: ดึงสินค้าทั้งหมดจาก cloud (per-product docs) รวมเข้าคลังในเครื่องนี้ โดย "ไม่ลบ" ของเดิม
   // ใช้กรณีสินค้าหาย/ย้ายเครื่อง/ล็อกอินใหม่ — เขียนลง local อย่างเดียว (ไม่ดันกลับ cloud)
   function restoreProductsFromCloud() {
-    return cloudLoadProducts().then(function () {
+    return cloudLoadProducts(true).then(function () {
       var cloud = read(KEY.cloudProducts, null) || [];
       var local = read(KEY.products, []);
       var byId = {};
