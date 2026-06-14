@@ -748,3 +748,9 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 .pd-viewing { font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--safety-orange); background: var(--dw-yellow-pale); border: 1.5px solid var(--dw-yellow-deep); border-radius: 6px; padding: 6px 10px; align-self: flex-start; }
 .pd-cross { margin-top: 48px; }
 .pd-cross .me-section-h { margin-bottom: 20px; }
+
+/* ขอใบเสนอราคา (modal) */
+.quote-form { display: flex; flex-direction: column; gap: 12px; }
+.quote-form .field { display: flex; flex-direction: column; gap: 5px; }
+.quote-form .field label { font-family: var(--font-body); font-weight: 700; font-size: 13px; color: var(--fg-2); }
+.quote-items { margin: 0; padding-left: 18px; font-family: var(--font-body); font-size: 14px; color: var(--ink); background: var(--bg-2); border: 1px solid var(--border-3); border-radius: 6px; padding: 10px 10px 10px 26px; }

@@ -27,7 +27,7 @@
   if (S.ensureAdminRegistered) S.ensureAdminRegistered().then(function (uid) { if (uid) subscribeOrdersGlobal(); });
   // เรียลไทม์: settings/staff/สินค้า อัปเดตเองทุกหน้าหลังร้านเมื่อมีการแก้จากอีกเครื่อง
   if (S.startAdminRealtime) S.startAdminRealtime();
-  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, warranty: initWarranty, import: function(){} }[view] || function () {})();
+  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, warranty: initWarranty, quotes: initQuotes, import: function(){} }[view] || function () {})();
 
   // subscribe orders/{id} จาก Firestore แบบเรียลไทม์ → S.absorbCloudOrders() เขียนลง local me_orders
   function subscribeOrdersGlobal() {
@@ -61,6 +61,7 @@
       botreplies: '<path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M7 8h10M7 12h7" stroke-linecap="round"/>',
       customers: '<path d="M17 21v-2a4 4 0 0 0-3-3.87"/><path d="M4 21v-2a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v2"/><circle cx="9" cy="7" r="4"/><circle cx="17" cy="6" r="3"/>',
       warranty: '<path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>',
+      quotes: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>',
     };
     var nav = [
       ["dashboard.html", "dashboard", "แดชบอร์ด", "dashboard"],
@@ -72,6 +73,7 @@
     // แชทลูกค้าหน้าเว็บถูกถอดออก — ลูกค้าทักผ่าน LINE OA ตรง ดูทุกบทสนทนาในหน้า "แชทบอท LINE"
     nav.push(["bot-inbox.html", "botinbox", "กล่องข้อความออนไลน์", "botinbox"]);
     nav.push(["warranty.html", "warranty", "ลงทะเบียนประกัน", "warranty"]);
+    nav.push(["quotes.html", "quotes", "ใบเสนอราคา", "quotes"]);
     nav.push(["customers.html", "customers", "สรุปลูกค้า", "customers"]);
     if (S.isOwner()) nav.push(["bot-replies.html", "botreplies", "คำตอบของบอท", "botreplies"]);
     if (S.isOwner()) nav.push(["import.html", "import", "นำเข้าสินค้า (AI)", "inventory"]);
@@ -1272,6 +1274,37 @@
   // หน้า "ใครอยากได้อะไร / ยอดซื้อต่อคน"
   // อ่าน Firestore orders (ทั้งหมด) → จัด group by userId → คำนวณยอดรวม, จัดอันดับ
   // นับเฉพาะออเดอร์ที่ "ยืนยันแล้ว" (status != cancelled) เพื่อไม่ให้ออเดอร์ที่ยกเลิกมาทำให้สับสน
+  /* ===================== QUOTES (ใบเสนอราคา B2B) ===================== */
+  function initQuotes() {
+    var root = document.querySelector("[data-quotes-root]"); if (!root) return;
+    var listEl = root.querySelector("[data-q-list]"), countEl = root.querySelector("[data-q-count]");
+    var all = [], tab = "all";
+    function statusLabel(s) { return s === "quoted" ? "เสนอราคาแล้ว" : s === "closed" ? "ปิดงาน" : "ใหม่"; }
+    function render() {
+      var list = all.filter(function (q) { return tab === "all" || (q.status || "new") === tab; });
+      if (countEl) countEl.textContent = list.length + " รายการ";
+      if (!list.length) { listEl.innerHTML = '<div class="wl-empty">ยังไม่มีคำขอใบเสนอราคา</div>'; return; }
+      listEl.innerHTML = list.map(function (q) {
+        var items = (q.items || []).map(function (it) { return esc(it.name) + " ×" + it.qty; }).join("<br>");
+        var st = q.status || "new";
+        return '<div class="wl-item"><div class="wl-item-main">' +
+          '<div class="wl-item-name">' + esc(q.contactName || "—") + (q.company ? " · " + esc(q.company) : "") + ' <span class="wl-badge ' + (st === "new" ? "staff" : "cust") + '">' + statusLabel(st) + "</span></div>" +
+          '<div class="wl-item-sub">📞 ' + esc(q.phone || "—") + (q.email ? " · " + esc(q.email) : "") + " · " + esc(q.id) + (q.createdAt ? " · " + S.fmtDate(q.createdAt) : "") + "</div>" +
+          '<div class="wl-item-sub" style="margin-top:6px">' + items + "</div>" +
+          (q.note ? '<div class="wl-item-sub" style="margin-top:6px">📝 ' + esc(q.note) + "</div>" : "") +
+          '</div><div style="display:flex;flex-direction:column;gap:6px">' +
+            '<a class="btn btn-sm" href="tel:' + esc((q.phone || "").replace(/\D/g, "")) + '">โทร</a>' +
+            '<select class="btn btn-sm" data-qstatus="' + esc(q.id) + '"><option value="new"' + (st === "new" ? " selected" : "") + ">ใหม่</option><option value=\"quoted\"" + (st === "quoted" ? " selected" : "") + ">เสนอราคาแล้ว</option><option value=\"closed\"" + (st === "closed" ? " selected" : "") + ">ปิดงาน</option></select>" +
+            '<button class="btn btn-sm btn-ghost" data-qdel="' + esc(q.id) + '">ลบ</button>' +
+          "</div></div>";
+      }).join("");
+      listEl.querySelectorAll("[data-qstatus]").forEach(function (s) { s.onchange = function () { S.setQuoteStatus(s.getAttribute("data-qstatus"), s.value); }; });
+      listEl.querySelectorAll("[data-qdel]").forEach(function (b) { b.onclick = function () { if (confirm("ลบคำขอนี้?")) S.deleteQuote(b.getAttribute("data-qdel")); }; });
+    }
+    root.querySelectorAll("[data-q-tab]").forEach(function (t) { t.onclick = function () { tab = t.getAttribute("data-q-tab"); root.querySelectorAll("[data-q-tab]").forEach(function (x) { x.classList.toggle("on", x === t); }); render(); }; });
+    S.subscribeQuotes(function (list) { all = list; render(); });
+  }
+
   /* ===================== WARRANTY (ลงทะเบียนประกัน) ===================== */
   function initWarranty() {
     var root = document.querySelector("[data-warranty-root]"); if (!root) return;

@@ -158,6 +158,15 @@ service cloud.firestore {
                  && request.resource.data.phone is string;
     }
 
+    // ขอใบเสนอราคา (B2B/ซื้อจำนวนมาก) — ลูกค้าส่งคำขอ, แอดมินดู/อัปเดตสถานะ
+    match /quotes/{id} {
+      allow get: if true;
+      allow list, update, delete: if isAdmin();
+      allow create: if request.auth != null
+                 && request.resource.data.contactName is string
+                 && request.resource.data.phone is string;
+    }
+
     // กันสลิปซ้ำ — เก็บแค่ "เลขอ้างอิงรายการโอน" (transRef) ไม่มีข้อมูลส่วนตัว
     // create/get: เปิด (API ตรวจสลิปเขียน/อ่านโดยไม่ auth) · ห้าม list/แก้/ลบ (กันดึงทั้งหมด)
     match /slip_refs/{ref} {

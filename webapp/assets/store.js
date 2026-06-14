@@ -23,6 +23,7 @@
     cloudProducts: "me_cloud_products", // catalog pulled from Firestore (customers only)
     deletedOrders: "me_deleted_orders", // tombstones: order ids ที่ลบแล้ว (กัน cloud snapshot ดูดกลับ)
     myWarranties: "me_my_warranties",   // เลขอ้างอิงใบประกันที่ลงจากเครื่องนี้ (ไว้ตรวจสอบสถานะ)
+    myQuotes: "me_my_quotes",           // เลขอ้างอิงใบขอเสนอราคาที่ส่งจากเครื่องนี้
     stockApplied: "me_stock_applied",   // order ids ที่ตัดสต๊อกแล้ว (กันตัดซ้ำตอนรับออเดอร์จาก cloud)
     ratings: "me_ratings",              // ดาวที่เบราว์เซอร์นี้ให้ไว้ { productId: stars }
   };
@@ -1308,6 +1309,46 @@
     });
   }
 
+  /* ---------- ขอใบเสนอราคา (Request a Quote) — สำหรับ B2B/ซื้อจำนวนมาก ---------- */
+  function quoteToken() {
+    var c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", s = "";
+    try { var a = new Uint8Array(12); (global.crypto || window.crypto).getRandomValues(a); for (var i = 0; i < a.length; i++) s += c[a[i] % c.length]; }
+    catch (e) { for (var j = 0; j < 12; j++) s += c[Math.floor(Math.random() * c.length)]; }
+    return "QT-" + s.slice(0, 4) + "-" + s.slice(4, 8) + "-" + s.slice(8, 12);
+  }
+  function submitQuote(data) {
+    return loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      var uid = (m.auth && m.auth.currentUser && m.auth.currentUser.uid) || "";
+      var id = quoteToken();
+      var payload = Object.assign({}, data, { id: id, userId: uid, status: "new", createdAtTs: fs.serverTimestamp() });
+      return fs.setDoc(fs.doc(m.db, "quotes", id), payload).then(function () {
+        try { var mine = read(KEY.myQuotes, []); mine.unshift({ id: id, company: data.company || "", at: Date.now() }); write(KEY.myQuotes, mine.slice(0, 30), { skipCloud: true }); } catch (e) {}
+        return id;
+      });
+    });
+  }
+  function subscribeQuotes(cb) {
+    return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      return fs.onSnapshot(fs.collection(m.db, "quotes"), function (snap) {
+        var list = snap.docs.map(function (d) { var x = d.data() || {}; if (x.createdAtTs && x.createdAtTs.toDate) x.createdAt = x.createdAtTs.toDate().getTime(); delete x.createdAtTs; return x; })
+          .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+        cb(list);
+      }, function (err) { console.warn("[quotes sub]", err && err.message); });
+    }).catch(function (err) { console.warn("[quotes sub init]", err && err.message); return null; });
+  }
+  function setQuoteStatus(id, status) {
+    return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      return m.fsMod.setDoc(m.fsMod.doc(m.db, "quotes", String(id)), { status: status }, { merge: true });
+    });
+  }
+  function deleteQuote(id) {
+    return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      return m.fsMod.deleteDoc(m.fsMod.doc(m.db, "quotes", String(id)));
+    });
+  }
+
   /* ---------- Chat (customer ↔ shop, LINE-OA style) -------------- */
   function getChats() { return read(KEY.chats, {}); }
   function saveChats(c) { write(KEY.chats, c); dispatch(); }
@@ -1804,6 +1845,7 @@
     getOrders: getOrders, placeOrder: placeOrder, setOrderStatus: setOrderStatus, saveOrderMessage: saveOrderMessage, confirmOrderPayment: confirmOrderPayment,
     submitWarranty: submitWarranty, subscribeWarranties: subscribeWarranties, deleteWarranty: deleteWarranty,
     getWarrantyById: getWarrantyById, getMyWarranties: getMyWarranties,
+    submitQuote: submitQuote, subscribeQuotes: subscribeQuotes, setQuoteStatus: setQuoteStatus, deleteQuote: deleteQuote,
     getMetrics: getMetrics, revenueByDay: revenueByDay,
     provinces: provinces, districtsOf: districtsOf, subdistrictsOf: subdistrictsOf, zipsOf: zipsOf,
     setGeoData: setGeoData,
