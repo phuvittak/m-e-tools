@@ -629,6 +629,7 @@
           "<table class=specs><tbody><tr><th>รหัสสินค้า (SKU)</th><td>" + p.sku + "</td></tr>" +
             "<tr><th>การรับประกัน</th><td>" + (p.warrantyYears ? "ศูนย์ " + p.warrantyYears + " ปี" : "ตามเงื่อนไขร้าน") + "</td></tr>" +
             (p.motorType && p.motorType !== "—" ? "<tr><th>ระบบมอเตอร์</th><td>" + p.motorType + "</td></tr>" : "") +
+            (p.batteryPlatform ? "<tr><th>แพลตฟอร์มแบตเตอรี่</th><td>🔋 " + esc(p.batteryPlatform) + (p.solo ? ' · <b>ขายตัวเปล่า (Solo)</b>' : "") + "</td></tr>" : "") +
             (p.shipSize ? "<tr><th>ขนาด/น้ำหนักสำหรับจัดส่ง</th><td>" + p.shipSize + "</td></tr>" : "") +
             (p.specs || []).map(function (s) { var kv = specKV(s); return "<tr><th>" + kv[0] + "</th><td>" + kv[1] + "</td></tr>"; }).join("") +
           "</tbody></table>" +
@@ -638,6 +639,7 @@
         '<div class="pd-rev-summary" data-rev-summary></div>' +
         '<div class="pd-rev-list" data-rev-list><div class="rv-empty">กำลังโหลดรีวิว…</div></div>' +
         reviewFormHtml() + "</section>" +
+      '<section class="pd-cross" data-battmates hidden><h2 class="me-section-h">ใช้<span class="me-hl">แบตเดียวกัน</span></h2><p class="note" style="margin:-8px 0 16px">เครื่องมือที่ใช้แบตเตอรี่แพลตฟอร์มเดียวกับตัวนี้ — ซื้อตัวเปล่าก็ใช้แบตที่มีอยู่ได้เลย</p><div class="cards" data-battmates-list></div></section>' +
       '<section class="pd-cross" data-cross hidden><h2 class="me-section-h">มัก<span class="me-hl">ซื้อคู่กัน</span></h2><div class="cards" data-cross-list></div></section>';
 
     wireViewer(root, p);
@@ -653,6 +655,15 @@
       rel.forEach(function (x) { if (!seen[x.id] && picked.length < 4) { seen[x.id] = 1; picked.push(x); } });
       if (!picked.length) return;
       box.innerHTML = picked.map(cardHtml).join("");
+      wireCards(box); sec.hidden = false;
+    })();
+    // เครื่องมือที่ใช้แบตแพลตฟอร์มเดียวกัน (Battery ecosystem)
+    (function renderBattMates() {
+      if (!p.batteryPlatform) return;
+      var sec = root.querySelector("[data-battmates]"); var box = root.querySelector("[data-battmates-list]"); if (!sec || !box) return;
+      var mates = S.getProducts().filter(function (x) { return !x.hidden && x.id !== p.id && (x.batteryPlatform || "").toLowerCase() === p.batteryPlatform.toLowerCase(); }).slice(0, 4);
+      if (!mates.length) return;
+      box.innerHTML = mates.map(cardHtml).join("");
       wireCards(box); sec.hidden = false;
     })();
     function loadAndRenderReviews() {
