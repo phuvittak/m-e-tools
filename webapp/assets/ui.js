@@ -170,7 +170,7 @@
           '<a href="index.html">หน้าแรก</a><a href="shop.html">สินค้า / หมวดหมู่</a>' +
           '<a href="catalog.html">แคตตาล็อก</a><a href="warranty.html">ลงทะเบียนประกัน</a><a href="cart.html">ตะกร้า</a><a href="orders.html">ติดตามคำสั่งซื้อ</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">ช่วยเหลือ</div>' +
-          '<a href="index.html#faq">คำถามที่พบบ่อย</a><a href="#" data-open-chat>ติดต่อร้าน (แชท)</a>' +
+          '<a href="guide.html">ความรู้ช่าง · ตารางช่วยช่าง</a><a href="index.html#faq">คำถามที่พบบ่อย</a><a href="#" data-open-chat>ติดต่อร้าน (แชท)</a>' +
           '<a href="login.html">เข้าสู่ระบบ</a><a href="register.html">สมัครสมาชิก</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">เวลาทำการ</div>' +
           "<div>" + esc(st.hoursWeek) + "</div><div>" + esc(st.hoursSun) + "</div>" +
