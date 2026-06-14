@@ -583,6 +583,29 @@
       return out.length;
     }).catch(function (err) { console.warn("[cloud products load]", err && err.message); return false; });
   }
+  // กู้คืน: ดึงสินค้าทั้งหมดจาก cloud (per-product docs) รวมเข้าคลังในเครื่องนี้ โดย "ไม่ลบ" ของเดิม
+  // ใช้กรณีสินค้าหาย/ย้ายเครื่อง/ล็อกอินใหม่ — เขียนลง local อย่างเดียว (ไม่ดันกลับ cloud)
+  function restoreProductsFromCloud() {
+    return cloudLoadProducts().then(function () {
+      var cloud = read(KEY.cloudProducts, null) || [];
+      var local = read(KEY.products, []);
+      var byId = {};
+      local.forEach(function (p) { if (p && p.id) byId[p.id] = p; });
+      cloud.forEach(function (c) {
+        if (!c || !c.id) return;
+        var ex = byId[c.id];
+        if (!ex) { byId[c.id] = c; return; }
+        var tl = Date.parse(ex.updatedAt) || 0, tc = Date.parse(c.updatedAt) || 0;
+        if (tc > tl) byId[c.id] = c;
+      });
+      var list = Object.keys(byId).map(function (k) { return byId[k]; });
+      write(KEY.products, list, { skipCloud: true });
+      write(KEY.deletedProducts, [], { skipCloud: true }); // ล้าง tombstone ที่อาจบล็อกการแสดง
+      dispatch();
+      try { global.dispatchEvent(new CustomEvent("me-products-loaded")); } catch (e) {}
+      return list.length;
+    });
+  }
 
   // add warranty / motor / shipping-size defaults to a seed product
   function enrichSeed(p) {
@@ -1883,7 +1906,7 @@
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
     getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,
     saveProduct: saveProduct, deleteProduct: deleteProduct, adjustStock: adjustStock,
-    cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, cloudPushProduct: cloudPushProduct,
+    cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, cloudPushProduct: cloudPushProduct, restoreProductsFromCloud: restoreProductsFromCloud,
     startAdminRealtime: startAdminRealtime,
     getCart: getCart, addToCart: addToCart, updateCartItem: updateCartItem,
     removeCartItem: removeCartItem, clearCart: clearCart,
