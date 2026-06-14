@@ -334,6 +334,7 @@
           if (d < 0 && !canReduce) { U.toast("พนักงานหักสต๊อกออกไม่ได้ — เฉพาะเจ้าของร้าน", "err"); return; }
           var ok = S.adjustStock(b.dataset.restock, d);
           if (ok === false) { U.toast("ปรับสต็อกไม่สำเร็จ (ไม่มีสิทธิ์)", "err"); return; }
+          if (S.pushProductToSheet) S.pushProductToSheet(S.getProduct(b.dataset.restock)); // เว็บ → Google Sheet
           U.toast("ปรับสต็อกแล้ว", "ok"); render();
         };
       });
@@ -1769,6 +1770,7 @@
       try { saveRes = S.saveProduct(data); }
       catch (e) { U.toast("บันทึกไม่สำเร็จ — รูปอาจใหญ่เกินไป ลองใช้รูปเล็กลง", "err"); return false; }
       if (saveRes === null) { U.toast("พนักงานลดสต๊อก/ลบสินค้าไม่ได้ — เฉพาะเจ้าของร้านเท่านั้น (เพิ่มได้อย่างเดียว)", "err"); return false; }
+      if (saveRes && S.pushProductToSheet) S.pushProductToSheet(saveRes); // เว็บ → Google Sheet
       U.toast(isNew ? "เพิ่มสินค้าแล้ว" : "บันทึกการแก้ไขแล้ว", "ok");
       if (window.__invRender) window.__invRender();
       return true;
@@ -2121,7 +2123,7 @@
   function initSettings() {
     var st = S.getSettings();
     var root = document.querySelector("[data-setroot]");
-    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
+    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "sheetWebAppUrl", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
     var openSunEl = root.querySelector("[data-open-sun]"); if (openSunEl) openSunEl.checked = st.openSun !== false;
     // VAT + การรับบัตร
     var vatOnEl = root.querySelector("[data-vat-on]"); if (vatOnEl) vatOnEl.checked = st.vatEnabled !== false;
