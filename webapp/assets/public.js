@@ -1853,10 +1853,37 @@
         (b.primary ? '<div class="me-brand-stamp">ศูนย์แท้</div>' : "") + "</a>";
     }
     var one = list.map(card).join("");
-    // 2 ชุดต่อกันใน track เดียว แล้วเลื่อนด้วย CSS transform (-50% = พอดี 1 ชุด) → วนไม่รู้จบแบบลื่นๆ
-    // ความเร็วคงที่ตามจำนวนแบรนด์ (ยิ่งเยอะ duration ยิ่งมาก) — แตะค้าง/ชี้เพื่อหยุด
-    var dur = Math.max(18, list.length * 4);
-    box.innerHTML = list.length ? ('<div class="me-brands-track" style="animation-duration:' + dur + 's">' + one + one + '</div>') : "";
+    // 3 ชุดต่อกัน เริ่มที่ชุดกลาง → เลื่อนเองด้วย rAF (ลื่น) และผู้ใช้เลื่อนมือเองก็ได้ (native scroll)
+    box.innerHTML = list.length ? ('<div class="me-brands-track">' + one + one + one + "</div>") : "";
+    setupBrandsAuto(box, list.length);
+  }
+  // เลื่อนแบรนด์อัตโนมัติแบบลื่น (requestAnimationFrame) + รองรับเลื่อนมือ + หยุดเมื่อแตะ/ชี้
+  function setupBrandsAuto(box, n) {
+    if (box._brandRaf) { cancelAnimationFrame(box._brandRaf); box._brandRaf = null; }
+    if (!n) return;
+    var paused = false, resumeT = null, acc = 0;
+    function third() { return box.scrollWidth / 3; }
+    (function init() { var t = third(); if (t > 0) { box.scrollLeft = t; acc = t; } else requestAnimationFrame(init); })();
+    function pause() { paused = true; if (resumeT) { clearTimeout(resumeT); resumeT = null; } }
+    function resumeSoon() { acc = box.scrollLeft; if (resumeT) clearTimeout(resumeT); resumeT = setTimeout(function () { paused = false; }, 1200); }
+    box.addEventListener("mouseenter", pause);
+    box.addEventListener("mouseleave", function () { paused = false; });
+    box.addEventListener("pointerdown", pause);
+    box.addEventListener("pointerup", resumeSoon);
+    box.addEventListener("touchstart", pause, { passive: true });
+    box.addEventListener("touchend", resumeSoon, { passive: true });
+    box.addEventListener("wheel", function () { pause(); resumeSoon(); }, { passive: true });
+    box.addEventListener("scroll", function () { if (paused) acc = box.scrollLeft; });
+    function tick() {
+      var t = third();
+      if (t > 0 && !paused) {
+        acc += 0.4;                       // ความเร็วเลื่อนเอง (px/เฟรม)
+        if (acc >= 2 * t) acc -= t;       // วนกลับแบบเนียน (เริ่มชุดกลางเสมอ)
+        box.scrollLeft = acc;
+      }
+      box._brandRaf = requestAnimationFrame(tick);
+    }
+    box._brandRaf = requestAnimationFrame(tick);
   }
   // วันนี้ในรูปแบบ YYYY-MM-DD (เวลาท้องถิ่น) — เทียบกับช่วงวันที่ของโปร
   function todayStr() {
