@@ -40,6 +40,8 @@
     if (S.cloudLoadAdminData) S.cloudLoadAdminData();
     if (S.cloudLoadProducts) S.cloudLoadProducts().then(function () { if (S.autoCatchUpSync) S.autoCatchUpSync(); });
   });
+  // ดันสินค้าที่ยังค้างขึ้น cloud "เองต่อเนื่อง" ทุก 30 วิ ระหว่างเปิดหลังร้าน → ครบเองไม่ต้องกดปุ่ม
+  if (S.autoCatchUpSync) setInterval(function () { if (document.visibilityState === "visible") S.autoCatchUpSync(); }, 30000);
   ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, warranty: initWarranty, quotes: initQuotes, import: function(){} }[view] || function () {})();
 
   // subscribe orders/{id} จาก Firestore แบบเรียลไทม์ → S.absorbCloudOrders() เขียนลง local me_orders
