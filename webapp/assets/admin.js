@@ -244,6 +244,29 @@
     document.querySelector("[data-add]").addEventListener("click", function () { openProductModal(null); });
     var syncBtn = document.querySelector("[data-sync-bot]");
     if (syncBtn) syncBtn.addEventListener("click", function () { syncCatalogToCloud(syncBtn); });
+    var expBtn = document.querySelector("[data-export-xlsx]");
+    if (expBtn) expBtn.addEventListener("click", function () {
+      if (!window.XLSX) { U.toast("ตัวสร้างไฟล์ Excel ยังโหลดไม่เสร็จ ลองอีกครั้ง", "err"); return; }
+      var rows = S.getProducts().map(function (p) {
+        return {
+          "ชื่อสินค้า": p.name || "", "รหัส SKU": p.sku || "", "แบรนด์": p.brand || "",
+          "หมวดหมู่": (S.categoryLabel ? S.categoryLabel(p.category) : p.category) || "",
+          "คงเหลือ": (p.stock || 0), "กำลังเช่า": (p.rented || 0),
+          "ราคาขาย": (p.price || 0), "ต้นทุน": (p.cost || 0), "ค่าเช่า/วัน": (p.rentPerDay || 0),
+          "ที่จัดเก็บ": p.location || "", "ระบบมอเตอร์": p.motorType || "",
+          "แพลตฟอร์มแบต": p.batteryPlatform || "", "รับประกัน(ปี)": (p.warrantyYears || 0),
+        };
+      });
+      if (!rows.length) { U.toast("ยังไม่มีสินค้าในคลัง", "err"); return; }
+      try {
+        var ws = XLSX.utils.json_to_sheet(rows);
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "สต๊อกสินค้า");
+        var d = new Date(), z = function (n) { return (n < 10 ? "0" : "") + n; };
+        XLSX.writeFile(wb, "metools-stock-" + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + ".xlsx");
+        U.toast("ดาวน์โหลด Excel แล้ว (" + rows.length + " รายการ)", "ok");
+      } catch (e) { U.toast("สร้างไฟล์ไม่สำเร็จ: " + (e && e.message), "err"); }
+    });
     var restoreBtn = document.querySelector("[data-restore-cloud]");
     if (restoreBtn) restoreBtn.addEventListener("click", function () {
       var orig = restoreBtn.textContent; restoreBtn.disabled = true; restoreBtn.textContent = "⏳ กำลังกู้คืน…";
