@@ -291,10 +291,14 @@
       tb.querySelectorAll("[data-hideprod]").forEach(function (b) { b.onclick = function () { var pr = S.getProduct(b.dataset.hideprod); if (!pr) return; S.saveProduct(Object.assign({}, pr, { hidden: !pr.hidden })); U.toast(pr.hidden ? "แสดงสินค้าแล้ว" : "ซ่อนสินค้าแล้ว", "ok"); render(); }; });
       tb.querySelectorAll("[data-restock]").forEach(function (b) {
         b.onclick = function () {
-          var n = prompt("เพิ่มสต็อกกี่ชิ้น? (ใส่จำนวนลบเพื่อหักออก)", "5");
+          var canReduce = S.canReduceInventory();
+          var n = prompt(canReduce ? "เพิ่มสต็อกกี่ชิ้น? (ใส่จำนวนลบเพื่อหักออก)" : "เพิ่มสต็อกกี่ชิ้น? (พนักงานเพิ่มได้อย่างเดียว)", "5");
           if (n === null) return;
           var d = parseInt(n, 10); if (isNaN(d)) return;
-          S.adjustStock(b.dataset.restock, d); U.toast("ปรับสต็อกแล้ว", "ok"); render();
+          if (d < 0 && !canReduce) { U.toast("พนักงานหักสต๊อกออกไม่ได้ — เฉพาะเจ้าของร้าน", "err"); return; }
+          var ok = S.adjustStock(b.dataset.restock, d);
+          if (ok === false) { U.toast("ปรับสต็อกไม่สำเร็จ (ไม่มีสิทธิ์)", "err"); return; }
+          U.toast("ปรับสต็อกแล้ว", "ok"); render();
         };
       });
       tb.querySelectorAll("[data-del]").forEach(function (b) {
@@ -1718,8 +1722,10 @@
           return false; // คงหน้าต่างสินค้าไว้จนกว่าจะเลือก
         }
       }
-      try { S.saveProduct(data); }
+      var saveRes;
+      try { saveRes = S.saveProduct(data); }
       catch (e) { U.toast("บันทึกไม่สำเร็จ — รูปอาจใหญ่เกินไป ลองใช้รูปเล็กลง", "err"); return false; }
+      if (saveRes === null) { U.toast("พนักงานลดสต๊อก/ลบสินค้าไม่ได้ — เฉพาะเจ้าของร้านเท่านั้น (เพิ่มได้อย่างเดียว)", "err"); return false; }
       U.toast(isNew ? "เพิ่มสินค้าแล้ว" : "บันทึกการแก้ไขแล้ว", "ok");
       if (window.__invRender) window.__invRender();
       return true;

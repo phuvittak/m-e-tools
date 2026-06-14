@@ -901,7 +901,15 @@
     });
   }
 
+  // สิทธิ์ลด/ลบสต๊อก: เจ้าของ หรือพนักงานที่ได้สิทธิ์ "ลบ" เท่านั้น (พนักงานทั่วไป = เพิ่มได้อย่างเดียว)
+  function canReduceInventory() { return isOwner() || hasPerm("inventory_delete"); }
   function saveProduct(p) {
+    // พนักงานเพิ่มได้อย่างเดียว — ห้าม "ลด" สต๊อกของสินค้าที่มีอยู่ (return null = ถูกบล็อก)
+    if (p && p.id && typeof p.stock === "number" && !canReduceInventory()) {
+      var exP = getLocalProducts().filter(function (x) { return x.id === p.id; })[0]
+        || (read(KEY.cloudProducts, []) || []).filter(function (x) { return x.id === p.id; })[0];
+      if (exP && p.stock < (exP.stock || 0)) return null;
+    }
     var list = getLocalProducts();
     var saved = p;
     if (!p.id) {
@@ -932,11 +940,13 @@
     return true;
   }
   // adjust physical stock by delta (+ receive, - shrink/sell off the books)
+  // หักออก (delta < 0) = เฉพาะเจ้าของ/ผู้มีสิทธิ์ลบ · พนักงานทั่วไปเพิ่มได้อย่างเดียว
   function adjustStock(id, delta) {
+    if (delta < 0 && !canReduceInventory()) return false;
     var p = getProduct(id);
-    if (!p) return;
+    if (!p) return false;
     p.stock = Math.max(0, (p.stock || 0) + delta);
-    saveProduct(p);
+    return !!saveProduct(p);
   }
 
   /* ---------- Cart ------------------------------------------------ */
@@ -1925,7 +1935,7 @@
     cloudLoadAdminData: cloudLoadAdminData, cloudPushAdminData: cloudPushAdminData,
     cloudLoadPublicSettings: cloudLoadPublicSettings,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
-    session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, PERM_KEYS: PERM_KEYS, PERM_DEFS: PERM_DEFS,
+    session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, canReduceInventory: canReduceInventory, PERM_KEYS: PERM_KEYS, PERM_DEFS: PERM_DEFS,
     logout: logout, requirePerm: requirePerm, checkPin: checkPin,
     ensureAdminRegistered: ensureAdminRegistered, adminIdToken: adminIdToken, absorbCloudOrders: absorbCloudOrders,
     deleteOrder: deleteOrder, deletePurchase: deletePurchase,
