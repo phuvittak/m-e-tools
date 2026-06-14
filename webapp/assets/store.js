@@ -528,9 +528,11 @@
     });
   }
   // ซิงค์อัตโนมัติแบบ "เฉพาะที่ยังไม่ขึ้น/ใหม่กว่า cloud" (incremental) — ไม่อัปซ้ำทั้งหมด
-  // เรียกเองตอนเปิดหลังร้าน หลังโหลด cloud เสร็จ → ดันเฉพาะตัวที่ค้าง (เช่นนำเข้ามาเยอะแล้วบางตัวยังไม่ทันขึ้น)
+  // เรียกเองตอนเปิดหลังร้าน + วนทุก 30 วิ → ดันตัวที่ค้างขึ้นเองจนครบ (ไม่ต้องกดปุ่ม)
+  var _autoSyncing = false;
   function autoCatchUpSync(progressCb) {
     if (!hasPerm("inventory")) return Promise.resolve(0);
+    if (_autoSyncing) return Promise.resolve(0); // กันรันซ้อน
     var cloud = read(KEY.cloudProducts, []) || [];
     var cloudById = {}; cloud.forEach(function (c) { if (c && c.id) cloudById[c.id] = c; });
     var pending = getLocalProducts().filter(function (p) {
@@ -541,6 +543,7 @@
       return tl > tc;                                       // local ใหม่กว่า → อัปเดต
     });
     if (!pending.length) return Promise.resolve(0);
+    _autoSyncing = true;
     return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
       var fs = m.fsMod, i = 0;
       function next() {
@@ -552,8 +555,8 @@
       return next().then(function () {
         var items = buildCatalogItems();
         return fs.setDoc(fs.doc(m.db, "products", "catalog"), { items: items, count: items.length, updatedAt: fs.serverTimestamp() });
-      }).then(function () { return pending.length; });
-    }).catch(function (e) { console.warn("[autosync]", e && e.message); return 0; });
+      }).then(function () { _autoSyncing = false; return pending.length; });
+    }).catch(function (e) { _autoSyncing = false; console.warn("[autosync]", e && e.message); return 0; });
   }
   // โหลดแคตตาล็อกจาก cloud → เก็บใน key แยก (ไม่ทับ me_products ของเจ้าของ)
   // ใช้ REST (public read) — ลูกค้าไม่ต้อง auth. ข้าม doc "catalog" (อันนั้นของบอท)
