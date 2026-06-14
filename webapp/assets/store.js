@@ -267,10 +267,17 @@
     { key: "orders", label: "คำสั่งซื้อ", group: "access" },
     { key: "erp", label: "ERP/บัญชี", group: "access" },
     { key: "settings", label: "ตั้งค่าเว็บไซต์", group: "access" },
+    { key: "botinbox", label: "กล่องข้อความออนไลน์", group: "access" },
+    { key: "warranty", label: "ลงทะเบียนประกัน", group: "access" },
+    { key: "quotes", label: "ใบเสนอราคา", group: "access" },
+    { key: "customers", label: "สรุปลูกค้า", group: "access" },
     { key: "inventory_delete", label: "ลบสินค้าออกจากคลัง", group: "danger" },
     { key: "orders_delete", label: "ลบคำสั่งซื้อ", group: "danger" },
   ];
   var PERM_KEYS = PERM_DEFS.map(function (d) { return d.key; });
+  // หน้าที่เพิ่งเพิ่มทีหลัง — พนักงานเดิมที่ยังไม่มีคีย์นี้ในสิทธิ์ ให้ "เปิด" ไว้ก่อน
+  // จนกว่าแอดมินจะกดปิดเอง (กันพนักงานหลุดสิทธิ์กะทันหันตอนอัปเดตระบบ)
+  var SOFT_PERMS = { botinbox: 1, warranty: 1, quotes: 1, customers: 1 };
   var DEFAULT_STAFF = [
     { id: "owner", name: "เจ้าของร้าน", email: "owner@metools.co.th", password: "owner123", role: "owner",
       perms: { dashboard: true, inventory: true, orders: true, erp: true, settings: true } },
@@ -1647,7 +1654,12 @@
   }
   function isStaff() { var s = session(); return !!(s && (s.role === "owner" || s.role === "employee")); }
   function isOwner() { var s = session(); return !!(s && s.role === "owner"); }
-  function hasPerm(key) { var s = session(); if (!s) return false; if (s.role === "owner") return true; return !!(s.perms && s.perms[key]); }
+  function hasPerm(key) {
+    var s = session(); if (!s) return false;
+    if (s.role === "owner") return true;
+    if (s.perms && Object.prototype.hasOwnProperty.call(s.perms, key)) return !!s.perms[key];
+    return !!SOFT_PERMS[key]; // หน้าใหม่: ค่าเดิม = เปิด จนแอดมินตั้งค่าเอง
+  }
   function logout() { localStorage.removeItem(KEY.session); dispatch(); }
 
   function registerUser(u) {

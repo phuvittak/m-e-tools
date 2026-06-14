@@ -7,7 +7,7 @@
   var view = document.body.getAttribute("data-admin");
 
   // permission gate per page (owner bypasses all). staff/botreplies are owner-only.
-  var permFor = { dashboard: "dashboard", inventory: "inventory", orders: "orders", erp: "erp", settings: "settings" };
+  var permFor = { dashboard: "dashboard", inventory: "inventory", orders: "orders", erp: "erp", settings: "settings", botinbox: "botinbox", warranty: "warranty", quotes: "quotes", customers: "customers" };
   if (view === "staff" || view === "botreplies") {
     if (!S.requirePerm(null, "../login.html")) return;
     if (!S.isOwner()) { window.location.href = "dashboard.html"; return; }
@@ -71,10 +71,10 @@
       ["settings.html", "settings", "ตั้งค่าเว็บไซต์", "settings"],
     ].filter(function (n) { return S.hasPerm(n[3]); });
     // แชทลูกค้าหน้าเว็บถูกถอดออก — ลูกค้าทักผ่าน LINE OA ตรง ดูทุกบทสนทนาในหน้า "แชทบอท LINE"
-    nav.push(["bot-inbox.html", "botinbox", "กล่องข้อความออนไลน์", "botinbox"]);
-    nav.push(["warranty.html", "warranty", "ลงทะเบียนประกัน", "warranty"]);
-    nav.push(["quotes.html", "quotes", "ใบเสนอราคา", "quotes"]);
-    nav.push(["customers.html", "customers", "สรุปลูกค้า", "customers"]);
+    if (S.hasPerm("botinbox")) nav.push(["bot-inbox.html", "botinbox", "กล่องข้อความออนไลน์", "botinbox"]);
+    if (S.hasPerm("warranty")) nav.push(["warranty.html", "warranty", "ลงทะเบียนประกัน", "warranty"]);
+    if (S.hasPerm("quotes")) nav.push(["quotes.html", "quotes", "ใบเสนอราคา", "quotes"]);
+    if (S.hasPerm("customers")) nav.push(["customers.html", "customers", "สรุปลูกค้า", "customers"]);
     if (S.isOwner()) nav.push(["bot-replies.html", "botreplies", "คำตอบของบอท", "botreplies"]);
     if (S.isOwner()) nav.push(["import.html", "import", "นำเข้าสินค้า (AI)", "inventory"]);
     if (S.isOwner()) nav.push(["staff.html", "staff", "จัดการทีมงาน", "staff"]);
@@ -2587,7 +2587,7 @@
           '<div class="perm-group-title">' + (groupLabels[g] || g) + "</div>" +
           '<div class="perm-grid">' + groups[g].map(function (d) {
             return '<label class="f-check"><input type="checkbox" ' + attr + '="' + d.key + '"' + idAttr +
-              (checkedFn(d.key) ? " checked" : "") + "> " + d.label + "</label>";
+              (checkedFn(d.key, d.group) ? " checked" : "") + "> " + d.label + "</label>";
           }).join("") + "</div></div>";
       }).join("");
     }
@@ -2602,7 +2602,7 @@
           '<div class="field"><label>รหัสผ่าน</label><input data-f="password" data-id="' + m.id + '" value="' + esc(m.password) + '"></div>' +
           (owner ? '<div class="img-hint">แอดมินมีสิทธิ์ใช้งานทุกระบบโดยอัตโนมัติ</div>'
             : '<div class="field"><label>สิทธิ์การใช้ระบบหลังร้าน</label>' +
-              permChecks("data-perm", ' data-id="' + m.id + '"', function (k) { return m.perms && m.perms[k]; }) + "</div>") +
+              permChecks("data-perm", ' data-id="' + m.id + '"', function (k, g) { if (m.perms && Object.prototype.hasOwnProperty.call(m.perms, k)) return !!m.perms[k]; return g !== "danger"; }) + "</div>") +
           '<button class="btn" data-save="' + m.id + '">บันทึก</button></div>';
       }).join("") +
       '<div class="panel"><div class="panel-head"><h2>+ เพิ่มพนักงานใหม่</h2></div>' +
