@@ -526,6 +526,34 @@
       }).then(function () { return all.length; });
     });
   }
+  // ซิงค์อัตโนมัติแบบ "เฉพาะที่ยังไม่ขึ้น/ใหม่กว่า cloud" (incremental) — ไม่อัปซ้ำทั้งหมด
+  // เรียกเองตอนเปิดหลังร้าน หลังโหลด cloud เสร็จ → ดันเฉพาะตัวที่ค้าง (เช่นนำเข้ามาเยอะแล้วบางตัวยังไม่ทันขึ้น)
+  function autoCatchUpSync(progressCb) {
+    if (!hasPerm("inventory")) return Promise.resolve(0);
+    var cloud = read(KEY.cloudProducts, []) || [];
+    var cloudById = {}; cloud.forEach(function (c) { if (c && c.id) cloudById[c.id] = c; });
+    var pending = getLocalProducts().filter(function (p) {
+      if (!p || !p.id) return false;
+      var c = cloudById[p.id];
+      if (!c) return true;                                  // ยังไม่มีบน cloud → ต้องดันขึ้น
+      var tl = Date.parse(p.updatedAt) || 0, tc = Date.parse(c.updatedAt) || 0;
+      return tl > tc;                                       // local ใหม่กว่า → อัปเดต
+    });
+    if (!pending.length) return Promise.resolve(0);
+    return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod, i = 0;
+      function next() {
+        if (i >= pending.length) return Promise.resolve();
+        var p = pending[i++];
+        if (progressCb) { try { progressCb(i, pending.length); } catch (e) {} }
+        return fs.setDoc(fs.doc(m.db, "products", String(p.id)), cleanProductDoc(p)).then(next, next);
+      }
+      return next().then(function () {
+        var items = buildCatalogItems();
+        return fs.setDoc(fs.doc(m.db, "products", "catalog"), { items: items, count: items.length, updatedAt: fs.serverTimestamp() });
+      }).then(function () { return pending.length; });
+    }).catch(function (e) { console.warn("[autosync]", e && e.message); return 0; });
+  }
   // โหลดแคตตาล็อกจาก cloud → เก็บใน key แยก (ไม่ทับ me_products ของเจ้าของ)
   // ใช้ REST (public read) — ลูกค้าไม่ต้อง auth. ข้าม doc "catalog" (อันนั้นของบอท)
   function cloudLoadProducts() {
@@ -1917,7 +1945,7 @@
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
     getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,
     saveProduct: saveProduct, deleteProduct: deleteProduct, adjustStock: adjustStock,
-    cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, cloudPushProduct: cloudPushProduct, restoreProductsFromCloud: restoreProductsFromCloud,
+    cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, autoCatchUpSync: autoCatchUpSync, cloudPushProduct: cloudPushProduct, restoreProductsFromCloud: restoreProductsFromCloud,
     startAdminRealtime: startAdminRealtime,
     getCart: getCart, addToCart: addToCart, updateCartItem: updateCartItem,
     removeCartItem: removeCartItem, clearCart: clearCart,
