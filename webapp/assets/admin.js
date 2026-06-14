@@ -1646,7 +1646,14 @@
         icons.map(function (i) { return '<option value="' + i + '"' + (p.icon === i ? " selected" : "") + ">" + i + "</option>"; }).join("") + "</select></div></div>" +
       '<div class="field"><label>ที่จัดเก็บในคลัง (เห็นเฉพาะหลังร้าน · ลูกค้าไม่เห็น)</label><input data-f="location" value="' + esc(p.location) + '" placeholder="เช่น โซน A-1 · ชั้น 2"></div>' +
       '<div class="f2"><div class="field"><label>การรับประกัน (ปี · 0 = ตามเงื่อนไข)</label><input data-f="warrantyYears" type="number" min="0" value="' + (p.warrantyYears || 0) + '"></div>' +
-      '<div class="field"><label>ระบบมอเตอร์</label><input data-f="motorType" value="' + esc(p.motorType || "") + '" placeholder="ไร้แปรงถ่าน / มีแปรงถ่าน / —"></div></div>' +
+      '<div class="field"><label>ระบบมอเตอร์</label><select data-f="motorType">' +
+        (function () {
+          var cur = (p.motorType && p.motorType !== "—") ? p.motorType : "";
+          var opts = ["", "ไร้แปรงถ่าน (Brushless)", "มีแปรงถ่าน (Brushed)"];
+          var html = opts.map(function (o) { return '<option value="' + esc(o) + '"' + (o === cur ? " selected" : "") + ">" + (o === "" ? "— ไม่ระบุ —" : esc(o)) + "</option>"; }).join("");
+          if (cur && opts.indexOf(cur) < 0) html += '<option value="' + esc(cur) + '" selected>' + esc(cur) + " (ค่าเดิม)</option>";
+          return html;
+        })() + "</select></div></div>" +
       '<div class="field"><label>วัสดุที่เจาะ/ตัด/ใช้งานได้ (ขึ้นป้ายไอคอนหน้าสินค้า)</label><div style="display:flex;gap:14px;flex-wrap:wrap">' +
         '<label class="check"><input type="checkbox" data-f="mat_concrete"' + ((p.materials || []).indexOf("concrete") >= 0 ? " checked" : "") + "> 🧱 ปูน/อิฐ</label>" +
         '<label class="check"><input type="checkbox" data-f="mat_steel"' + ((p.materials || []).indexOf("steel") >= 0 ? " checked" : "") + "> ⚙️ เหล็ก/โลหะ</label>" +
