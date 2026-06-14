@@ -808,6 +808,22 @@
       }, { merge: true });
     }).catch(function (err) { console.warn("[rate]", productId, err && err.message); });
   }
+  // นับยอดดูสินค้าจริง (เก็บ products/{id}.views) — เขียนด้วย anonymous auth เหมือนเรตติ้ง
+  function cloudBumpView(productId) {
+    loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      return fs.setDoc(fs.doc(m.db, "products", String(productId)), { views: fs.increment(1) }, { merge: true });
+    }).catch(function (err) { console.warn("[view]", productId, err && err.message); });
+  }
+  // เรียนรู้ "ซื้อคู่กัน" จากออเดอร์จริง → products/{aId}.coBought[bId] += 1 (ไม่เก็บว่าใครซื้อ)
+  function cloudBumpAffinity(aId, bId) {
+    if (!aId || !bId || aId === bId) return;
+    loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      var inner = {}; inner[String(bId)] = fs.increment(1);
+      return fs.setDoc(fs.doc(m.db, "products", String(aId)), { coBought: inner }, { merge: true });
+    }).catch(function (err) { console.warn("[affinity]", err && err.message); });
+  }
 
   /* ---------- Reviews (ดาว + ความเห็น + รูป) ----------------------- */
   // เก็บที่ doc products/{id}_reviews (กฎเดิมรองรับ: read public, write ต้อง auth)
@@ -1031,6 +1047,11 @@
 
     write(KEY.orders, orders);
     clearCart();
+    // เรียนรู้ "ซื้อคู่กัน": ทุกคู่สินค้าในตะกร้านี้ → เพิ่มคะแนนความสัมพันธ์ทั้งสองทาง
+    try {
+      var pids = lines.map(function (l) { return l.product.id; });
+      for (var a = 0; a < pids.length; a++) for (var b = 0; b < pids.length; b++) if (a !== b) cloudBumpAffinity(pids[a], pids[b]);
+    } catch (e) {}
     // Phase E: sync ขึ้น Firestore — fire-and-forget เพื่อไม่บล็อก UI
     // ซิงค์ "ทุก" ออเดอร์ (รวมลูกค้าที่ไม่ได้ล็อกอิน — ใช้ anonymous auth) เพื่อให้
     // เจ้าของเห็นออเดอร์ครบทุกเครื่อง ไม่ใช่แค่เครื่องที่กดสั่ง
@@ -1832,6 +1853,7 @@
     getCategory: getCategory, getSubcategories: getSubcategories, categoryHasChildren: categoryHasChildren,
     catDescendants: catDescendants, categoryPath: categoryPath, productCountInCat: productCountInCat,
     getMyRating: getMyRating, productRating: productRating, rateProduct: rateProduct,
+    cloudBumpView: cloudBumpView, cloudBumpAffinity: cloudBumpAffinity,
     loadReviews: loadReviews, submitReview: submitReview,
     typeLabel: typeLabel, statusLabel: statusLabel, fulfillmentLabel: fulfillmentLabel,
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,

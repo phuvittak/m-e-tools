@@ -1610,6 +1610,10 @@
       '<div class="field"><label>ลิงก์คู่มือ PDF (ไม่บังคับ) — โชว์ปุ่มดาวน์โหลดหน้าสินค้า</label><input data-f="manualUrl" value="' + esc(p.manualUrl || "") + '" placeholder="https://... (วางลิงก์ไฟล์คู่มือ)"></div>' +
       '<div class="f2"><div class="field"><label>แพลตฟอร์มแบตเตอรี่ (ใช้จับคู่เครื่องมือใช้แบตเดียวกัน)</label><input data-f="batteryPlatform" value="' + esc(p.batteryPlatform || "") + '" placeholder="เช่น DEWALT 20V MAX / Makita 18V LXT"></div>' +
       '<div class="field"><label class="check" style="margin-top:24px"><input type="checkbox" data-f="solo"' + (p.solo ? " checked" : "") + "> ขายตัวเปล่า (Solo · ไม่รวมแบต/แท่นชาร์จ)</label></div></div>" +
+      '<div class="field"><label>สินค้าที่มักซื้อคู่กัน (เลือกได้หลายตัว — กด Ctrl/⌘ ค้าง · ถ้าไม่เลือก ระบบจะเรียนรู้จากที่ลูกค้าซื้อจริงเอง)</label>' +
+        '<select data-f="relatedIds" multiple size="5" style="height:auto;min-height:120px">' +
+          S.getProducts().filter(function (x) { return x.id !== p.id && !x.hidden; }).map(function (x) { return '<option value="' + esc(x.id) + '"' + (((p.relatedIds || []).indexOf(x.id) >= 0) ? " selected" : "") + ">" + esc(x.name) + "</option>"; }).join("") +
+        "</select></div>" +
       '<div class="f2"><div class="field"><label>ต้นทุน/ชิ้น (บาท)</label><input data-f="cost" type="number" min="0" value="' + p.cost + '"></div>' +
       '<div class="field"><label>ราคาขาย / SRP (บาท)</label><input data-f="price" type="number" min="0" value="' + p.price + '"></div></div>' +
       '<div class="f2"><div class="field"><label>ค่าเช่า/วัน (บาท)</label><input data-f="rentPerDay" type="number" min="0" value="' + p.rentPerDay + '"></div>' +
@@ -1663,6 +1667,7 @@
         warrantyYears: +val("warrantyYears") || 0, motorType: val("motorType").trim() || "—", shipSize: val("shipSize").trim(),
         materials: ["concrete", "steel", "wood", "tile"].filter(function (m) { return chk("mat_" + m); }), safety: chk("safety"), manualUrl: val("manualUrl").trim(),
         batteryPlatform: val("batteryPlatform").trim(), solo: chk("solo"),
+        relatedIds: (function () { var el = root.querySelector("[data-f=relatedIds]"); return el ? Array.prototype.slice.call(el.selectedOptions).map(function (o) { return o.value; }) : (p.relatedIds || []); })(),
         priceCtrl: +val("priceCtrl") || 0, qtyPerBox: +val("qtyPerBox") || 0,
         highlights: val("highlights").split("\n").map(function (s) { return s.trim(); }).filter(Boolean),
       };
