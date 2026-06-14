@@ -237,6 +237,14 @@
     document.querySelector("[data-add]").addEventListener("click", function () { openProductModal(null); });
     var syncBtn = document.querySelector("[data-sync-bot]");
     if (syncBtn) syncBtn.addEventListener("click", function () { syncCatalogToCloud(syncBtn); });
+    var restoreBtn = document.querySelector("[data-restore-cloud]");
+    if (restoreBtn) restoreBtn.addEventListener("click", function () {
+      var orig = restoreBtn.textContent; restoreBtn.disabled = true; restoreBtn.textContent = "⏳ กำลังกู้คืน…";
+      S.restoreProductsFromCloud().then(function (n) {
+        U.toast("กู้คืนสำเร็จ — มีสินค้า " + n + " รายการในคลังแล้ว", "ok"); render();
+      }).catch(function () { U.toast("กู้คืนไม่สำเร็จ ลองใหม่อีกครั้ง", "err"); })
+        .then(function () { restoreBtn.disabled = false; restoreBtn.textContent = orig; });
+    });
 
     function render() {
       var alertBox = document.querySelector("[data-alert]");
