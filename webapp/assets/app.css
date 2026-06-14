@@ -727,7 +727,7 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 /* ===================== เครื่องมือเปรียบเทียบสินค้า ===================== */
 .card-cmp { display: flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: 12px; color: var(--fg-2); margin-top: 6px; cursor: pointer; user-select: none; }
 .card-cmp input { width: 15px; height: 15px; accent-color: var(--ink); }
-.cmp-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 60; display: flex; align-items: center; gap: 14px; background: var(--ink); color: var(--paper); border: 3px solid var(--dw-yellow); box-shadow: 5px 5px 0 0 rgba(0,0,0,.3); padding: 10px 16px; }
+.cmp-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 88px; z-index: 188; display: flex; align-items: center; gap: 14px; background: var(--ink); color: var(--paper); border: 3px solid var(--dw-yellow); box-shadow: 5px 5px 0 0 rgba(0,0,0,.3); padding: 10px 16px; max-width: calc(100vw - 24px); }
 .cmp-bar-n { font-family: var(--font-body); font-weight: 700; font-size: 14px; }
 .cmp-bar .linkbtn { color: var(--dw-yellow); }
 .cmp-modal { max-width: min(960px, 96vw); width: 100%; }
@@ -739,7 +739,7 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 .cmp-table .cmp-img .tile { width: 120px; height: 90px; margin: 0 auto; }
 .cmp-table a { color: var(--ink); text-decoration: none; font-weight: 700; }
 .cmp-table a:hover { background: var(--dw-yellow); }
-@media (max-width: 520px) { .cmp-bar { width: 92vw; justify-content: space-between; gap: 8px; } .cmp-table th, .cmp-table td { min-width: 100px; font-size: 13px; } }
+@media (max-width: 520px) { .cmp-bar { width: calc(100vw - 24px); bottom: 80px; justify-content: space-between; gap: 8px; padding: 9px 12px; } .cmp-bar-n { font-size: 13px; } .cmp-table th, .cmp-table td { min-width: 100px; font-size: 13px; } }
 
 /* หน้าสินค้า: ป้าย "กำลังดู" + ส่วนซื้อคู่กัน */
 .pd-viewing { font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--safety-orange); background: var(--dw-yellow-pale); border: 1.5px solid var(--dw-yellow-deep); border-radius: 6px; padding: 6px 10px; align-self: flex-start; }
