@@ -304,10 +304,11 @@
       });
       var tb = document.querySelector("[data-invtable]");
       tb.innerHTML =
-        "<thead><tr><th>สินค้า</th><th>หมวด</th><th class=num>คงเหลือ</th><th class=num>เช่าอยู่</th><th>ที่จัดเก็บ</th><th class=num>ต้นทุน</th><th class=num>ราคาขาย</th><th class=num>เช่า/วัน</th><th>จัดการ</th></tr></thead><tbody>" +
-        list.map(function (p) {
+        "<thead><tr><th class=rownum>#</th><th>สินค้า</th><th>หมวด</th><th class=num>คงเหลือ</th><th class=num>เช่าอยู่</th><th>ที่จัดเก็บ</th><th class=num>ต้นทุน</th><th class=num>ราคาขาย</th><th class=num>เช่า/วัน</th><th>จัดการ</th></tr></thead><tbody>" +
+        list.map(function (p, idx) {
           var av = S.available(p);
           return "<tr" + (p.hidden ? ' style="opacity:.45"' : "") + ">" +
+            '<td class="rownum">' + (idx + 1) + "</td>" +
             '<td><div class="prod-cell">' + miniVisual(p) +
               '<div><div class="prod-name">' + p.name + (p.hidden ? ' <span style="font-size:11px;color:#c00;font-weight:700">[ซ่อน]</span>' : "") + '</div><div class="prod-sku">' + p.sku + " · " + p.brand + " · " + saleRent(p) + "</div></div></div></td>" +
             "<td>" + S.categoryLabel(p.category) + "</td>" +
