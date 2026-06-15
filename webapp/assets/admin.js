@@ -2212,6 +2212,31 @@
   function initSettings() {
     var st = S.getSettings();
     var root = document.querySelector("[data-setroot]");
+    // ----- พื้นที่จัดเก็บ / ล้างข้อมูล -----
+    (function renderStoragePanel() {
+      var el = root.querySelector("[data-storage-panel]");
+      if (!el || !S.storageReport) return;
+      function fmt(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB"; }
+      function draw() {
+        var rep = S.storageReport();
+        el.innerHTML = rep.map(function (r) {
+          return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-3,#eee)">' +
+            '<div style="flex:1;min-width:0"><div style="font-weight:700">' + r.label + ' · <span style="font-family:var(--font-mono,monospace)">' + fmt(r.bytes) + '</span></div>' +
+            '<div class="img-hint">' + r.note + '</div></div>' +
+            (r.removable ? '<button type="button" class="btn btn-sm btn-danger" data-clearkind="' + r.kind + '">ล้าง</button>' : '<span class="img-hint">แนะนำเก็บไว้</span>') +
+            '</div>';
+        }).join("");
+        el.querySelectorAll("[data-clearkind]").forEach(function (b) {
+          b.onclick = function () {
+            if (!confirm("ยืนยันล้างข้อมูลส่วนนี้ออกจากเครื่องนี้?")) return;
+            S.clearStorageKind(b.dataset.clearkind);
+            U.toast("ล้างข้อมูลแล้ว", "ok");
+            draw();
+          };
+        });
+      }
+      draw();
+    })();
     var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "sheetWebAppUrl", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
     var openSunEl = root.querySelector("[data-open-sun]"); if (openSunEl) openSunEl.checked = st.openSun !== false;
     // VAT + การรับบัตร

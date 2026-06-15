@@ -531,10 +531,27 @@
       return localConv(id, cb);
     }
     function subscribeList(cb) {
+      try { purgeOld(7); } catch (e) {} // แอดมินเปิดรายการแชท → ล้างของเก่าเกิน 7 วันบน cloud
       if (mode() === "online") { var u = function () {}; ensure(function (ok) { if (!ok) { u = localList(cb); return; } u = db.collection("chats").orderBy("updatedAt", "desc").onSnapshot(function (s) { cb(s.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })); }, function () {}); }); return function () { try { u(); } catch (e) {} }; }
       return localList(cb);
     }
-    return { enabled: enabled, mode: mode, convId: convId, send: send, subscribeConv: subscribeConv, subscribeList: subscribeList };
+    // ลบแชทบน cloud ที่เงียบเกิน N วัน (ค่าเริ่ม 7) — ลบข้อความในห้องก่อนแล้วลบห้อง (best-effort)
+    function purgeOld(days) {
+      days = days || 7;
+      if (mode() !== "online") return;
+      ensure(function (ok) {
+        if (!ok || !db) return;
+        var cutoff = Date.now() - days * 86400000;
+        db.collection("chats").where("updatedAt", "<", cutoff).get().then(function (snap) {
+          snap.forEach(function (doc) {
+            doc.ref.collection("messages").get().then(function (ms) {
+              ms.forEach(function (md) { md.ref.delete().catch(function () {}); });
+            }).catch(function () {}).then(function () { doc.ref.delete().catch(function () {}); });
+          });
+        }).catch(function () {});
+      });
+    }
+    return { enabled: enabled, mode: mode, convId: convId, send: send, subscribeConv: subscribeConv, subscribeList: subscribeList, purgeOld: purgeOld };
   })();
   global.MEChat = MEChat;
 
@@ -549,6 +566,7 @@
         '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> แชท</button>' +
       '<div class="me-chat-panel" data-chat-panel hidden>' +
         '<div class="me-chat-head"><span>แชทกับ M.E.Tools</span><button data-chat-close aria-label="ปิด">×</button></div>' +
+        '<div class="me-chat-note" style="font-size:11px;color:#888;text-align:center;padding:5px 10px;border-bottom:1px solid rgba(0,0,0,.06)">🔒 ข้อความแชทจะถูกลบอัตโนมัติหลังครบ 7 วัน เพื่อความเป็นส่วนตัว</div>' +
         '<div class="me-chat-body" data-chat-body></div>' +
         '<form class="me-chat-input" data-chat-form><input data-chat-text placeholder="พิมพ์คำถาม เช่น เวลาเปิด, ค่าส่ง…" autocomplete="off"><button class="me-btn me-btn-sm" type="submit">ส่ง</button></form>' +
       "</div>";
