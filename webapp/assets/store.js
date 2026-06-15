@@ -454,6 +454,18 @@
     if (m.auth && m.auth.currentUser) return Promise.resolve(m);
     return m.authMod.signInAnonymously(m.auth).then(function () { return m; }).catch(function () { return m; });
   }
+  // ---- ตัวกันชนลิมิต Firebase ----
+  // ถ้าเจอ 429 (โควต้าหมด) หรือ 403 (สิทธิ์ไม่พอ) → "พัก" การเขียนขึ้น cloud ชั่วคราว
+  // กันยิงซ้ำ ๆ จนโควต้าหมดเร็วขึ้น/สแปม error — งานในเครื่อง (localStorage) ยังทำงานปกติ
+  var _cloudPausedUntil = 0;
+  function cloudWritesPaused() { return Date.now() < _cloudPausedUntil; }
+  function noteCloudError(e) {
+    var s = String((e && (e.code || e.status)) || (e && e.message) || e || "").toLowerCase();
+    if (/resource-exhausted|quota|429|permission-denied|insufficient|403/.test(s)) {
+      _cloudPausedUntil = Date.now() + 10 * 60000; // พัก 10 นาที แล้วค่อยลองใหม่เอง
+      console.warn("[cloud] writes paused 10m —", s);
+    }
+  }
   // specs ภายในเก็บเป็น [["ป้าย","ค่า"], ...] (array ซ้อน array) ซึ่ง Firestore "เขียนไม่ได้"
   // จึงต้องแปลงเป็น [{label,value}, ...] ก่อนทุกครั้งที่เขียนขึ้น cloud (per-product doc + อันรวม)
   function specToObj(s) {
@@ -490,18 +502,18 @@
   }
   // push สินค้า 1 ตัวขึ้น cloud (fire-and-forget)
   function cloudPushProduct(p) {
-    if (!p || !p.id) return;
+    if (!p || !p.id || cloudWritesPaused()) return;
     loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
       var fs = m.fsMod;
       return fs.setDoc(fs.doc(m.db, "products", String(p.id)), cleanProductDoc(p));
-    }).catch(function (err) { console.warn("[cloud product push]", p.id, err && err.message); });
+    }).catch(function (err) { noteCloudError(err); console.warn("[cloud product push]", p.id, err && err.message); });
   }
   function cloudDeleteProductDoc(id) {
-    if (!id) return;
+    if (!id || cloudWritesPaused()) return;
     loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
       var fs = m.fsMod;
       return fs.deleteDoc(fs.doc(m.db, "products", String(id)));
-    }).catch(function (err) { console.warn("[cloud product del]", id, err && err.message); });
+    }).catch(function (err) { noteCloudError(err); console.warn("[cloud product del]", id, err && err.message); });
   }
   // rebuild เอกสารรวมสำหรับบอท — debounce กันยิงถี่ตอน import หลายตัว
   var _catalogTimer = null;
@@ -548,7 +560,7 @@
   }
   function autoCatchUpSync(progressCb) {
     if (!hasPerm("inventory")) return Promise.resolve(0);
-    if (_autoSyncing) return Promise.resolve(0); // กันรันซ้อน
+    if (_autoSyncing || cloudWritesPaused()) return Promise.resolve(0); // กันรันซ้อน + พักถ้าชนลิมิต
     var cloud = read(KEY.cloudProducts, []) || [];
     var cloudById = {}; cloud.forEach(function (c) { if (c && c.id) cloudById[c.id] = c; });
     var pending = getLocalProducts().filter(function (p) {
@@ -574,7 +586,7 @@
         var items = buildCatalogItems();
         return fs.setDoc(fs.doc(m.db, "products", "catalog"), { items: items, count: items.length, updatedAt: fs.serverTimestamp() });
       }).then(function () { _autoSyncing = false; markSynced(pushed); return pending.length; });
-    }).catch(function (e) { _autoSyncing = false; markSynced(pushed); console.warn("[autosync]", e && e.message); return 0; });
+    }).catch(function (e) { _autoSyncing = false; markSynced(pushed); noteCloudError(e); console.warn("[autosync]", e && e.message); return 0; });
   }
   // โหลดแคตตาล็อกจาก cloud → เก็บใน key แยก (ไม่ทับ me_products ของเจ้าของ)
   // ใช้ REST (public read) — ลูกค้าไม่ต้อง auth. ข้าม doc "catalog" (อันนั้นของบอท)
@@ -660,7 +672,7 @@
         var list = out.filter(function (r) { return r && r.id; });
         return finish(list, ver);
       });
-    }).catch(function (err) { console.warn("[cloud products load]", err && err.message); return false; });
+    }).catch(function (err) { noteCloudError(err); console.warn("[cloud products load]", err && err.message); return false; });
   }
   // กู้คืน: ดึงสินค้าทั้งหมดจาก cloud (per-product docs) รวมเข้าคลังในเครื่องนี้ โดย "ไม่ลบ" ของเดิม
   // ใช้กรณีสินค้าหาย/ย้ายเครื่อง/ล็อกอินใหม่ — เขียนลง local อย่างเดียว (ไม่ดันกลับ cloud)
@@ -937,28 +949,30 @@
     });
   }
   function cloudRateProduct(productId, deltaSum, deltaCount) {
+    if (cloudWritesPaused()) return;
     loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
       var fs = m.fsMod;
       return fs.setDoc(fs.doc(m.db, "products", String(productId)), {
         ratingSum: fs.increment(deltaSum), ratingCount: fs.increment(deltaCount),
       }, { merge: true });
-    }).catch(function (err) { console.warn("[rate]", productId, err && err.message); });
+    }).catch(function (err) { noteCloudError(err); console.warn("[rate]", productId, err && err.message); });
   }
   // นับยอดดูสินค้าจริง (เก็บ products/{id}.views) — เขียนด้วย anonymous auth เหมือนเรตติ้ง
   function cloudBumpView(productId) {
+    if (cloudWritesPaused()) return;
     loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
       var fs = m.fsMod;
       return fs.setDoc(fs.doc(m.db, "products", String(productId)), { views: fs.increment(1) }, { merge: true });
-    }).catch(function (err) { console.warn("[view]", productId, err && err.message); });
+    }).catch(function (err) { noteCloudError(err); console.warn("[view]", productId, err && err.message); });
   }
   // เรียนรู้ "ซื้อคู่กัน" จากออเดอร์จริง → products/{aId}.coBought[bId] += 1 (ไม่เก็บว่าใครซื้อ)
   function cloudBumpAffinity(aId, bId) {
-    if (!aId || !bId || aId === bId) return;
+    if (!aId || !bId || aId === bId || cloudWritesPaused()) return;
     loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
       var fs = m.fsMod;
       var inner = {}; inner[String(bId)] = fs.increment(1);
       return fs.setDoc(fs.doc(m.db, "products", String(aId)), { coBought: inner }, { merge: true });
-    }).catch(function (err) { console.warn("[affinity]", err && err.message); });
+    }).catch(function (err) { noteCloudError(err); console.warn("[affinity]", err && err.message); });
   }
 
   /* ---------- Reviews (ดาว + ความเห็น + รูป) ----------------------- */
