@@ -1525,12 +1525,6 @@
     renderStatic(); updateNav();
   }
 
-  // ตัวเลข "กำลังดู" แบบ pseudo-random นิ่งต่อสินค้า เปลี่ยนทุก 5 นาที (สร้างความรู้สึกแย่งของ)
-  function viewersFor(id) {
-    var w = Math.floor(Date.now() / (5 * 60000)), s = 0, str = String(id) + "|" + w;
-    for (var i = 0; i < str.length; i++) s = (s * 31 + str.charCodeAt(i)) >>> 0;
-    return 2 + (s % 8);
-  }
   function cardHtml(p) {
     var avail = S.available(p);
     var low = avail > 0 && avail <= 3;
