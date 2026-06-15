@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>แคตตาล็อกสินค้า — M.E.Tools ท่ารั้ว เชียงใหม่</title>
   <meta name="description" content="ดูแคตตาล็อกเครื่องมือช่าง M.E.Tools ครบทุกรุ่น DEWALT MAKITA BOSCH ท่ารั้ว เชียงใหม่">
-  <link rel="stylesheet" href="assets/app.css?v=20260614a">
+  <link rel="stylesheet" href="assets/app.css?v=20260614b">
   <style>
     :root { --cat-paper:#ffffff; --cat-red:#d11f26; --cat-ink:#15171c; }
     .catalog-wrap { display:flex; flex-direction:column; min-height:100vh; background:#23262c }
@@ -115,6 +115,14 @@
     .osk-price td { border:1px solid #e4e4e4; padding:2px 3px; font-weight:700; text-align:center; color:var(--cat-ink) }
     .osk-price td.c-ctrl { color:var(--cat-red) }
 
+    /* ---- St.PageFlip fancy book (เปิดกระดาษจริง) ---- */
+    .book-fancy { width:min(1040px,96vw); margin:0 auto }
+    .book-fancy .flip-book { width:100%; margin:0 auto }
+    .book-fancy .page { background:var(--cat-paper); overflow:hidden }
+    .book-fancy .page .cat-page { position:absolute; inset:0 } /* เนื้อหาเต็มหน้ากระดาษ */
+    .book-fancy .stf__parent { margin:0 auto }
+    .book-fancy .--soft { box-shadow:none }
+
     /* ---- mobile: single page ---- */
     @media (max-width:760px) {
       .book-spread { aspect-ratio:.707/1 }
@@ -146,9 +154,9 @@
 
   <div data-footer></div>
 
-  <script src="assets/thai-geo.js?v=20260614a"></script>
-  <script src="assets/store.js?v=20260614a"></script>
-  <script src="assets/ui.js?v=20260614a"></script>
-  <script src="assets/public.js?v=20260614a"></script>
+  <script src="assets/thai-geo.js?v=20260614b"></script>
+  <script src="assets/store.js?v=20260614b"></script>
+  <script src="assets/ui.js?v=20260614b"></script>
+  <script src="assets/public.js?v=20260614b"></script>
 </body>
 </html>
