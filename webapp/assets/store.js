@@ -466,6 +466,10 @@
     var clean = JSON.parse(JSON.stringify(p)); // ตัด undefined/ฟังก์ชัน
     if (Array.isArray(clean.specs)) clean.specs = clean.specs.map(specToObj); // กัน nested array ที่ทำให้ setDoc ล้มเงียบ ๆ
     function size() { try { return JSON.stringify(clean).length; } catch (e) { return 0; } }
+    // เฟรมหมุน 360° มักใหญ่สุด — ถ้าเกินลิมิต ลดจำนวนลงครึ่งหนึ่งไปเรื่อย ๆ (ยังหมุนได้ด้วยเฟรมน้อยลง)
+    while (size() > 950000 && Array.isArray(clean.frames360) && clean.frames360.length > 8) {
+      clean.frames360 = clean.frames360.filter(function (_, i) { return i % 2 === 0; });
+    }
     if (size() > 950000 && clean.images && clean.images.length > 1) clean.images = [clean.images[0]];
     if (size() > 950000) { clean.images = []; clean.image = ""; } // รูปใหญ่เกิน — เก็บแค่ข้อความ
     clean.available = available(p);

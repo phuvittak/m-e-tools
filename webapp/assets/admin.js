@@ -1622,6 +1622,10 @@
     var icons = ["drill", "driver", "saw", "grinder", "rotary", "battery", "charger", "measure", "wrench", "laser", "compressor", "box", "tool"];
     var owner = S.isOwner();
     var pendingImages = (p.images && p.images.length) ? p.images.slice() : (p.image ? [p.image] : []);
+    // 360° เฟรมหมุน: แยกรูปที่อัปโหลด (data:) ออกจากลิงก์ URL (พิมพ์เอง) เพื่อไม่ให้ซ้ำตอนบันทึก
+    var existing360 = p.frames360 || [];
+    var pending360 = existing360.filter(function (u) { return /^data:/.test(u); });
+    var url360text = existing360.filter(function (u) { return !/^data:/.test(u); }).join("\n");
     // media viewer fields (360 frames + exploded parts) — text <-> data helpers
     function textToParts(text) {
       return String(text || "").split("\n").map(function (line) {
@@ -1689,9 +1693,14 @@
       '<div class="field"><label>จุดเด่น (พิมพ์ 1 ข้อ / 1 บรรทัด · โชว์ในแคตตาล็อก)</label>' +
         '<textarea data-f="highlights" rows="3" placeholder="เช่น ใช้งานง่าย ปรับแรงบิดได้ · น้ำหนักเบา จับถนัดมือ (1 ข้อต่อบรรทัด)">' + esc((p.highlights || []).join("\n")) + '</textarea></div>' +
       (owner
-        ? '<div class="field"><label>360° เฟรมหมุน — วาง URL รูปทีละบรรทัด (เรียงตามลำดับหมุน · ต้องมี ≥ 2 รูปจึงจะแสดงแท็บหมุน)</label>' +
-          '<textarea data-f="frames360" rows="3" placeholder="https://.../frame-01.jpg&#10;https://.../frame-02.jpg&#10;… (1 URL ต่อบรรทัด)">' + esc((p.frames360 || []).join("\n")) + '</textarea>' +
-          '<div class="img-hint">ใช้รูปชุดที่ถ่ายรอบสินค้า (เช่น 24–36 เฟรม) — ลูกค้าจะลาก/เลื่อนเพื่อหมุนดูรอบทิศ · เว้นว่างถ้ายังไม่มี</div></div>' +
+        ? '<div class="field"><label>🔄 หมุนดูรอบ 360° — ถ่ายรูปสินค้ารอบตัว (วางบนโต๊ะหมุน/เดินถ่ายรอบ) แล้วอัปโหลดทีเดียวหลายรูป</label>' +
+          '<label class="btn btn-ghost btn-sm filebtn">📷 อัปโหลดรูปหมุน 360° (เลือกหลายรูปพร้อมกัน)<input type="file" accept="image/*" multiple data-360file></label>' +
+          ' <button type="button" class="btn btn-ghost btn-sm" data-360clear>ล้างรูปหมุน</button>' +
+          ' <span data-360count style="font-size:12px;color:var(--fg-3)"></span>' +
+          '<div class="gal-edit" data-360gal style="margin-top:6px"></div>' +
+          '<div class="img-hint">แนะนำ 24–36 รูป เรียงตามลำดับการหมุน (ระบบเรียงตามลำดับที่เลือก) — ลูกค้าจะลาก/เลื่อนเพื่อหมุนดูรอบทิศเหมือนจับของจริง · ต้องมี ≥ 2 รูปแท็บ “หมุน 360°” ถึงจะโผล่</div>' +
+          '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;color:var(--fg-3)">หรือวางลิงก์ URL รูปเอง (ขั้นสูง)</summary>' +
+          '<textarea data-f="frames360" rows="3" placeholder="https://.../frame-01.jpg&#10;https://.../frame-02.jpg&#10;… (1 URL ต่อบรรทัด)">' + esc(url360text) + '</textarea></details></div>' +
           '<div class="field"><label>จุดอะไหล่ / แยกชิ้น — 1 จุดต่อบรรทัด รูปแบบ: <code>x,y | ชื่อ | รหัส | URLรูป | หมายเหตุ</code></label>' +
           '<textarea data-f="parts" rows="3" placeholder="50,40 | หัวจับดอกสว่าน | CHK-13 | https://.../chuck.jpg | ถอดเปลี่ยนได้&#10;72,65 | แบตเตอรี่ 20V | BAT-20 |  | กดปลดสลักด้านล่าง">' + esc(partsToText(p.parts || [])) + '</textarea>' +
           '<div class="img-hint">x,y = ตำแหน่ง % บนรูป (0–100) · ลูกค้าดับเบิลคลิกจุดเพื่อแยกชิ้นส่วนออกมาดูทีละจุด · ช่องไหนไม่มีให้เว้นว่างได้ · เว้นทั้งช่องถ้ายังไม่มี</div></div>' +
@@ -1732,7 +1741,8 @@
       };
       if (owner) {
         data.images = pendingImages.slice(); data.image = pendingImages[0] || "";
-        data.frames360 = val("frames360").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+        var urls360 = val("frames360").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+        data.frames360 = pending360.concat(urls360); // รูปที่อัปโหลด (data:) + ลิงก์ URL ที่พิมพ์เอง
         data.parts = textToParts(val("parts"));
         data.model3d = val("model3d").trim();
       } else {
@@ -1878,7 +1888,59 @@
         files.forEach(function (f) { readImageFile(f, function (d) { pendingImages.push(d); if (++loaded === files.length) drawGallery(); }); });
         e.target.value = "";
       });
+
+      // ----- 360° spin uploader -----
+      var gal360 = modalEl.querySelector("[data-360gal]");
+      var count360 = modalEl.querySelector("[data-360count]");
+      function draw360() {
+        gal360.innerHTML = pending360.map(function (im, i) {
+          return '<div class="gal-item"><span class="gal-main">' + (i + 1) + '</span><img src="' + im + '"><button type="button" class="gal-del" data-f360del="' + i + '">×</button></div>';
+        }).join("");
+        count360.textContent = pending360.length ? pending360.length + " รูป" : "";
+        gal360.querySelectorAll("[data-f360del]").forEach(function (b) { b.onclick = function () { pending360.splice(+b.dataset.f360del, 1); draw360(); }; });
+      }
+      draw360();
+      modalEl.querySelector("[data-360file]").addEventListener("change", function (e) {
+        var files = Array.prototype.slice.call(e.target.files || []);
+        if (!files.length) return;
+        // เรียงตามชื่อไฟล์ เพื่อให้ลำดับการหมุนถูกต้อง (เช่น frame-01, frame-02 …)
+        files.sort(function (a, b) { return String(a.name).localeCompare(String(b.name), undefined, { numeric: true }); });
+        var results = new Array(files.length), loaded = 0;
+        files.forEach(function (f, idx) {
+          read360File(f, function (d) {
+            results[idx] = d;
+            if (++loaded === files.length) { results.forEach(function (d) { if (d) pending360.push(d); }); draw360(); }
+          });
+        });
+        e.target.value = "";
+      });
+      var clr360 = modalEl.querySelector("[data-360clear]");
+      if (clr360) clr360.onclick = function () { pending360.length = 0; draw360(); };
     }
+  }
+
+  // อ่านรูปสำหรับเฟรมหมุน 360° — ย่อเล็กกว่ารูปปกติ (≤600px, คุณภาพ .7) เพราะมีหลายสิบรูป
+  function read360File(file, cb) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var max = 600, w = img.width, h = img.height;
+        if (w > max || h > max) {
+          if (w > h) { h = Math.round(h * max / w); w = max; }
+          else { w = Math.round(w * max / h); h = max; }
+        }
+        try {
+          var c = document.createElement("canvas");
+          c.width = w; c.height = h;
+          c.getContext("2d").drawImage(img, 0, 0, w, h);
+          cb(c.toDataURL("image/jpeg", 0.7));
+        } catch (e) { cb(reader.result); }
+      };
+      img.onerror = function () { cb(reader.result); };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
   }
 
   // read an image File, downscale to <=800px, return a JPEG data URL
