@@ -711,6 +711,17 @@
           var col = fsMod.collection(db, "bot_messages");
           state.unsub = fsMod.onSnapshot(col, function (snap) {
             alert("");
+            // ลบข้อความแชทบอท LINE ที่เก่าเกิน 7 วันออกจาก cloud (ครั้งเดียวต่อการเปิดหน้า)
+            if (!state.purgedOld) {
+              state.purgedOld = true;
+              var cutoff = Date.now() - 7 * 86400000, nDel = 0;
+              snap.docs.forEach(function (d) {
+                var f = d.data() || {};
+                var t = (f.at && typeof f.at.toDate === "function") ? f.at.toDate().getTime() : (f.at ? Date.parse(String(f.at)) : 0);
+                if (t && t < cutoff) { nDel++; try { fsMod.deleteDoc(fsMod.doc(db, "bot_messages", d.id)); } catch (e) {} }
+              });
+              if (nDel && window.U && U.toast) U.toast("ลบแชทเก่าเกิน 7 วัน " + nDel + " ข้อความ", "ok");
+            }
             state.messages = snap.docs.map(function (d) {
               var f = d.data() || {};
               var atStr = "";
