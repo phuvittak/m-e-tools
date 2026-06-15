@@ -1619,6 +1619,15 @@
       if (typeof s === "string") { var m = s.match(/^([^:：—\t]+)[:：—\t]\s*(.*)$/); return m ? { k: m[1].trim(), v: m[2].trim() } : { k: s, v: "" }; }
       return { k: "", v: "" };
     });
+    // แม่แบบสเปคมาตรฐาน — เพิ่มสินค้าใหม่จะมีหัวข้อที่ "ควรมี" ขึ้นให้กรอกเลย (เว้นว่าง = ไม่บันทึก/ปิดเอง)
+    var SPEC_TEMPLATE = ["แรงดันไฟ (V)", "ความเร็วรอบ (รอบ/นาที)", "แรงบิด (Nm)", "ขนาดหัวจับ/ใบมีด", "ความจุแบต (Ah)", "ระดับเสียง (dB)"];
+    if (isNew && !specs.length) specs = SPEC_TEMPLATE.map(function (l) { return { k: l, v: "" }; });
+    // แพลตฟอร์มแบต — กดเลือก ไม่ต้องพิมพ์
+    var BATTERY_PLATFORMS = ["DEWALT 20V MAX", "DEWALT 18V XR", "DEWALT 12V MAX", "DEWALT FLEXVOLT 54V", "Makita 18V LXT", "Makita 40V XGT", "Makita 12V CXT", "Bosch 18V", "Bosch 12V", "Milwaukee M18", "Milwaukee M12", "ไม่ใช้แบต (มีสาย/ลม)"];
+    // ขนาดกล่อง: ใช้ค่าที่เก็บแยกก่อน ถ้าไม่มีก็แกะตัวเลขจากข้อความ shipSize เดิม
+    var _dimNums = String(p.shipSize || "").match(/[\d.]+/g) || [];
+    var _wtM = String(p.shipSize || "").match(/([\d.]+)\s*กก/);
+    var dim = { w: p.dimW || _dimNums[0] || "", l: p.dimL || _dimNums[1] || "", h: p.dimH || _dimNums[2] || "", wt: p.weightKg || (_wtM ? _wtM[1] : "") };
     var icons = ["drill", "driver", "saw", "grinder", "rotary", "battery", "charger", "measure", "wrench", "laser", "compressor", "box", "tool"];
     var owner = S.isOwner();
     var pendingImages = (p.images && p.images.length) ? p.images.slice() : (p.image ? [p.image] : []);
@@ -1669,9 +1678,19 @@
         '<label class="check"><input type="checkbox" data-f="mat_tile"' + ((p.materials || []).indexOf("tile") >= 0 ? " checked" : "") + "> 🔲 กระเบื้อง</label>" +
       "</div></div>" +
       '<div class="field"><label class="check"><input type="checkbox" data-f="safety"' + (p.safety ? " checked" : "") + "> ⚠️ ต้องใช้อุปกรณ์ป้องกัน (แว่น/ถุงมือ) — ขึ้นป้ายเตือนหน้าสินค้า</label></div>" +
-      '<div class="field"><label>ขนาด/น้ำหนักสำหรับจัดส่ง</label><input data-f="shipSize" value="' + esc(p.shipSize || "") + '" placeholder="เช่น 32 × 9 × 24 ซม. · ~2 กก."></div>' +
+      '<div class="field"><label>ขนาดกล่องพัสดุ + น้ำหนัก (ไว้คำนวณค่าจัดส่ง · เว้นว่างได้)</label>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+          '<div style="flex:1;min-width:78px"><input data-f="dimW" type="number" min="0" step="0.1" value="' + dim.w + '" placeholder="กว้าง"><div class="img-hint" style="text-align:center;margin-top:2px">กว้าง (ซม.)</div></div>' +
+          '<div style="flex:1;min-width:78px"><input data-f="dimL" type="number" min="0" step="0.1" value="' + dim.l + '" placeholder="ยาว"><div class="img-hint" style="text-align:center;margin-top:2px">ยาว (ซม.)</div></div>' +
+          '<div style="flex:1;min-width:78px"><input data-f="dimH" type="number" min="0" step="0.1" value="' + dim.h + '" placeholder="สูง"><div class="img-hint" style="text-align:center;margin-top:2px">สูง (ซม.)</div></div>' +
+          '<div style="flex:1;min-width:78px"><input data-f="weightKg" type="number" min="0" step="0.1" value="' + dim.wt + '" placeholder="น้ำหนัก"><div class="img-hint" style="text-align:center;margin-top:2px">น้ำหนัก (กก.)</div></div>' +
+        '</div></div>' +
       '<div class="field"><label>ลิงก์คู่มือ PDF (ไม่บังคับ) — โชว์ปุ่มดาวน์โหลดหน้าสินค้า</label><input data-f="manualUrl" value="' + esc(p.manualUrl || "") + '" placeholder="https://... (วางลิงก์ไฟล์คู่มือ)"></div>' +
-      '<div class="f2"><div class="field"><label>แพลตฟอร์มแบตเตอรี่ (ใช้จับคู่เครื่องมือใช้แบตเดียวกัน)</label><input data-f="batteryPlatform" value="' + esc(p.batteryPlatform || "") + '" placeholder="เช่น DEWALT 20V MAX / Makita 18V LXT"></div>' +
+      '<div class="f2"><div class="field"><label>แพลตฟอร์มแบตเตอรี่ (กดเลือก · จับคู่เครื่องมือใช้แบตเดียวกัน)</label>' +
+        '<select data-f="batteryPlatform"><option value="">— ไม่ระบุ —</option>' +
+        BATTERY_PLATFORMS.map(function (b) { return '<option value="' + esc(b) + '"' + (p.batteryPlatform === b ? " selected" : "") + ">" + esc(b) + "</option>"; }).join("") +
+        ((p.batteryPlatform && BATTERY_PLATFORMS.indexOf(p.batteryPlatform) < 0) ? '<option value="' + esc(p.batteryPlatform) + '" selected>' + esc(p.batteryPlatform) + " (ค่าเดิม)</option>" : "") +
+        "</select></div>" +
       '<div class="field"><label class="check" style="margin-top:24px"><input type="checkbox" data-f="solo"' + (p.solo ? " checked" : "") + "> ขายตัวเปล่า (Solo · ไม่รวมแบต/แท่นชาร์จ)</label></div></div>" +
       '<div class="field"><label>สินค้าที่มักซื้อคู่กัน (เลือกได้หลายตัว — กด Ctrl/⌘ ค้าง · ถ้าไม่เลือก ระบบจะเรียนรู้จากที่ลูกค้าซื้อจริงเอง)</label>' +
         '<select data-f="relatedIds" multiple size="5" style="height:auto;min-height:120px">' +
@@ -1724,7 +1743,8 @@
       var savedSpecs = [];
       root.querySelectorAll("[data-srow]").forEach(function (row) {
         var k = row.querySelector("[data-sk]"); var v = row.querySelector("[data-sv]");
-        if (k && k.value.trim()) savedSpecs.push([k.value.trim(), v ? v.value.trim() : ""]);
+        // เก็บเฉพาะแถวที่กรอก "ค่า" ด้วย — หัวข้อแม่แบบที่เว้นว่างจะไม่ถูกบันทึก (ปิดอัตโนมัติ)
+        if (k && k.value.trim() && v && v.value.trim()) savedSpecs.push([k.value.trim(), v.value.trim()]);
       });
       var data = {
         id: p.id, name: name, brand: val("brand").trim() || "—", sku: val("sku").trim() || S.genId("SKU"),
@@ -1739,6 +1759,10 @@
         priceCtrl: +val("priceCtrl") || 0, qtyPerBox: +val("qtyPerBox") || 0,
         highlights: val("highlights").split("\n").map(function (s) { return s.trim(); }).filter(Boolean),
       };
+      // ขนาด/น้ำหนัก → เก็บแยก + ประกอบเป็นข้อความ shipSize ให้ส่วนอื่น (ค่าส่ง/แคตตาล็อก) ใช้ได้เหมือนเดิม
+      data.dimW = +val("dimW") || 0; data.dimL = +val("dimL") || 0; data.dimH = +val("dimH") || 0; data.weightKg = +val("weightKg") || 0;
+      var _dt = (data.dimW && data.dimL && data.dimH) ? (data.dimW + " × " + data.dimL + " × " + data.dimH + " ซม.") : "";
+      data.shipSize = _dt + (data.weightKg ? ((_dt ? " · " : "") + "~" + data.weightKg + " กก.") : "");
       if (owner) {
         data.images = pendingImages.slice(); data.image = pendingImages[0] || "";
         var urls360 = val("frames360").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
