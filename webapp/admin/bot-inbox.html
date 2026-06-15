@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>แชทบอทลูกค้า — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260614k">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260614l">
   <style>
     .botinbox-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px }
     .botinbox-kpi { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:14px 16px }
@@ -16,6 +16,9 @@
     @media (max-width:900px) { .botinbox-split { grid-template-columns:1fr } }
 
     .conv-list { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; overflow:auto; max-height:70vh; padding:6px }
+    .conv-tabs { display:flex; gap:8px; margin-bottom:10px }
+    .conv-tabs .btn { flex:1 }
+    .conv-tabs .btn.on { background:var(--accent,#FFB81C); color:#111; border-color:var(--accent,#FFB81C); font-weight:700 }
     .conv-section { margin-bottom:10px }
     .conv-section:last-child { margin-bottom:0 }
     .conv-section-head { padding:8px 10px; font-size:11px; font-weight:700; color:var(--fg-2); text-transform:uppercase; letter-spacing:.04em; border-radius:6px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; background:var(--bg-2) }
@@ -105,6 +108,11 @@
         <input data-search type="search" placeholder="🔎 ค้นหาลูกค้า — ชื่อ, ID, หรือคำที่ลูกค้าถาม (เช่น สว่าน)" style="width:100%; padding:10px 14px; border:1px solid var(--border-3); border-radius:8px; font-family:var(--font-body); font-size:14px; outline:none; background:#fff">
       </div>
 
+      <div class="conv-tabs" data-conv-tabs>
+        <button type="button" class="btn btn-sm on" data-tab="open">💬 เปิด (<span data-tab-open-n>0</span>)</button>
+        <button type="button" class="btn btn-sm" data-tab="closed">✓ ปิดแล้ว (<span data-tab-closed-n>0</span>)</button>
+      </div>
+
       <div class="botinbox-split">
         <div class="conv-list" data-convs>
           <div class="thread-empty">กำลังโหลด…</div>
@@ -121,9 +129,9 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260614k"></script>
-  <script src="../assets/store.js?v=20260614k"></script>
-  <script src="../assets/ui.js?v=20260614k"></script>
-  <script src="../assets/admin.js?v=20260614k"></script>
+  <script src="../assets/thai-geo.js?v=20260614l"></script>
+  <script src="../assets/store.js?v=20260614l"></script>
+  <script src="../assets/ui.js?v=20260614l"></script>
+  <script src="../assets/admin.js?v=20260614l"></script>
 </body>
 </html>
