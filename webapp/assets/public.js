@@ -1215,6 +1215,12 @@
       '<div class="cat-cover-hint">แตะหน้า หรือใช้ปุ่ม ‹ › เพื่อเปิดดู</div>' +
       "</div>";
   }
+  // ป้ายสถานะ มี/หมด ตามจำนวนสต๊อก (available = stock − ที่ถูกเช่า)
+  function catStockBadge(p) {
+    return (S.available(p) > 0)
+      ? '<span class="cat-stock in">มีสินค้า</span>'
+      : '<span class="cat-stock out">สินค้าหมด</span>';
+  }
   function catCardHtml(p, brand) {
     var imgs = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
     var main = imgs[0] || "";
@@ -1246,7 +1252,7 @@
       (qty ? "<td>" + esc(String(p.qtyPerBox)) + " ตัว</td>" : "") + "</tr>";
     return '<div class="osk-card">' +
       '<div class="osk-name">' + esc(p.name || "") + "</div>" +
-      '<div class="osk-img">' + chip + img + "</div>" +
+      '<div class="osk-img">' + chip + img + catStockBadge(p) + "</div>" +
       inboxHtml + specsHtml + hlHtml +
       '<table class="osk-price">' + head + body + "</table>" +
     "</div>";
@@ -1279,7 +1285,7 @@
     var body = "<tr><td>" + esc(p.sku || "-") + "</td><td>" + S.money(p.price || 0) + '</td><td class="ctrl">' +
       (p.priceCtrl ? S.money(p.priceCtrl) : "—") + "</td>" + (qty ? "<td>" + esc(String(p.qtyPerBox)) + " ตัว</td>" : "") + "</tr>";
     return '<div class="cat-page">' +
-      '<div class="cat-brandbar">DEWALT · ' + esc(p.brand || "DEWALT") + "</div>" +
+      '<div class="cat-brandbar">DEWALT · ' + esc(p.brand || "DEWALT") + catStockBadge(p) + "</div>" +
       '<div class="cat-page-body"><div class="cat-card">' +
         '<div class="cat-card-head">' + esc(p.name || "") + "</div>" +
         '<div class="cat-card-main">' + photo +
