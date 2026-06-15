@@ -1335,6 +1335,84 @@
     });
     if (pages.length % 2 !== 0) pages.push(BLANK);
 
+    // ลองเปิดแบบ "พลิกกระดาษจริง" (St.PageFlip: วางเมาส์ที่มุม = ดึงหน้ากระดาษ, โค้งเงานุ่ม, ลื่น)
+    // ถ้าโหลดไลบรารีไม่ได้ (เน็ต/CDN) → ใช้ตัวพลิกเดิมในเครื่องแทน เพื่อไม่ให้หน้าพัง
+    loadPageFlipLib().then(function (ok) {
+      var done = false;
+      if (ok) { try { renderFancyBook(box, pages); done = true; } catch (e) { console.warn("[catalog] fancy fail", e && e.message); } }
+      if (!done) renderManualBook(box, pages, BLANK);
+    });
+  }
+
+  // โหลดไลบรารี St.PageFlip จาก CDN ครั้งเดียว (lazy) — คืน true ถ้าพร้อมใช้
+  var _pfPromise = null;
+  function loadPageFlipLib() {
+    if (window.St && window.St.PageFlip) return Promise.resolve(true);
+    if (_pfPromise) return _pfPromise;
+    _pfPromise = new Promise(function (resolve) {
+      var s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js";
+      s.onload = function () { resolve(!!(window.St && window.St.PageFlip)); };
+      s.onerror = function () { _pfPromise = null; resolve(false); };
+      document.head.appendChild(s);
+    });
+    return _pfPromise;
+  }
+
+  // เปิดกระดาษจริง: มุมหน้าโผล่ตามเมาส์ + โค้งเงานุ่ม ลาก/คลิก/ปัดได้ ลื่นไหล
+  function renderFancyBook(box, pages) {
+    box.innerHTML =
+      '<div class="book book-fancy"><div class="flip-book" data-flip></div></div>' +
+      '<div class="book-nav"><button type="button" data-prev aria-label="ก่อนหน้า">‹</button>' +
+        '<span class="book-pageno" data-pageno></span>' +
+        '<button type="button" data-next aria-label="ถัดไป">›</button></div>';
+    var el = box.querySelector("[data-flip]");
+    pages.forEach(function (html, i) {
+      var d = document.createElement("div");
+      d.className = "page";
+      if (i === 0 || i === pages.length - 1) d.setAttribute("data-density", "hard"); // ปก/ปกหลังแข็ง ที่เหลือพลิกโค้งได้
+      d.innerHTML = html;
+      el.appendChild(d);
+    });
+
+    var pf = new window.St.PageFlip(el, {
+      width: 545, height: 771,            // อัตราส่วน ~A4 (กระดาษแนวตั้ง)
+      size: "stretch",
+      minWidth: 255, maxWidth: 1000,
+      minHeight: 360, maxHeight: 1414,
+      maxShadowOpacity: 0.5,
+      showCover: true,                    // หน้าแรก = ปก เปิดเดี่ยว
+      usePortrait: true,                  // จอแคบ (มือถือ) → ทีละหน้า
+      mobileScrollSupport: false,
+      flippingTime: 650,
+      drawShadow: true,
+      showPageCorners: true,              // มุมหน้าโผล่ตอนวางเมาส์
+      swipeDistance: 30,
+      autoSize: true,
+    });
+    pf.loadFromHTML(el.querySelectorAll(".page"));
+
+    var prevBtn = box.querySelector("[data-prev]");
+    var nextBtn = box.querySelector("[data-next]");
+    var pageno = box.querySelector("[data-pageno]");
+    function upd() {
+      var cur = (pf.getCurrentPageIndex && pf.getCurrentPageIndex()) || 0;
+      var total = pages.length;
+      pageno.textContent = "หน้า " + (cur + 1) + " / " + total;
+      prevBtn.disabled = cur <= 0;
+      nextBtn.disabled = cur >= total - 1;
+    }
+    prevBtn.addEventListener("click", function () { try { pf.flipPrev(); } catch (e) {} });
+    nextBtn.addEventListener("click", function () { try { pf.flipNext(); } catch (e) {} });
+    pf.on("flip", upd);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") { try { pf.flipNext(); } catch (e2) {} }
+      else if (e.key === "ArrowLeft") { try { pf.flipPrev(); } catch (e2) {} }
+    });
+    upd();
+  }
+
+  function renderManualBook(box, pages, BLANK) {
     box.innerHTML =
       '<div class="book"><div class="book-spread" data-spread>' +
         '<div class="book-page book-left"><div class="book-page-inner" data-pleft></div></div>' +
