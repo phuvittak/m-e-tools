@@ -1601,11 +1601,10 @@
       spinB += bytesOf(p.frames360);
     });
     var rep = [
-      { kind: "spin360", label: "รูปหมุน 360° ของสินค้า", bytes: spinB, note: "ลบแล้วแท็บ “หมุน 360°” จะหายไป (ข้อมูลสินค้าอื่นอยู่ครบ)", removable: true },
-      { kind: "prodimg", label: "รูปสินค้า (ในเครื่องนี้)", bytes: imgB, note: "ลบรูปออกจากเครื่องนี้ — ถ้าเคยซิงค์ขึ้น cloud ดึงกลับได้", removable: true },
+      { kind: "spin360", label: "รูปหมุน 360° ของสินค้า", bytes: spinB, note: "รูปสินค้า — เก็บไว้ (ไม่ลบ)", removable: false },
+      { kind: "prodimg", label: "รูปสินค้า", bytes: imgB, note: "รูปสินค้า — เก็บไว้ (ไม่ลบ)", removable: false },
       { kind: "cloudcache", label: "แคชสินค้าจาก cloud", bytes: lsBytes(KEY.cloudProducts), note: "ปลอดภัย — ลบแล้วโหลดใหม่อัตโนมัติ", removable: true },
-      { kind: "chats", label: "ประวัติแชทลูกค้า", bytes: lsBytes(KEY.chats), note: "ระบบลบที่เกิน 7 วันให้อยู่แล้ว — ปุ่มนี้ล้างทั้งหมดทันที", removable: true },
-      { kind: "orders", label: "คำสั่งซื้อ/เช่า (เก็บไว้ดีกว่า)", bytes: lsBytes(KEY.orders), note: "⚠️ เป็นประวัติการขาย ไม่แนะนำให้ลบ", removable: false },
+      { kind: "orders", label: "คำสั่งซื้อ/เช่า", bytes: lsBytes(KEY.orders), note: "⚠️ เป็นประวัติการขาย ไม่แนะนำให้ลบ", removable: false },
     ];
     rep.sort(function (a, b) { return b.bytes - a.bytes; });
     return rep;
@@ -2069,8 +2068,6 @@
 
   // seed on load
   seed();
-  // ลบแชทเก่าเกิน 7 วันอัตโนมัติทุกครั้งที่เปิดหน้า (กันเก็บข้อมูลนาน + ประหยัดพื้นที่)
-  try { purgeOldChats(7); } catch (e) {}
 
   global.MEStore = {
     KEY: KEY,
