@@ -1572,6 +1572,60 @@
   function chatCurrent() { return chatGetConv(chatConvId()); }
   function chatList() { var c = getChats(); return Object.keys(c).map(function (k) { return c[k]; }).sort(function (a, b) { return b.updatedAt - a.updatedAt; }); }
   function chatDelete(id) { var c = getChats(); delete c[id]; saveChats(c); }
+  // ลบข้อความแชทที่เก่าเกิน N วัน (ค่าเริ่ม 7) ออกจากเครื่อง — กันเก็บข้อมูลนาน + ประหยัดพื้นที่
+  // ห้องไหนไม่เหลือข้อความ + เงียบเกิน 7 วัน → ลบทั้งห้อง
+  function purgeOldChats(days) {
+    days = days || 7;
+    var cutoff = Date.now() - days * 86400000;
+    var chats = getChats(), changed = false;
+    Object.keys(chats).forEach(function (id) {
+      var c = chats[id]; if (!c) return;
+      var before = (c.messages || []).length;
+      c.messages = (c.messages || []).filter(function (m) { return (m.at || 0) >= cutoff; });
+      if (c.messages.length !== before) changed = true;
+      if (!c.messages.length && (c.updatedAt || 0) < cutoff) { delete chats[id]; changed = true; }
+    });
+    if (changed) { write(KEY.chats, chats, { skipCloud: true }); dispatch(); }
+    return changed;
+  }
+  // รายงานการใช้พื้นที่ในเครื่อง (localStorage) แยกตามหมวด — ใช้ในหน้า "ล้างข้อมูล"
+  // คืน [{ kind, label, bytes, note, removable }] เรียงจากใหญ่ไปเล็ก
+  function storageReport() {
+    function bytesOf(v) { try { return (typeof v === "string" ? v : JSON.stringify(v || "")).length * 2; } catch (e) { return 0; } }
+    function lsBytes(key) { try { var s = localStorage.getItem(key); return s ? s.length * 2 : 0; } catch (e) { return 0; } }
+    // แยกขนาด "รูป/มีเดีย" ออกจากตัวสินค้า (รูปคือก้อนใหญ่สุดมักไม่ค่อยใช้พื้นที่คุ้ม)
+    var prods = read(KEY.products, []) || [];
+    var imgB = 0, spinB = 0;
+    prods.forEach(function (p) {
+      imgB += bytesOf(p.image) + bytesOf(p.images);
+      spinB += bytesOf(p.frames360);
+    });
+    var rep = [
+      { kind: "spin360", label: "รูปหมุน 360° ของสินค้า", bytes: spinB, note: "ลบแล้วแท็บ “หมุน 360°” จะหายไป (ข้อมูลสินค้าอื่นอยู่ครบ)", removable: true },
+      { kind: "prodimg", label: "รูปสินค้า (ในเครื่องนี้)", bytes: imgB, note: "ลบรูปออกจากเครื่องนี้ — ถ้าเคยซิงค์ขึ้น cloud ดึงกลับได้", removable: true },
+      { kind: "cloudcache", label: "แคชสินค้าจาก cloud", bytes: lsBytes(KEY.cloudProducts), note: "ปลอดภัย — ลบแล้วโหลดใหม่อัตโนมัติ", removable: true },
+      { kind: "chats", label: "ประวัติแชทลูกค้า", bytes: lsBytes(KEY.chats), note: "ระบบลบที่เกิน 7 วันให้อยู่แล้ว — ปุ่มนี้ล้างทั้งหมดทันที", removable: true },
+      { kind: "orders", label: "คำสั่งซื้อ/เช่า (เก็บไว้ดีกว่า)", bytes: lsBytes(KEY.orders), note: "⚠️ เป็นประวัติการขาย ไม่แนะนำให้ลบ", removable: false },
+    ];
+    rep.sort(function (a, b) { return b.bytes - a.bytes; });
+    return rep;
+  }
+  // ลบข้อมูลตามหมวดที่เลือกในหน้า "ล้างข้อมูล"
+  function clearStorageKind(kind) {
+    if (kind === "cloudcache") { try { localStorage.removeItem(KEY.cloudProducts); localStorage.removeItem(KEY.catalogVer); } catch (e) {} dispatch(); return true; }
+    if (kind === "chats") { write(KEY.chats, {}, { skipCloud: true }); dispatch(); return true; }
+    if (kind === "spin360" || kind === "prodimg") {
+      var list = read(KEY.products, []) || [];
+      list.forEach(function (p) {
+        if (kind === "spin360") p.frames360 = [];
+        else { p.images = []; p.image = ""; }
+        p.updatedAt = new Date().toISOString();
+      });
+      write(KEY.products, list, { skipCloud: true }); dispatch();
+      return true;
+    }
+    return false;
+  }
 
   /* ---------- Metrics (for the employee dashboard) ---------------- */
   function getMetrics() {
@@ -2015,6 +2069,8 @@
 
   // seed on load
   seed();
+  // ลบแชทเก่าเกิน 7 วันอัตโนมัติทุกครั้งที่เปิดหน้า (กันเก็บข้อมูลนาน + ประหยัดพื้นที่)
+  try { purgeOldChats(7); } catch (e) {}
 
   global.MEStore = {
     KEY: KEY,
@@ -2056,6 +2112,7 @@
     getPurchases: getPurchases, receivePurchase: receivePurchase, getPnL: getPnL,
     chatPushUser: chatPushUser, chatPushBot: chatPushBot, chatReplyShop: chatReplyShop,
     chatCurrent: chatCurrent, chatGetConv: chatGetConv, chatConvId: chatConvId, chatList: chatList, chatDelete: chatDelete,
+    purgeOldChats: purgeOldChats, storageReport: storageReport, clearStorageKind: clearStorageKind,
     resetAll: resetAll, onChange: onChange,
   };
 })(window);
