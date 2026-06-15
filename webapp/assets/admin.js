@@ -706,22 +706,32 @@
             var map = {};
             ss.docs.forEach(function (d) { map[d.id] = d.data() || {}; });
             state.sessions = map;
+            purgeClosedOld();
             if (state.messages.length) groupAndRender();
           }, function (err) { console.warn("[sessions listener]", err); });
+          // ลบเฉพาะ "แชทที่กดปิดแล้ว" และเก่าเกิน 7 วัน — แชทที่ยังคุยอยู่ (ยังไม่ปิด) จะไม่ถูกลบ
+          function purgeClosedOld() {
+            if (!state.msgDocsRaw || !state.sessions) return; // รอข้อมูลทั้งข้อความ + สถานะเปิด/ปิดให้ครบก่อน
+            var cutoff = Date.now() - 7 * 86400000, nDel = 0;
+            state.purgeTried = state.purgeTried || {};
+            state.msgDocsRaw.forEach(function (d) {
+              if (state.purgeTried[d.id]) return;             // เคยสั่งลบไปแล้ว ไม่ทำซ้ำ
+              var f = d.data() || {};
+              var sess = state.sessions[f.userId];
+              if (!sess || !sess.closed) return;              // ยังไม่กดปิดการสนทนา → เก็บไว้เสมอ
+              var t = (f.at && typeof f.at.toDate === "function") ? f.at.toDate().getTime() : (f.at ? Date.parse(String(f.at)) : 0);
+              if (t && t < cutoff) {
+                state.purgeTried[d.id] = 1; nDel++;
+                try { fsMod.deleteDoc(fsMod.doc(db, "bot_messages", d.id)); } catch (e) {}
+              }
+            });
+            if (nDel && window.U && U.toast) U.toast("ลบแชทที่ปิดแล้วเกิน 7 วัน " + nDel + " ข้อความ", "ok");
+          }
           var col = fsMod.collection(db, "bot_messages");
           state.unsub = fsMod.onSnapshot(col, function (snap) {
             alert("");
-            // ลบข้อความแชทบอท LINE ที่เก่าเกิน 7 วันออกจาก cloud (ครั้งเดียวต่อการเปิดหน้า)
-            if (!state.purgedOld) {
-              state.purgedOld = true;
-              var cutoff = Date.now() - 7 * 86400000, nDel = 0;
-              snap.docs.forEach(function (d) {
-                var f = d.data() || {};
-                var t = (f.at && typeof f.at.toDate === "function") ? f.at.toDate().getTime() : (f.at ? Date.parse(String(f.at)) : 0);
-                if (t && t < cutoff) { nDel++; try { fsMod.deleteDoc(fsMod.doc(db, "bot_messages", d.id)); } catch (e) {} }
-              });
-              if (nDel && window.U && U.toast) U.toast("ลบแชทเก่าเกิน 7 วัน " + nDel + " ข้อความ", "ok");
-            }
+            state.msgDocsRaw = snap.docs;
+            purgeClosedOld();
             state.messages = snap.docs.map(function (d) {
               var f = d.data() || {};
               var atStr = "";

@@ -1,6 +1,6 @@
 /* M.E.Tools service worker — offline app shell + runtime cache.
    Scope = the folder this file lives in (the app root). */
-var CACHE = "metools-v46";
+var CACHE = "metools-v47";
 var CORE = [
   "./", "index.html", "categories.html", "shop.html", "product.html", "cart.html", "orders.html",
   "login.html", "register.html", "manifest.webmanifest",
