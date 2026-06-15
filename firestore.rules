@@ -75,7 +75,8 @@ service cloud.firestore {
                       // flat format จากแอดมิน/เว็บ
                       || (request.resource.data.role in ["user", "admin", "bot"])
                     );
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin(); // ลบข้อความเก่าเกิน 7 วันจากหน้า "แชทบอท LINE"
     }
 
     // โปรไฟล์ลูกค้า (ชื่อเล่นที่แอดมินตั้ง) — แยกจาก ID ใน bot_messages
