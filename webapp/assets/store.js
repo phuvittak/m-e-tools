@@ -533,7 +533,10 @@
   function migrateImagesToStorage(progressCb) {
     return Promise.all([loadFirebaseAuthAndDb("admin").then(ensureCloudAuth), loadStorageMod()]).then(function (arr) {
       var m = arr[0], sm = arr[1], storage = sm.getStorage(m.app);
-      var all = read(KEY.products, []) || [];
+      // ใช้รายการที่รวม local+cloud แล้ว (กันกรณีสินค้าอยู่ใน cloud cache ไม่ใช่ me_products)
+      var all = getProducts();
+      // กันพลาด: ถ้าโหลดสินค้าไม่ได้/ว่าง → "ห้าม" ซิงค์ (ไม่งั้นจะเขียน catalog ว่างทับ = สินค้าหายหมด)
+      if (!all.length) { throw new Error("ยังโหลดสินค้าไม่ได้ (อาจ Firebase เกินลิมิต) — ยกเลิกการย้ายรูปเพื่อกันข้อมูลหาย"); }
       var i = 0, nProd = 0, nImg = 0;
       function next() {
         if (i >= all.length) {
