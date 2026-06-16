@@ -2460,6 +2460,11 @@
       electric: "อุปกรณ์ไฟฟ้า", bearing: "ลูกปืน", generator: "เครื่องปั่นไฟ", safety: "อุปกรณ์เซฟตี้",
       gear: "เฟือง/อะไหล่", pipe: "ท่อ/ประปา", paint: "สี/งานพ่นสี",
     };
+    // ชื่อหมวดสำเร็จรูป — ให้เจ้าของ "เลือกจากที่มี หรือพิมพ์เอง" ไม่ต้องพิมพ์ทุกครั้ง
+    var CAT_NAME_PRESETS = ["สว่าน / ไขควง", "เลื่อย", "เครื่องเจียร", "แบต / ที่ชาร์จ", "เครื่องมือวัด",
+      "เครื่องมือช่างมือ", "เครื่องมือไฟฟ้าอื่นๆ", "อะไหล่", "ปั๊มลม", "เครื่องเชื่อม", "ปั๊มน้ำ",
+      "เครื่องมือเกษตร", "อุปกรณ์ยานยนต์", "อุปกรณ์เซฟตี้", "ค้อน", "ประแจ", "น็อต/สกรู",
+      "ท่อ/ประปา", "สี/งานพ่นสี", "ทำความสะอาด", "บันได", "รอก/ลิฟต์ยก", "เครื่องปั่นไฟ"];
     var cats = S.getCategories();
     var catList = root.querySelector("[data-catlist]");
     function catPreview(c) {
@@ -2487,7 +2492,7 @@
     var _catDragIdx = null;
     function renderCats() {
       if (!catList) return;
-      catList.innerHTML = cats.map(function (c, i) {
+      catList.innerHTML = '<datalist id="cat-name-presets">' + CAT_NAME_PRESETS.map(function (n) { return '<option value="' + esc(n) + '">'; }).join("") + "</datalist>" + cats.map(function (c, i) {
         var depth = catDepth(c.key);
         var lineage = depth === 0
           ? '⭐ หมวดหลัก (ชั้นบนสุด)'
@@ -2497,7 +2502,7 @@
           '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 4px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
           '<span class="cat-lvl" title="ชั้นที่ ' + (depth + 1) + '" style="flex:0 0 auto;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--ink);min-width:26px">L' + (depth + 1) + '</span>' +
           '<span style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:var(--bg-1,#f5f5f5);border-radius:6px">' + catPreview(c) + "</span>" +
-          '<input data-cn="' + i + '" value="' + esc(c.label) + '" placeholder="ชื่อหมวด" style="flex:1;min-width:110px">' +
+          '<input data-cn="' + i + '" list="cat-name-presets" value="' + esc(c.label) + '" placeholder="ชื่อหมวด (เลือกหรือพิมพ์)" style="flex:1;min-width:110px">' +
           (function () {
             var forbidden = catDescLocal(c.key);
             return '<select data-cp="' + i + '" title="หมวดแม่ (เว้นว่าง = หมวดบนสุด) — เลือกหมวดลึกเท่าไรก็ได้" style="flex:0 0 180px">' +
