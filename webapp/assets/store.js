@@ -515,6 +515,50 @@
       return fs.deleteDoc(fs.doc(m.db, "products", String(id)));
     }).catch(function (err) { noteCloudError(err); console.warn("[cloud product del]", id, err && err.message); });
   }
+
+  /* ---------- Phase F: ย้ายรูปสินค้าขึ้น Firebase Storage (ลด Firestore reads) ----
+     เดิมเก็บรูปเป็น base64 ในเอกสาร → ลูกค้าใหม่โหลดหนัก/กิน read มาก
+     ย้ายขึ้น Storage เก็บแค่ลิงก์ → หน้าร้านโหลดเบา รูปมาจาก CDN (ไม่กิน read quota) */
+  var FB_SDK_BASE = "https://www.gstatic.com/firebasejs/10.12.2/";
+  function loadStorageMod() { return import(FB_SDK_BASE + "firebase-storage.js"); }
+  function isDataUrl(s) { return typeof s === "string" && s.indexOf("data:") === 0; }
+  function storagePath(id, idx) { return "products/" + String(id).replace(/[^a-zA-Z0-9_-]/g, "_") + "/" + idx + "_" + Date.now() + ".jpg"; }
+  function uploadDataUrl(sm, storage, path, dataUrl) {
+    var ref = sm.ref(storage, path);
+    return sm.uploadString(ref, dataUrl, "data_url").then(function () { return sm.getDownloadURL(ref); });
+  }
+  // ย้ายรูป base64 ของสินค้าทุกตัวขึ้น Storage → แทนด้วยลิงก์ → เซฟ local + ดันขึ้น cloud
+  // ถ้าอัปรูปไหนไม่สำเร็จ จะคงรูปเดิม (base64) ไว้ ไม่ทำให้รูปหาย
+  // progressCb(done, total) · คืน Promise<{ products, images }>
+  function migrateImagesToStorage(progressCb) {
+    return Promise.all([loadFirebaseAuthAndDb("admin").then(ensureCloudAuth), loadStorageMod()]).then(function (arr) {
+      var m = arr[0], sm = arr[1], storage = sm.getStorage(m.app);
+      var all = read(KEY.products, []) || [];
+      var i = 0, nProd = 0, nImg = 0;
+      function next() {
+        if (i >= all.length) {
+          write(KEY.products, all, { skipCloud: true });          // เซฟ local (images เป็นลิงก์แล้ว)
+          return cloudSyncAllProducts().then(function () { return { products: nProd, images: nImg }; });
+        }
+        var p = all[i++];
+        if (progressCb) { try { progressCb(i, all.length); } catch (e) {} }
+        var imgs = (p.images && p.images.length) ? p.images.slice() : (p.image ? [p.image] : []);
+        var idxs = []; imgs.forEach(function (im, k) { if (isDataUrl(im)) idxs.push(k); });
+        if (!idxs.length) return next();
+        var j = 0;
+        function up() {
+          if (j >= idxs.length) { p.images = imgs; p.image = imgs[0] || ""; nProd++; return next(); }
+          var k = idxs[j++];
+          return uploadDataUrl(sm, storage, storagePath(p.id, k), imgs[k])
+            .then(function (url) { imgs[k] = url; nImg++; return up(); },
+                  function (e) { console.warn("[migrate img]", p.id, e && e.message); return up(); });
+        }
+        return up();
+      }
+      return next();
+    });
+  }
+
   // rebuild เอกสารรวมสำหรับบอท — debounce กันยิงถี่ตอน import หลายตัว
   var _catalogTimer = null;
   function scheduleCatalogSync() {
@@ -2081,7 +2125,7 @@
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
     getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,
     saveProduct: saveProduct, deleteProduct: deleteProduct, adjustStock: adjustStock,
-    cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, autoCatchUpSync: autoCatchUpSync, cloudPushProduct: cloudPushProduct, restoreProductsFromCloud: restoreProductsFromCloud, pushProductToSheet: pushProductToSheet, pushSheetDelete: pushSheetDelete,
+    cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, autoCatchUpSync: autoCatchUpSync, cloudPushProduct: cloudPushProduct, restoreProductsFromCloud: restoreProductsFromCloud, pushProductToSheet: pushProductToSheet, pushSheetDelete: pushSheetDelete, migrateImagesToStorage: migrateImagesToStorage,
     startAdminRealtime: startAdminRealtime,
     getCart: getCart, addToCart: addToCart, updateCartItem: updateCartItem,
     removeCartItem: removeCartItem, clearCart: clearCart,

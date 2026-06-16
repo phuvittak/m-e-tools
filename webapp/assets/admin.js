@@ -317,6 +317,8 @@
     document.querySelector("[data-add]").addEventListener("click", function () { openProductModal(null); });
     var syncBtn = document.querySelector("[data-sync-bot]");
     if (syncBtn) syncBtn.addEventListener("click", function () { syncCatalogToCloud(syncBtn); });
+    var migBtn = document.querySelector("[data-migrate-img]");
+    if (migBtn) migBtn.addEventListener("click", function () { migrateImagesUI(migBtn); });
     var expBtn = document.querySelector("[data-export-xlsx]");
     if (expBtn) expBtn.addEventListener("click", function () {
       if (!window.XLSX) { U.toast("ตัวสร้างไฟล์ Excel ยังโหลดไม่เสร็จ ลองอีกครั้ง", "err"); return; }
@@ -474,6 +476,27 @@
     }).catch(function (e) {
       var code = e && e.code ? " [" + e.code + "]" : "";
       done("ซิงค์ไม่สำเร็จ" + code + ": " + (e && e.message || e), "err");
+    });
+  }
+
+  // ย้ายรูปสินค้า (base64) ขึ้น Firebase Storage → เก็บแค่ลิงก์ (ลด Firebase reads ตอนลูกค้าเข้าเว็บ)
+  function migrateImagesUI(btn) {
+    if (!S.migrateImagesToStorage) { U.toast("ฟังก์ชันยังไม่พร้อม — ลองรีโหลดหน้า", "err"); return; }
+    if (!confirm("ย้ายรูปสินค้าทั้งหมดขึ้น Firebase Storage?\n(ทำครั้งเดียว · อาจใช้เวลาสักครู่ถ้ารูปเยอะ · รูปที่ย้ายไม่สำเร็จจะคงไว้แบบเดิม)")) return;
+    var orig = btn.textContent, finished = false;
+    btn.disabled = true; btn.textContent = "กำลังย้ายรูป…";
+    function done(msg, kind) {
+      if (finished) return; finished = true; clearTimeout(hard);
+      btn.disabled = false; btn.textContent = orig; U.toast(msg, kind);
+    }
+    var hard = setTimeout(function () { done("ใช้เวลานานเกินไป — ลองใหม่อีกครั้ง (ดู Console F12 ว่าค้างขั้นไหน)", "err"); }, 600000);
+    S.migrateImagesToStorage(function (i, total) {
+      if (!finished) btn.textContent = "ย้ายรูป " + i + "/" + total + "…";
+    }).then(function (r) {
+      done("ย้ายรูปขึ้น Storage แล้ว: " + r.products + " สินค้า · " + r.images + " รูป ✓", "ok");
+    }).catch(function (e) {
+      var code = e && e.code ? " [" + e.code + "]" : "";
+      done("ย้ายรูปไม่สำเร็จ" + code + ": " + (e && e.message || e) + " (ตรวจว่าเปิด Storage + ตั้ง rules แล้ว)", "err");
     });
   }
 
