@@ -150,16 +150,81 @@
     // line chart
     document.querySelector("[data-chart]").innerHTML = lineChart(S.revenueByDay(7));
 
-    // low stock list
-    var low = S.getProducts().filter(function (p) { return S.available(p) <= 3; }).sort(function (a, b) { return S.available(a) - S.available(b); });
-    var lowBox = document.querySelector("[data-lowstock]");
-    lowBox.innerHTML = low.length
-      ? low.map(function (p) {
-          return '<div class="order-line" style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border-3);font-family:var(--font-body);font-size:14px">' +
-            "<span><b>" + p.name + "</b><br><span class=prod-sku>" + p.location + "</span></span>" +
-            '<span class="stock-n low">' + S.available(p) + " ชิ้น</span></div>";
-        }).join("")
-      : '<p style="font-family:var(--font-body);color:var(--fg-2)">สต็อกเพียงพอทุกรายการ ✓</p>';
+    // low stock — ค้นหา + จัดกลุ่มตามแบรนด์ (พับได้) + กดเพื่อเติมสต๊อก/ตั้งที่จัดเก็บ
+    (function () {
+      var lowBox = document.querySelector("[data-lowstock]");
+      if (!lowBox) return;
+      var st = { q: "", open: {}, prod: null };
+
+      function uniqLocations() {
+        var seen = {}, out = [];
+        S.getProducts().forEach(function (p) { var l = (p.location || "").trim(); if (l && !seen[l]) { seen[l] = 1; out.push(l); } });
+        return out.sort();
+      }
+      function brandRank() {
+        var map = {}; ((S.getSettings() || {}).brands || []).forEach(function (b, i) { if (b && b.name) map[b.name.toUpperCase()] = i; });
+        return map;
+      }
+      function formHtml(p) {
+        return '<div class="low-form" data-form="' + p.id + '">' +
+          '<div class="low-frow"><label>เพิ่มจำนวน</label><input type="number" data-qty value="5" min="1"></div>' +
+          '<div class="low-frow"><label>ที่จัดเก็บ</label><input data-loc list="low-locs" value="' + esc(p.location || "") + '" placeholder="เลือกที่มีอยู่ หรือพิมพ์ใหม่"></div>' +
+          '<datalist id="low-locs">' + uniqLocations().map(function (l) { return '<option value="' + esc(l) + '">'; }).join("") + "</datalist>" +
+          '<button class="btn btn-sm" data-save="' + p.id + '">บันทึก</button>' +
+        "</div>";
+      }
+      function itemHtml(p) {
+        var loc = (p.location || "").trim();
+        return '<div class="low-item">' +
+          '<div class="low-irow" data-prod="' + p.id + '">' +
+            "<span><b>" + esc(p.name) + "</b><br><span class=prod-sku>" + (loc ? esc(loc) : "— ยังไม่มีที่จัดเก็บ") + "</span></span>" +
+            '<span class="stock-n low">' + S.available(p) + " ชิ้น</span>" +
+          "</div>" + (st.prod === p.id ? formHtml(p) : "") + "</div>";
+      }
+      function paint() {
+        var rank = brandRank(), q = st.q.trim().toLowerCase();
+        var all = S.getProducts().filter(function (p) { return S.available(p) <= 3; });
+        var low = all.filter(function (p) { return !q || ((p.name || "") + " " + (p.brand || "") + " " + (p.sku || "")).toLowerCase().indexOf(q) >= 0; });
+        var listHtml;
+        if (!low.length) {
+          listHtml = '<p style="font-family:var(--font-body);color:var(--fg-2);padding:8px 0">' + (all.length ? "ไม่พบสินค้าที่ค้นหา" : "สต็อกเพียงพอทุกรายการ ✓") + "</p>";
+        } else {
+          var groups = {};
+          low.forEach(function (p) { var b = (p.brand || "").trim() || "ไม่ระบุแบรนด์"; (groups[b] = groups[b] || []).push(p); });
+          listHtml = Object.keys(groups).sort(function (a, b) {
+            var ia = rank[a.toUpperCase()], ib = rank[b.toUpperCase()];
+            if (ia == null && ib == null) return a.localeCompare(b, "th");
+            if (ia == null) return 1; if (ib == null) return -1; return ia - ib;
+          }).map(function (b) {
+            var items = groups[b].sort(function (x, y) { return S.available(x) - S.available(y); });
+            var open = !!st.open[b] || !!q;
+            return '<div class="low-group"><div class="low-ghead" data-brand="' + esc(b) + '">' + (open ? "▾" : "▸") + " " + esc(b) +
+              ' <span class="low-gn">(' + items.length + ")</span></div>" + (open ? items.map(itemHtml).join("") : "") + "</div>";
+          }).join("");
+        }
+        lowBox.innerHTML = '<input data-lowq placeholder="🔎 ค้นหาสินค้า / แบรนด์ / SKU" value="' + esc(st.q) + '" class="low-search">' + listHtml;
+        wire();
+      }
+      function wire() {
+        var qEl = lowBox.querySelector("[data-lowq]");
+        if (qEl) qEl.oninput = function () { var pos = qEl.selectionStart; st.q = qEl.value; paint(); var n = lowBox.querySelector("[data-lowq]"); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} } };
+        lowBox.querySelectorAll("[data-brand]").forEach(function (h) { h.onclick = function () { var b = h.getAttribute("data-brand"); st.open[b] = !st.open[b]; paint(); }; });
+        lowBox.querySelectorAll("[data-prod]").forEach(function (r) { r.onclick = function () { var id = r.getAttribute("data-prod"); st.prod = st.prod === id ? null : id; paint(); }; });
+        lowBox.querySelectorAll("[data-save]").forEach(function (btn) {
+          btn.onclick = function (e) {
+            e.stopPropagation();
+            var id = btn.getAttribute("data-save"), form = lowBox.querySelector('[data-form="' + id + '"]');
+            var qty = parseInt(form.querySelector("[data-qty]").value, 10), loc = form.querySelector("[data-loc]").value.trim();
+            var p = S.getProduct(id); if (!p) return;
+            if (loc !== (p.location || "")) S.saveProduct(Object.assign({}, p, { location: loc }));
+            if (!isNaN(qty) && qty !== 0) { if (S.adjustStock(id, qty) === false) { U.toast("ไม่มีสิทธิ์ปรับสต็อก", "err"); return; } }
+            if (S.pushProductToSheet) S.pushProductToSheet(S.getProduct(id));
+            U.toast("บันทึกแล้ว ✓", "ok"); st.prod = null; paint();
+          };
+        });
+      }
+      paint();
+    })();
 
     // recent orders
     var recent = S.getOrders().slice(0, 6);
