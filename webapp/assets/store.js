@@ -178,7 +178,7 @@
 
   /* ---------- Editable site content (back office) ----------------- */
   var DEFAULT_SETTINGS = {
-    heroOverline: "DEWALT BY M.E.TOOLS · แยกท่ารั้ว เชียงใหม่",
+    heroOverline: "DEWALT BY M.E.TOOLS · ท่ารั้ว เชียงใหม่",
     heroTitle: "PRO TOOLS",
     heroPhrases: ["เช่าก็ได้ ซื้อก็ดี"],
     heroSub: "ศูนย์รวมเครื่องมือช่าง DEWALT ของแท้ + แบรนด์โปร เช่ารายวัน หรือ ซื้อขาด จองง่ายในไม่กี่คลิก รับเองที่ร้านหรือส่งถึงงาน",
