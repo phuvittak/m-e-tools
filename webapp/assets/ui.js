@@ -177,7 +177,7 @@
           (function () { var op = S.isOpenNow(); return '<div class="me-footer-pill ' + (op.open ? "open" : "closed") + '"><span class="dot' + (op.open ? "" : " dot-closed") + '"></span> ' + (op.open ? "เปิดอยู่" : "ปิดอยู่" + (op.reason ? " · " + esc(op.reason) : "")) + "</div>"; })() + "</div>" +
     "</div>" +
       '<div class="me-footer-foot">' +
-      '  <span>© 2026 ' + esc(st.company) + ' · แยกท่ารั้ว เชียงใหม่</span>' +
+      '  <span>© 2026 ' + esc(st.company) + ' · ท่ารั้ว เชียงใหม่</span>' +
       '  <span>พัฒนาโดย นายภูวิศทักษ์ ฐิติฤทธินันท์ | All Brands® are trademarks of their owners.</span>' +
       '</div></footer>'
     );
