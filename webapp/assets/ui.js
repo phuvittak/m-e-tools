@@ -175,9 +175,11 @@
         '<div class="me-footer-col"><div class="me-footer-h">เวลาทำการ</div>' +
           "<div>" + esc(st.hoursWeek) + "</div><div>" + esc(st.hoursSun) + "</div>" +
           (function () { var op = S.isOpenNow(); return '<div class="me-footer-pill ' + (op.open ? "open" : "closed") + '"><span class="dot' + (op.open ? "" : " dot-closed") + '"></span> ' + (op.open ? "เปิดอยู่" : "ปิดอยู่" + (op.reason ? " · " + esc(op.reason) : "")) + "</div>"; })() + "</div>" +
-      "</div>" +
-      '<div class="me-footer-foot"><span>© 2026 ' + esc(st.company) + " · แยกท่ารั้ว เชียงใหม่</span>" +
-      "<span>DEWALT® is a trademark of Stanley Black &amp; Decker.</span></div></footer>"
+    "</div>" +
+      '<div class="me-footer-foot">' +
+      '  <span>© 2026 ' + esc(st.company) + ' · แยกท่ารั้ว เชียงใหม่</span>' +
+      '  <span>พัฒนาโดย นายภูวิศทักษ์ ฐิติฤทธินันท์ | All Brands® are trademarks of their owners.</span>' +
+      '</div></footer>'
     );
   }
 
