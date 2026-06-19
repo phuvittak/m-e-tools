@@ -27,6 +27,8 @@ import crypto from 'crypto';
 const API_BASE = (process.env.BIGSELLER_API_BASE || 'https://api.bigseller.com').replace(/\/+$/, '');
 const EP = {
   'product.upsert': process.env.BIGSELLER_EP_PRODUCT || '/api/v1/product/upsert',
+  'product.offshelf': process.env.BIGSELLER_EP_OFFSHELF || '/api/v1/product/off-shelf',
+  'product.delete': process.env.BIGSELLER_EP_DELETE || '/api/v1/product/delete',
   'order.create': process.env.BIGSELLER_EP_ORDER || '/api/v1/order/create',
   'stock.query': process.env.BIGSELLER_EP_STOCK || '/api/v1/stock/query',
 };
@@ -56,6 +58,12 @@ function mapForBigSeller(action, p) {
       items: (p.items || []).map((it) => ({ merchantSku: it.sku, name: it.name, quantity: it.qty, price: it.price })),
       totalAmount: p.total,
     };
+  }
+  if (action === 'product.offshelf') {
+    return { merchantSku: p.sku, status: 'OFF_SHELF' };   // ปิดการขายบนทุกแพลตฟอร์ม
+  }
+  if (action === 'product.delete') {
+    return { merchantSku: p.sku };                         // ลบสินค้าต้นแบบ
   }
   if (action === 'stock.query') {
     return { skuList: p.skus || [] };

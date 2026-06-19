@@ -287,6 +287,20 @@
       enqueue("order.create", buildOrderPayload(o));
     } catch (e) { log({ kind: "order.create", status: "error", message: "exception: " + (e && e.message) }); }
   }
+  // ปิดการขายสินค้า (off-shelf) บนทุกแพลตฟอร์ม — ใช้ตอน "ซ่อน/ปิดขายทั้งแบรนด์"
+  function offShelfProduct(p) {
+    try {
+      if (!featureOn("product")) return;
+      enqueue("product.offshelf", { sku: merchantSku(p) });
+    } catch (e) { log({ kind: "product.offshelf", status: "error", message: "exception: " + (e && e.message) }); }
+  }
+  // ลบสินค้าต้นแบบใน BigSeller — ใช้ตอน "ลบทั้งแบรนด์" (ถอนรากถอนโคน)
+  function removeProduct(p) {
+    try {
+      if (!featureOn("product")) return;
+      enqueue("product.delete", { sku: merchantSku(p) });
+    } catch (e) { log({ kind: "product.delete", status: "error", message: "exception: " + (e && e.message) }); }
+  }
 
   /* ---------- read-only: ดึงสต็อกจาก BigSeller (Phase 1 — ปลอดภัยสุด) ----------
      เรียกแบบ on-demand เท่านั้น (ปุ่มในหน้าแอดมิน / ก่อนชำระเงิน) — ไม่ polling
@@ -340,7 +354,7 @@
     specToDescription: specToDescription, buildProductPayload: buildProductPayload,
     buildOrderPayload: buildOrderPayload, validateProduct: validateProduct, merchantSku: merchantSku,
     // outbound
-    syncProduct: syncProduct, syncOrder: syncOrder,
+    syncProduct: syncProduct, syncOrder: syncOrder, offShelfProduct: offShelfProduct, removeProduct: removeProduct,
     // read-only / checkout guard
     pullStock: pullStock, finalStockCheck: finalStockCheck,
     // queue/log

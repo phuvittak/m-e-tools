@@ -1766,7 +1766,18 @@
           '<label class="btn btn-ghost btn-sm filebtn" style="margin-top:8px">+ เพิ่มรูป…<input type="file" accept="image/*" multiple data-imgfile></label></div>'
         : '<div class="img-hint" style="margin-bottom:6px">เฉพาะแอดมินเท่านั้นที่จัดการรูปสินค้าได้</div>') +
       '<div class="field"><label>ชื่อสินค้า</label><input data-f="name" value="' + esc(p.name) + '" placeholder="เช่น สว่านกระแทกไร้สาย 20V"></div>' +
-      '<div class="f2"><div class="field"><label>แบรนด์</label><input data-f="brand" value="' + esc(p.brand) + '"></div>' +
+      '<div class="f2"><div class="field"><label>แบรนด์ <span style="font-weight:400;color:#888">(เลือกจากรายการ — กันสะกดผิด)</span></label><select data-f="brand">' +
+        (function () {
+          var names = ((S.getSettings() || {}).brands || []).map(function (b) { return b.name; }).filter(Boolean);
+          var cur = p.brand || "";
+          var html = "";
+          if (!cur) html += '<option value="" selected disabled>— เลือกแบรนด์ —</option>';
+          // ค่าเดิมที่ไม่อยู่ในรายการแบรนด์ (สินค้าเก่า) — เก็บไว้ให้เลือกได้ ไม่ให้ข้อมูลหาย
+          if (cur && names.indexOf(cur) < 0) html += '<option value="' + esc(cur) + '" selected>' + esc(cur) + " (ค่าเดิม — ยังไม่อยู่ในรายการแบรนด์)</option>";
+          html += names.map(function (n) { return '<option value="' + esc(n) + '"' + (cur === n ? " selected" : "") + ">" + esc(n) + "</option>"; }).join("");
+          return html;
+        })() +
+        '</select></div>' +
       '<div class="field"><label>รหัส SKU</label><input data-f="sku" value="' + esc(p.sku) + '"></div></div>' +
       '<div class="f2"><div class="field"><label>หมวดหมู่</label><select data-f="category">' +
         S.getCategories().map(function (c) { var path = S.categoryPath(c.key).map(function (x) { return x.label; }).join(" › "); return '<option value="' + c.key + '"' + (p.category === c.key ? " selected" : "") + ">" + esc(path || c.label) + "</option>"; }).join("") + "</select></div>" +
@@ -2432,19 +2443,61 @@
       brandList.querySelectorAll("[data-bh]").forEach(function (i) { brands[+i.dataset.bh].hidden = i.checked; });
     }
     var _dragSrcIdx = null;
+    // ---- cascade helpers: แบรนด์ → สินค้าในแบรนด์นั้น (+ ยิง BigSeller) ----
+    function brandProducts(name) {
+      name = (name || "").trim().toLowerCase();
+      if (!name) return [];
+      return S.getProducts().filter(function (p) { return (p.brand || "").trim().toLowerCase() === name; });
+    }
+    function cascadeOffShelf(name) {
+      var prods = brandProducts(name);
+      if (!prods.length) { U.toast('แบรนด์ "' + name + '" ยังไม่มีสินค้า', ""); return; }
+      if (!window.confirm('ปิดการขายสินค้าแบรนด์ "' + name + '" ทั้งหมด ' + prods.length + ' รายการ?\n• ซ่อนจากหน้าเว็บ M.E.Tools\n• ส่งคำสั่งปิดการขาย (off-shelf) ไป BigSeller → Shopee/Lazada/TikTok (เฉพาะเมื่อเปิดซิงค์ API)')) return;
+      var n = 0;
+      prods.forEach(function (p) {
+        if (S.saveProduct(Object.assign({}, p, { hidden: true }))) n++;
+        try { if (window.BigSellerSync) window.BigSellerSync.offShelfProduct(p); } catch (e) {}
+      });
+      U.toast("ปิดการขายแบรนด์ " + name + " แล้ว " + n + " รายการ", "ok");
+    }
+    function cascadeDeleteProducts(name) {
+      var prods = brandProducts(name), n = 0;
+      prods.forEach(function (p) {
+        try { if (window.BigSellerSync) window.BigSellerSync.removeProduct(p); } catch (e) {}
+        try { S.deleteProduct(p.id); n++; } catch (e) {}
+      });
+      return n;
+    }
     function renderBrands() {
       if (!brandList) return;
       brandList.innerHTML = brands.map(function (b, i) {
+        var pc = brandProducts(b.name).length;
         return '<div class="row-edit' + (b.hidden ? " is-hidden" : "") + '" draggable="true" data-brow="' + i + '" style="cursor:grab">' +
           '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 6px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
           '<input data-bn="' + i + '" value="' + esc(b.name) + '" placeholder="ชื่อแบรนด์" style="flex:1">' +
-          '<input data-bt="' + i + '" value="' + esc(b.tag || "") + '" placeholder="คำอธิบายสั้น" style="flex:1.4">' +
-          '<label class="f-check"><input type="checkbox" data-bp="' + i + '"' + (b.primary ? " checked" : "") + "> เด่น</label>" +
-          '<label class="f-check"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อน</label>" +
+          '<input data-bt="' + i + '" value="' + esc(b.tag || "") + '" placeholder="คำอธิบายสั้น (โชว์บนเว็บเท่านั้น)" style="flex:1.4">' +
+          '<span style="font-size:11px;color:var(--fg-2);white-space:nowrap" title="จำนวนสินค้าในแบรนด์นี้">' + pc + ' สินค้า</span>' +
+          '<label class="f-check" title="ซ่อนเฉพาะป้ายแบรนด์บนหน้าเว็บ (ไม่กระทบสินค้า/แพลตฟอร์มอื่น)"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อนป้าย</label>" +
+          '<button class="btn btn-sm btn-ghost" data-boff="' + i + '" title="ซ่อนสินค้าทั้งแบรนด์จากเว็บ + ปิดการขายบน Shopee/Lazada/TikTok ผ่าน BigSeller">🚫 ปิดขายทั้งแบรนด์</button>' +
           '<button class="btn btn-sm btn-danger" data-bdel="' + i + '">ลบ</button></div>';
       }).join("");
       brandList.querySelectorAll("[data-bdel]").forEach(function (b) {
-        b.onclick = function () { syncBrands(); brands.splice(+b.dataset.bdel, 1); renderBrands(); };
+        b.onclick = function () {
+          syncBrands();
+          var idx = +b.dataset.bdel, name = (brands[idx].name || "").trim();
+          var prods = brandProducts(name);
+          if (prods.length) {
+            // ลบแบบถอนรากถอนโคน → ต้องพิมพ์ชื่อแบรนด์ยืนยัน (Safety Confirmation)
+            var typed = window.prompt('⚠️ ลบแบรนด์ "' + name + '" และสินค้าทั้งหมด ' + prods.length + ' รายการออกจากเว็บ + BigSeller (กู้คืนไม่ได้)\n\nพิมพ์ชื่อแบรนด์ "' + name + '" เพื่อยืนยัน:');
+            if ((typed || "").trim().toLowerCase() !== name.toLowerCase()) { U.toast("ยกเลิกการลบ (พิมพ์ชื่อไม่ตรง)", ""); return; }
+            var n = cascadeDeleteProducts(name);
+            U.toast("ลบแบรนด์ " + name + " + สินค้า " + n + " รายการแล้ว", "ok");
+          }
+          brands.splice(idx, 1); renderBrands();
+        };
+      });
+      brandList.querySelectorAll("[data-boff]").forEach(function (b) {
+        b.onclick = function () { syncBrands(); cascadeOffShelf((brands[+b.dataset.boff].name || "").trim()); renderBrands(); };
       });
       brandList.querySelectorAll("[data-bh]").forEach(function (i) { i.onchange = function () { syncBrands(); renderBrands(); }; });
       // drag-and-drop reorder
@@ -2504,6 +2557,7 @@
       catList.querySelectorAll("[data-cp]").forEach(function (i) { cats[+i.dataset.cp].parent = i.value; });
       catList.querySelectorAll("[data-ch]").forEach(function (i) { cats[+i.dataset.ch].hidden = i.checked; });
       catList.querySelectorAll("[data-cv]").forEach(function (i) { cats[+i.dataset.cv].vat = i.checked; });
+      catList.querySelectorAll("[data-cbs]").forEach(function (i) { cats[+i.dataset.cbs].bsCatId = i.value.trim(); });
     }
     // เซ็ตลูกหลานของ key (จาก cats ปัจจุบัน) — กันเลือกหมวดแม่เป็นตัวเอง/ลูกตัวเอง (วน loop)
     function catDescLocal(key) {
@@ -2542,6 +2596,7 @@
           '<label class="btn btn-sm" style="cursor:pointer;white-space:nowrap">⬆ รูป<input type="file" accept="image/*" data-cimg="' + i + '" style="display:none"></label>' +
           (c.image ? '<button type="button" class="btn btn-sm" data-cimgclr="' + i + '">ลบรูป</button>' : "") +
           '<label class="f-check" style="white-space:nowrap" title="หมวดนี้คิด VAT ไหม"><input type="checkbox" data-cv="' + i + '"' + (c.vat !== false ? " checked" : "") + "> VAT</label>" +
+          '<input data-cbs="' + i + '" value="' + esc(c.bsCatId || "") + '" placeholder="BigSeller Cat ID" title="รหัสหมวดหมู่ใน BigSeller — ผูกให้สินค้าหมวดนี้วิ่งเข้าหมวดที่ถูกต้องบน Shopee/Lazada/TikTok (ไม่ใส่ก็ได้)" style="flex:0 0 120px;font-family:var(--font-mono,monospace);font-size:12px">' +
           '<label class="f-check" style="white-space:nowrap"><input type="checkbox" data-ch="' + i + '"' + (c.hidden ? " checked" : "") + "> ซ่อน</label>" +
           '<button type="button" class="btn btn-sm btn-danger" data-cdel="' + i + '">ลบ</button></div>';
       }).join("");
@@ -2734,7 +2789,7 @@
       var patch = {};
       simpleKeys.forEach(function (k) { var el = root.querySelector('[data-set="' + k + '"]'); patch[k] = el ? el.value : st[k]; });
       patch.phone = phones.map(function (p) { return p.trim(); }).filter(Boolean).join(", ");
-      patch.categories = cats.filter(function (c) { return (c.label || "").trim(); }).map(function (c) { return { key: c.key, label: c.label.trim(), icon: c.icon || "tool", image: c.image || "", hidden: !!c.hidden, parent: c.parent || "", vat: c.vat !== false }; });
+      patch.categories = cats.filter(function (c) { return (c.label || "").trim(); }).map(function (c) { return { key: c.key, label: c.label.trim(), icon: c.icon || "tool", image: c.image || "", hidden: !!c.hidden, parent: c.parent || "", vat: c.vat !== false, bsCatId: (c.bsCatId || "").trim() }; });
       if (openSunEl) patch.openSun = openSunEl.checked;
       if (vatOnEl) patch.vatEnabled = vatOnEl.checked;
       if (vatPctEl) patch.vatPct = +vatPctEl.value || 0;
