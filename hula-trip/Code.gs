@@ -6,7 +6,7 @@
  */
 
 // ===== แหล่งข้อมูล: ลิงก์ Google Sheets (เนทีฟ) ที่แปลงจาก Excel แล้ว =====
-var SOURCE_URL = 'วางลิงก์ Google Sheets ตรงนี้';
+var SOURCE_URL = 'https://docs.google.com/spreadsheets/d/1j6lyoahjSgKDH20I0zxbed6RNMCP8sqGDhy1sTc3rNk/edit';
 var MIN_INVEST = 1000;
 var FOOD_OPTIONS = ['ปกติ', 'อาหารเจ', 'อาหารมังสวิรัติ', 'อาหารมุสลิม'];
 var THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
