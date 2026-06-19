@@ -913,7 +913,7 @@
   function typeLabel(type) { return type === "rent" ? "เช่าสินค้า" : "ซื้อสินค้า"; }
   function statusLabel(s) {
     return { paid: "ชำระแล้ว", waiting: "รอรับสินค้า", pickup: "รับสินค้าหน้าร้าน",
-      received: "ได้รับสินค้าแล้ว", returned: "คืนแล้ว", cancelled: "ยกเลิก" }[s] || s;
+      delivering: "กำลังจัดส่ง", received: "ได้รับสินค้าแล้ว", returned: "คืนแล้ว", cancelled: "ยกเลิก" }[s] || s;
   }
   function fulfillmentLabel(f) { return f === "delivery" ? "บริการจัดส่ง" : "รับสินค้าหน้าร้าน"; }
 
@@ -1086,6 +1086,9 @@
     // auto-sync ขึ้น cloud — ใครก็ตามที่มีสิทธิ์ "คลัง/สต็อก" (เจ้าของ + พนักงานที่ได้รับสิทธิ์)
     // ลูกค้า/คนไม่มีสิทธิ์ไม่เข้าเงื่อนไขนี้ จึงไม่เขียนทับแคตตาล็อกบน cloud
     if (hasPerm("inventory")) { cloudPushProduct(saved); scheduleCatalogSync(); }
+    // BigSeller: ซิงค์สินค้าขาออก (async, ไม่บล็อก, ปลอดภัยถ้าโมดูลปิด/ไม่มี)
+    // หมายเหตุ: ตั้งใจ "ไม่ส่ง" ฟิลด์ location/ที่จัดเก็บ — เก็บในเว็บเราเท่านั้น
+    try { if (global.BigSellerSync) global.BigSellerSync.syncProduct(saved); } catch (e) {}
     return saved;
   }
   function deleteProduct(id) {
@@ -1266,6 +1269,8 @@
     // ซิงค์ "ทุก" ออเดอร์ (รวมลูกค้าที่ไม่ได้ล็อกอิน — ใช้ anonymous auth) เพื่อให้
     // เจ้าของเห็นออเดอร์ครบทุกเครื่อง ไม่ใช่แค่เครื่องที่กดสั่ง
     syncOrdersToCloud(created, sess || {});
+    // BigSeller: สร้างออเดอร์ขาออก (async, ไม่บล็อก, ทำงานเฉพาะเมื่อเปิด feature order)
+    try { if (global.BigSellerSync) created.forEach(function (o) { global.BigSellerSync.syncOrder(o); }); } catch (e) {}
     return created;
   }
 
@@ -1303,6 +1308,9 @@
       var o = orders[i];
       var prev = o.status;
       if (extra.reason) o.cancelReason = extra.reason;
+      // เลขพัสดุ/ขนส่ง (จาก BigSeller webhook → "กำลังจัดส่ง")
+      if (extra.tracking) o.tracking = extra.tracking;
+      if (extra.carrier) o.carrier = extra.carrier;
       if (status === "cancelled") o.refunded = true;
       // returning a rental puts units back as available
       if (o.type === "rent" && status === "returned" && prev !== "returned") {

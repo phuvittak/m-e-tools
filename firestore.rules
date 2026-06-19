@@ -79,6 +79,18 @@ service cloud.firestore {
       allow delete: if isAdmin(); // ลบข้อความเก่าเกิน 7 วันจากหน้า "แชทบอท LINE"
     }
 
+    // BigSeller webhook ขาเข้า — เก็บเหตุการณ์ออเดอร์/ยกเลิก/คืน/พัสดุ ไว้ให้หลังร้านดึงไป apply
+    //   อ่าน/อัปเดต(ติด processed): แอดมินเท่านั้น
+    //   create: shape-gated (มาจาก /api/bigseller-webhook ที่ตรวจลายเซ็น HMAC แล้ว — ชั้นนี้กันรูปแบบ)
+    match /bigseller_events/{eventId} {
+      allow read, list: if isAdmin();
+      allow create: if request.resource.data.type is string
+                 && request.resource.data.type.size() < 40
+                 && request.resource.data.processed == false;
+      allow update: if isAdmin();   // ติดธง processed หลัง apply เสร็จ
+      allow delete: if isAdmin();
+    }
+
     // โปรไฟล์ลูกค้า (ชื่อเล่นที่แอดมินตั้ง) — แยกจาก ID ใน bot_messages
     // อ่าน: แอดมินอ่านทั้งหมด, ลูกค้าอ่านของตัวเอง
     // เขียน: แอดมินเท่านั้น (ตั้งชื่อเล่นเป็นเรื่องหลังร้าน)

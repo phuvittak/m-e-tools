@@ -610,12 +610,33 @@
     var mode = p.forSale ? "buy" : "rent";
     var qty = 1, days = 1;
 
+    // ---- badges ข้างชื่อสินค้า (ประกัน / ของแท้ / พร้อมส่ง) ----
+    var badgesHtml = '<div class="pd-badges">' +
+      (p.warrantyYears ? '<span class="pd-badge warranty">🛡️ ประกันศูนย์ ' + p.warrantyYears + ' ปี</span>' : "") +
+      '<span class="pd-badge genuine">✓ ของแท้ 100%</span>' +
+      (avail > 0 ? '<span class="pd-badge ready">⚡ พร้อมส่ง</span>' : "") +
+      "</div>";
+
+    // ---- ตารางสเปกด่วน (quick attributes grid) ----
+    var quickAttrs = [];
+    if (p.warrantyYears) quickAttrs.push(["🛡️", "การรับประกัน", "ศูนย์ " + p.warrantyYears + " ปี"]);
+    if (p.motorType && p.motorType !== "—") quickAttrs.push(["⚙️", "ระบบมอเตอร์", p.motorType]);
+    if (p.voltage) quickAttrs.push(["🔌", "แรงดันไฟฟ้า", p.voltage]);
+    if (p.batteryPlatform) quickAttrs.push(["🔋", "แพลตฟอร์มแบต", p.batteryPlatform]);
+    (p.specs || []).forEach(function (s) { var kv = specKV(s); if (kv && kv[0] && kv[1] && quickAttrs.length < 6) quickAttrs.push(["▪️", kv[0], kv[1]]); });
+    var quickGridHtml = quickAttrs.length
+      ? '<div class="pd-quickgrid">' + quickAttrs.map(function (a) {
+          return '<div class="pd-qcell"><span class="pd-qicon">' + a[0] + '</span><span class="pd-qk">' + esc(a[1]) + '</span><span class="pd-qv">' + esc(a[2]) + "</span></div>";
+        }).join("") + "</div>"
+      : "";
+
     root.innerHTML =
       '<div class="crumbs"><a href="index.html">หน้าแรก</a> / <a href="shop.html">สินค้า</a> / ' +
         '<a href="shop.html?cat=' + p.category + '">' + S.categoryLabel(p.category) + "</a> / " + p.name + "</div>" +
       '<div class="pd-grid"><div>' + productViewer(p) + "</div>" +
         '<div class="pd-info"><span class="pd-brand">' + p.brand + "</span>" +
           '<h1 class="pd-name">' + p.name + "</h1>" +
+          badgesHtml +
           '<div class="pd-rate">' + starsDisplay(p) + "</div>" +
           '<span class="' + (avail > 0 ? "stockpill in" : "stockpill out") + '">' +
             (avail > 0 ? "มีของพร้อมส่ง · เหลือ " + avail + " ชิ้น" : "สินค้าหมดชั่วคราว") + " · " + S.categoryLabel(p.category) + "</span>" +
@@ -625,6 +646,7 @@
             (p.forSale ? '<div class="pd-price-box"><div class="k">ราคาขาย</div><div class="v">' + S.money(p.price) + "</div></div>" : "") +
             (p.forRent ? '<div class="pd-price-box" data-rent-only><div class="k">ค่าเช่า / วัน</div><div class="v rent">' + S.money(p.rentPerDay) + "</div></div>" : "") +
           "</div><div class=\"buybox\" data-buybox></div>" +
+          quickGridHtml +
           '<div class="pd-rate-give"><span class="pd-rate-give-label">⭐ ให้คะแนนสินค้านี้</span>' + ratingWidget(p.id) + "</div>" +
           "<table class=specs><tbody><tr><th>รหัสสินค้า (SKU)</th><td>" + p.sku + "</td></tr>" +
             "<tr><th>การรับประกัน</th><td>" + (p.warrantyYears ? "ศูนย์ " + p.warrantyYears + " ปี" : "ตามเงื่อนไขร้าน") + "</td></tr>" +
@@ -715,10 +737,41 @@
         bb.querySelector("[data-d='1']").addEventListener("click", function () { days = days + 1; drawBuybox(); });
         bb.querySelector("[data-days]").addEventListener("change", function (e) { days = clampInt(e.target.value, 1, 365); drawBuybox(); });
       }
-      bb.querySelector("[data-add]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); U.toast("เพิ่ม <b>" + p.name + "</b> ลงตะกร้าแล้ว", "ok"); });
+      bb.querySelector("[data-add]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); U.toast("เพิ่ม <b>" + p.name + "</b> ลงตะกร้าแล้ว", "ok"); syncStickyPrice(); });
       bb.querySelector("[data-buynow]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); window.location.href = "cart.html"; });
     }
     drawBuybox();
+    mountStickyBar();
+
+    // ---- แถบปุ่มตรึงด้านล่าง (มือถือ) : แชท · ใส่ตะกร้า · ซื้อทันที(ราคา) ----
+    function syncStickyPrice() {
+      var el = document.querySelector(".pd-stickybar [data-sb-price]");
+      if (!el) return;
+      var unit = mode === "rent" ? p.rentPerDay : p.price;
+      var total = mode === "rent" ? unit * qty * days : unit * qty;
+      el.textContent = S.money(total);
+    }
+    function mountStickyBar() {
+      var old = document.querySelector(".pd-stickybar"); if (old) old.remove();
+      if (avail <= 0) return;
+      var bar = document.createElement("div");
+      bar.className = "pd-stickybar";
+      bar.innerHTML =
+        '<button class="sb-chat" data-sb-chat aria-label="แชทกับร้าน">' +
+          '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
+          "<span>แชท</span></button>" +
+        '<button class="sb-cart" data-sb-cart>🛒 ใส่ตะกร้า</button>' +
+        '<button class="sb-buy" data-sb-buy>ซื้อทันที · <b data-sb-price></b></button>';
+      document.body.appendChild(bar);
+      bar.querySelector("[data-sb-chat]").addEventListener("click", function () {
+        var fab = document.querySelector("[data-line-fab]");
+        if (fab) fab.click();
+        else { var oc = document.querySelector("[data-open-chat]"); if (oc) oc.click(); }
+      });
+      bar.querySelector("[data-sb-cart]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); U.toast("เพิ่ม <b>" + p.name + "</b> ลงตะกร้าแล้ว", "ok"); });
+      bar.querySelector("[data-sb-buy]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); window.location.href = "cart.html"; });
+      syncStickyPrice();
+    }
   }
 
   /* ===================== CART + CHECKOUT ===================== */
@@ -1006,12 +1059,32 @@
       paidBtn.onclick = function () {
         if (!payStatus) { U.toast("กรุณาอัปโหลดสลิปให้ตรวจผ่านก่อน", "err"); return; }
         var co = Object.assign({}, checkout, { slip: slip, slipRef: slipRef, payStatus: payStatus, payAmount: payAmount, payMethod: "promptpay" });
-        var created = S.placeOrder(co);
-        close();
-        if (created && created.length) {
-          var ids = created.map(function (o) { return o.id; }).join(",");
-          window.location.href = "orders.html?new=" + encodeURIComponent(ids);
+
+        function finalize() {
+          var created = S.placeOrder(co);
+          close();
+          if (created && created.length) {
+            var ids = created.map(function (o) { return o.id; }).join(",");
+            window.location.href = "orders.html?new=" + encodeURIComponent(ids);
+          }
         }
+
+        // BigSeller: ตรวจสต็อกจริงที่คลังกลางอีกครั้งก่อนตัดเงิน (ถ้าเปิดฟีเจอร์ไว้)
+        // ปิด/ดึงไม่ได้ → ปล่อยผ่าน ใช้สต็อก local เดิม (ไม่ขวางการขาย)
+        var BS = window.BigSellerSync;
+        if (BS && BS.featureOn && BS.featureOn("stockPull")) {
+          var lines = (S.cartLines() || []).filter(function (l) { return l.mode === "buy"; })
+            .map(function (l) { return { sku: BS.merchantSku(l.product), qty: l.qty }; });
+          paidBtn.setAttribute("disabled", "disabled");
+          BS.finalStockCheck(lines).then(function (res) {
+            paidBtn.removeAttribute("disabled");
+            if (res.ok) { finalize(); return; }
+            var msg = (res.shortages || []).map(function (s) { return s.sku + " เหลือ " + s.have + " (สั่ง " + s.want + ")"; }).join(", ");
+            U.toast("สินค้าบางรายการเหลือไม่พอแล้ว: " + msg + " — กรุณาปรับจำนวนในตะกร้า", "err");
+          }).catch(function () { paidBtn.removeAttribute("disabled"); finalize(); });
+          return;
+        }
+        finalize();
       };
     }
 
