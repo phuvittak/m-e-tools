@@ -11,7 +11,7 @@
 
 // ===== ตั้งค่า =====
 // ลิงก์แชร์ไฟล์ Excel บน OneDrive (ตั้งให้ "ทุกคนที่มีลิงก์ดูได้")
-var EXCEL_SHARE_URL = 'https://1drv.ms/x/c/d4226e2b85a84b3d/IQB6emuhEbMFQpp4-GnsLzUtAeGHGgvWA-ajoQpW0LUehmE';
+var EXCEL_SHARE_URL = 'https://1drv.ms/x/c/d4226e2b85a84b3d/IQB6emuhEbMFQpp4-GnsLzUtAeGHGgvWA-ajoQpW0LUehmE?e=yk8M3w';
 var REG_TAB = 'การลงทะเบียน';
 var MIN_INVEST = 1000;
 var FOOD_OPTIONS = ['ปกติ', 'อาหารเจ', 'อาหารมังสวิรัติ', 'อาหารมุสลิม'];
@@ -72,11 +72,38 @@ function oneDriveDirect_(share){
   return 'https://api.onedrive.com/v1.0/shares/u!' + b64 + '/root/content';
 }
 
+/** ดึงไฟล์ Excel จาก OneDrive — ลองหลายวิธีจนกว่าจะได้ไฟล์จริง (ไม่ใช่หน้า HTML) */
+function fetchExcelBlob_(){
+  var share = EXCEL_SHARE_URL;
+  var tries = [];
+  // วิธี 1: api.onedrive.com/shares
+  tries.push(oneDriveDirect_(share));
+  // วิธี 3: เติม &download=1 ที่ลิงก์แชร์ตรง ๆ
+  tries.push(share + (share.indexOf('?')>=0 ? '&' : '?') + 'download=1');
+
+  // วิธี 2: ตามรีไดเรกต์ของ 1drv.ms แล้วสั่งดาวน์โหลด
+  try {
+    var r0 = UrlFetchApp.fetch(share, { followRedirects:false, muteHttpExceptions:true });
+    var h = r0.getHeaders(); var loc = h['Location'] || h['location'];
+    if (loc) tries.push(loc + (loc.indexOf('?')>=0 ? '&' : '?') + 'download=1');
+  } catch(e){}
+
+  for (var i=0;i<tries.length;i++){
+    try {
+      var resp = UrlFetchApp.fetch(tries[i], { followRedirects:true, muteHttpExceptions:true });
+      if (resp.getResponseCode() < 300){
+        var blob = resp.getBlob();
+        var ct = blob.getContentType() || '';
+        if (ct.indexOf('html') < 0 && ct.indexOf('text/plain') < 0) return blob.setName('hula-src.xlsx');
+      }
+    } catch(e){}
+  }
+  throw new Error('ดึงไฟล์ OneDrive ไม่สำเร็จทุกวิธี — แนะนำย้ายไฟล์ไป Google Drive (ดู SETUP)');
+}
+
 /** ดึง Excel จาก OneDrive แปลงเป็นชีต แล้วเขียนทับข้อมูลใน Google Sheet ปลายทาง */
 function syncFromExcel(){
-  var resp = UrlFetchApp.fetch(oneDriveDirect_(EXCEL_SHARE_URL), { followRedirects:true, muteHttpExceptions:true });
-  if (resp.getResponseCode() >= 300) throw new Error('ดึงไฟล์ Excel ไม่สำเร็จ (HTTP '+resp.getResponseCode()+') — ตรวจการแชร์ OneDrive');
-  var blob = resp.getBlob().setName('hula-src.xlsx');
+  var blob = fetchExcelBlob_();
 
   var tmp = Drive.Files.insert({ title:'hula-src-temp', mimeType:MimeType.GOOGLE_SHEETS }, blob, { convert:true });
   try {
