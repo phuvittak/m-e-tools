@@ -11,7 +11,7 @@
 
 // ===== ตั้งค่า =====
 // ลิงก์แชร์ไฟล์ Excel บน OneDrive (ตั้งให้ "ทุกคนที่มีลิงก์ดูได้")
-var EXCEL_SHARE_URL = 'https://1drv.ms/x/c/d4226e2b85a84b3d/IQB6emuhEbMFQpp4-GnsLzUtAeGHGgvWA-ajoQpW0LUehmE?e=pXYbAo';
+var EXCEL_SHARE_URL = 'https://1drv.ms/x/c/d4226e2b85a84b3d/IQB6emuhEbMFQpp4-GnsLzUtAeGHGgvWA-ajoQpW0LUehmE';
 var REG_TAB = 'การลงทะเบียน';
 var MIN_INVEST = 1000;
 var FOOD_OPTIONS = ['ปกติ', 'อาหารเจ', 'อาหารมังสวิรัติ', 'อาหารมุสลิม'];
