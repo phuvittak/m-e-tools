@@ -7,7 +7,7 @@
   var view = document.body.getAttribute("data-admin");
 
   // permission gate per page (owner bypasses all). staff/botreplies are owner-only.
-  var permFor = { dashboard: "dashboard", inventory: "inventory", orders: "orders", erp: "erp", settings: "settings", botinbox: "botinbox", warranty: "warranty", quotes: "quotes", customers: "customers" };
+  var permFor = { dashboard: "dashboard", inventory: "inventory", orders: "orders", erp: "erp", settings: "settings", botinbox: "botinbox", warranty: "warranty", quotes: "quotes", customers: "customers", bigseller: "inventory" };
   if (view === "staff" || view === "botreplies") {
     if (!S.requirePerm(null, "../login.html")) return;
     if (!S.isOwner()) { window.location.href = "dashboard.html"; return; }
@@ -42,7 +42,7 @@
   });
   // ดันสินค้าที่ยังค้างขึ้น cloud "เองต่อเนื่อง" ทุก 30 วิ ระหว่างเปิดหลังร้าน → ครบเองไม่ต้องกดปุ่ม
   if (S.autoCatchUpSync) setInterval(function () { if (document.visibilityState === "visible") S.autoCatchUpSync(); }, 30000);
-  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, warranty: initWarranty, quotes: initQuotes, import: function(){} }[view] || function () {})();
+  ({ dashboard: initDashboard, inventory: initInventory, orders: initOrders, erp: initErp, settings: initSettings, staff: initStaff, chat: initChat, botinbox: initBotInbox, botreplies: initBotReplies, customers: initCustomers, warranty: initWarranty, quotes: initQuotes, import: function(){}, bigseller: function(){} }[view] || function () {})();
 
   // subscribe orders/{id} จาก Firestore แบบเรียลไทม์ → S.absorbCloudOrders() เขียนลง local me_orders
   function subscribeOrdersGlobal() {
@@ -77,6 +77,7 @@
       customers: '<path d="M17 21v-2a4 4 0 0 0-3-3.87"/><path d="M4 21v-2a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4v2"/><circle cx="9" cy="7" r="4"/><circle cx="17" cy="6" r="3"/>',
       warranty: '<path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>',
       quotes: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>',
+      bigseller: '<path d="M3 7h18l-1.5 12.5a2 2 0 0 1-2 1.5H6.5a2 2 0 0 1-2-1.5z"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/><path d="M12 11v6M9 14h6" stroke-linecap="round"/>',
     };
     var nav = [
       ["dashboard.html", "dashboard", "แดชบอร์ด", "dashboard"],
@@ -92,6 +93,7 @@
     if (S.hasPerm("customers")) nav.push(["customers.html", "customers", "สรุปลูกค้า", "customers"]);
     if (S.isOwner()) nav.push(["bot-replies.html", "botreplies", "คำตอบของบอท", "botreplies"]);
     if (S.isOwner()) nav.push(["import.html", "import", "นำเข้าสินค้า (AI)", "inventory"]);
+    if (S.isOwner()) nav.push(["bigseller.html", "bigseller", "BigSeller Sync", "bigseller"]);
     if (S.isOwner()) nav.push(["staff.html", "staff", "จัดการทีมงาน", "staff"]);
 
     var roleTag = sess.role === "owner" ? "แอดมิน" : "พนักงาน";
