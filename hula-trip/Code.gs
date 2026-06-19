@@ -13,7 +13,7 @@
 // ลิงก์แชร์ไฟล์ Excel บน OneDrive (ตั้งให้ "ทุกคนที่มีลิงก์ดูได้")
 // ===== แหล่งข้อมูล Excel =====
 // ✅ แนะนำ: อัปโหลดไฟล์ Excel ขึ้น Google Drive (บัญชีเดียวกับที่ deploy) แล้ววางลิงก์ทั้งลิงก์ตรงนี้
-var DRIVE_FILE_URL = '';   // เช่น 'https://drive.google.com/file/d/XXXXXXXX/view?usp=sharing'
+var DRIVE_FILE_URL = 'https://docs.google.com/spreadsheets/d/1zeYVV2vp4p8b2d_HRImUBHDOwunV5ax3/edit?usp=sharing';   // ไฟล์ Excel บน Google Drive
 // (สำรอง) ลิงก์ OneDrive — ใช้ก็ต่อเมื่อ DRIVE_FILE_URL ว่าง (มักโดน edu/องค์กรบล็อก)
 var EXCEL_SHARE_URL = 'https://1drv.ms/x/c/d4226e2b85a84b3d/IQB6emuhEbMFQpp4-GnsLzUtAeGHGgvWA-ajoQpW0LUehmE?e=yk8M3w';
 var REG_TAB = 'การลงทะเบียน';
