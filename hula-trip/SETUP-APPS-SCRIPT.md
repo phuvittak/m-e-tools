@@ -20,21 +20,22 @@
 3. กด **＋ → HTML** ตั้งชื่อ `Index` → วางเนื้อหา `Index.html`
 4. ⚙️ **Project Settings** → ติ๊ก **Show appsscript.json** → กลับมาวางเนื้อหา `appsscript.json`
 5. เพิ่มบริการ: เมนูซ้าย **Services (＋)** → เพิ่ม **Drive API**
-6. เลือกฟังก์ชัน **`setupAutoSync`** → กด **▶ Run**
-   - เด้งขออนุญาต → Advanced → Go to project → **Allow** (จะขอสิทธิ์ Sheets/Drive/ดึงเน็ต)
-   - ฟังก์ชันนี้จะ **ซิงค์ Excel เข้า Google Sheet ทันที + ตั้งให้ซิงค์เองทุก 6 ชม.**
-   - ตรวจผล: รัน `pingServer` ดู Log ต้องเห็นจำนวนสมาชิก > 0
-7. **Deploy → New deployment → Web app**
+6. เลือกฟังก์ชัน **`syncFromExcel`** → กด **▶ Run**
+   - เด้งขออนุญาต → Advanced → Go to project → **Allow** (Sheets/Drive/ดึงเน็ต)
+   - จะ **ดึง Excel จาก OneDrive → เขียนลง Google Sheet ทันที**
+   - ตรวจผล: ดู Log ต้องขึ้นว่าซิงค์กี่แถว (หรือรัน `pingServer` ดูจำนวนสมาชิก > 0)
+7. **ตั้งซิงค์อัตโนมัติ** (ไม่ต้องเขียนโค้ด): เมนูซ้าย **⏰ Triggers → Add Trigger**
+   - Function: **`syncFromExcel`** · Event source: **Time-driven** · **Hour timer → Every 6 hours** → **Save**
+8. **Deploy → New deployment → Web app**
    - Execute as: **Me** · Who has access: **Anyone** → **Deploy** → ก๊อป URL `…/exec`
-8. ส่ง URL ให้สมาชิก → กรอกรหัส (เช่น `PPARmvo`) → ใช้งานได้เลย
+9. ส่ง URL ให้สมาชิก → กรอกรหัส (เช่น `PPARmvo`) → ใช้งานได้เลย
 
 ---
 
 ## ฟังก์ชันที่ควรรู้ (รันในหน้า Apps Script)
 | ฟังก์ชัน | หน้าที่ |
 |---|---|
-| `setupAutoSync` | ตั้งซิงค์อัตโนมัติทุก 6 ชม. + ซิงค์รอบแรก (รันครั้งเดียวตอนติดตั้ง) |
-| `syncFromExcel` | ซิงค์ Excel → Sheet เดี๋ยวนั้น (กดเองได้ทุกเมื่อ) |
+| `syncFromExcel` | ซิงค์ Excel → Sheet เดี๋ยวนั้น (รันตอนติดตั้ง + ตั้ง trigger ให้รันเองทุก 6 ชม.) |
 | `pingServer` | ตรวจว่าอ่านข้อมูลได้ + จำนวนสมาชิก + เวลาซิงค์ล่าสุด |
 | `getWorkSheetUrl` | ลิงก์เปิด Google Sheet ปลายทาง (ดูข้อมูล + การลงทะเบียน) |
 

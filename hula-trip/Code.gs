@@ -100,15 +100,11 @@ function syncFromExcel(){
   }
 }
 
-/** ตั้งซิงค์อัตโนมัติทุก 6 ชั่วโมง (รันครั้งเดียว) */
-function setupAutoSync(){
-  ScriptApp.getProjectTriggers().forEach(function(t){
-    if (t.getHandlerFunction() === 'syncFromExcel') ScriptApp.deleteTrigger(t);
-  });
-  ScriptApp.newTrigger('syncFromExcel').timeBased().everyHours(6).create();
-  syncFromExcel();   // ซิงค์ทันที 1 รอบ
-  return 'ตั้งซิงค์อัตโนมัติทุก 6 ชั่วโมง + ซิงค์รอบแรกแล้ว';
-}
+/**
+ * ซิงค์อัตโนมัติ: ตั้งผ่านหน้าจอ Apps Script แทน (ไม่ต้องใช้สิทธิ์ script.scriptapp)
+ *   เมนูซ้าย ⏰ Triggers → Add Trigger → ฟังก์ชัน "syncFromExcel"
+ *   → Event source: Time-driven → Hour timer → Every 6 hours → Save
+ */
 
 // ===== หาแท็บฐานข้อมูลสมาชิก (รหัส + เลขบัตรประชาชน) =====
 function findMaster_(){
