@@ -2189,7 +2189,8 @@
               '<div class="ord-msg"><input data-msg="' + o.id + '" value="' + esc(o.staffMessage || "") + '" placeholder="ตอบลูกค้า เช่น ของถึงใน 2 วัน"><button class="btn btn-sm" data-sendmsg="' + o.id + '">ส่ง</button></div>' +
               (o.slip ? '<button class="btn btn-sm btn-ghost" data-viewslip="' + o.id + '">📄 ดูสลิป</button>' : "") +
               (o.payStatus === "pending" ? '<button class="btn btn-sm" data-confirmpay="' + o.id + '">✓ ยืนยันรับเงิน</button>' : "") +
-              '<button class="btn btn-sm" data-printlabel="' + o.id + '">🖨️ พิมพ์ที่อยู่</button>' +
+              '<button class="btn btn-sm" data-printlabel="' + o.id + '">🏷️ ใบปะหน้าซอง</button>' +
+              '<button class="btn btn-sm" data-printreceipt="' + o.id + '">🧾 ใบเสร็จ</button>' +
               (S.hasPerm("orders_delete") ? '<button class="btn btn-sm btn-danger" data-delorder="' + o.id + '">ลบคำสั่งซื้อ</button>' : "") +
             "</div></td></tr>";
         }).join("") + "</tbody>";
@@ -2215,6 +2216,9 @@
       });
       tb.querySelectorAll("[data-printlabel]").forEach(function (b) {
         b.onclick = function () { var ord = S.getOrders().filter(function (x) { return x.id === b.dataset.printlabel; })[0]; if (ord) printOrderLabel(ord); };
+      });
+      tb.querySelectorAll("[data-printreceipt]").forEach(function (b) {
+        b.onclick = function () { var ord = S.getOrders().filter(function (x) { return x.id === b.dataset.printreceipt; })[0]; if (ord) printReceipt(ord); };
       });
       tb.querySelectorAll("[data-viewslip]").forEach(function (b) {
         b.onclick = function () { var ord = S.getOrders().filter(function (x) { return x.id === b.dataset.viewslip; })[0]; if (ord && ord.slip) viewSlip(ord); };
@@ -2280,6 +2284,11 @@
       (o.taxInvoice ? '<div class="sec"><div class="k">🧾 ออกใบกำกับภาษีในนาม</div><div class="to">' + esc(o.taxInvoice.name) + '</div><div class="ad">เลขประจำตัวผู้เสียภาษี: ' + esc(o.taxInvoice.taxId) + '<br>' + esc(o.taxInvoice.address) + '</div></div>' : "") +
       '<div class="frm"><b>ผู้ส่ง:</b> ' + esc(st.company || "M.E.Tools") + " · " + esc(shopPhone) + "<br>" + esc(st.address || "") + "</div>" +
       '</div></body></html>';
+    printDocHtml(doc);
+  }
+
+  // พิมพ์เอกสาร HTML ผ่าน iframe ซ่อน แล้วสั่งพิมพ์ (เลือกเครื่องพิมพ์/กระดาษในกล่องของระบบ)
+  function printDocHtml(doc) {
     var ifr = document.createElement("iframe");
     ifr.setAttribute("aria-hidden", "true");
     ifr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
@@ -2290,6 +2299,52 @@
       try { ifr.contentWindow.focus(); ifr.contentWindow.print(); } catch (e) { U.toast("เปิดหน้าต่างพิมพ์ไม่สำเร็จ", "err"); }
       setTimeout(function () { try { document.body.removeChild(ifr); } catch (e) {} }, 2000);
     }, 300);
+  }
+
+  // พิมพ์ใบเสร็จรับเงิน (เงินสด/โอน) — สำหรับลูกค้ารับหน้าร้าน หรือแนบไปกับพัสดุ
+  function printReceipt(o) {
+    var st = S.getSettings();
+    var c = o.customer || {};
+    var payTxt = o.payMethod === "promptpay" ? "โอน / PromptPay" : (o.payMethod === "cash" ? "เงินสด" : (o.payMethod || "เงินสด"));
+    var rows = (o.items || []).map(function (it) {
+      var line = (it.unitPrice || 0) * it.qty;
+      return '<tr><td>' + esc(it.name) + (it.days ? ' (เช่า ' + it.days + ' วัน)' : '') + '</td><td class="n">' + it.qty +
+        '</td><td class="n">' + esc(S.money(it.unitPrice || 0)) + '</td><td class="n">' + esc(S.money(line)) + '</td></tr>';
+    }).join("");
+    var shopPhone = String(st.phone || "").replace(/\s*,\s*/g, ", ");
+    var doc =
+      '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบเสร็จ ' + esc(o.id) + '</title><style>' +
+      '@page{margin:8mm}*{box-sizing:border-box}body{font-family:"Sarabun",system-ui,sans-serif;margin:0;color:#000}' +
+      '.rc{max-width:150mm;padding:14px}' +
+      '.hd{text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:8px}' +
+      '.hd .b{font-weight:800;font-size:20px}.hd .s{font-size:12px;color:#444}' +
+      '.meta{display:flex;justify-content:space-between;font-size:12px;margin:8px 0}' +
+      'table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}' +
+      'th,td{border-bottom:1px solid #ccc;padding:5px 4px;text-align:left}th{border-bottom:1.5px solid #000;font-size:12px}' +
+      'td.n,th.n{text-align:right;white-space:nowrap}' +
+      '.tot{margin-top:8px;font-size:13px}.tot .r{display:flex;justify-content:space-between;padding:2px 0}' +
+      '.tot .g{font-weight:800;font-size:17px;border-top:2px solid #000;margin-top:4px;padding-top:6px}' +
+      '.paid{display:inline-block;border:2px solid #0a0;color:#0a0;border-radius:6px;padding:2px 10px;font-weight:800;transform:rotate(-4deg)}' +
+      '.ft{border-top:1px dashed #888;margin-top:12px;padding-top:8px;font-size:11px;color:#444;text-align:center}' +
+      '</style></head><body><div class="rc">' +
+      '<div class="hd"><div class="b">' + esc(st.company || "M.E.Tools") + '</div><div class="s">' + esc(st.address || "") + (shopPhone ? "<br>โทร. " + esc(shopPhone) : "") + '</div>' +
+      (st.taxId ? '<div class="s">เลขผู้เสียภาษี ' + esc(st.taxId) + '</div>' : "") +
+      '<div style="font-weight:800;margin-top:6px">ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ</div></div>' +
+      '<div class="meta"><div>เลขที่: <b>' + esc(o.id) + '</b><br>ลูกค้า: ' + esc(c.name || "—") + (c.phone ? " · " + esc(c.phone) : "") + '</div>' +
+      '<div style="text-align:right">วันที่: ' + esc(S.fmtDate(o.createdAt)) + '<br>ชำระโดย: ' + esc(payTxt) + '</div></div>' +
+      '<table><thead><tr><th>รายการ</th><th class="n">จำนวน</th><th class="n">ราคา/หน่วย</th><th class="n">รวม</th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="4">—</td></tr>') + '</tbody></table>' +
+      '<div class="tot">' +
+      '<div class="r"><span>ยอดสินค้า</span><span>' + esc(S.money(o.subtotal || 0)) + '</span></div>' +
+      (o.deposit ? '<div class="r"><span>เงินมัดจำ (คืนเมื่อส่งคืน)</span><span>' + esc(S.money(o.deposit)) + '</span></div>' : "") +
+      (o.shipping ? '<div class="r"><span>ค่าจัดส่ง</span><span>' + esc(S.money(o.shipping)) + '</span></div>' : "") +
+      (o.vat ? '<div class="r"><span>VAT ' + (o.vatPct || 7) + '%</span><span>' + esc(S.money(o.vat)) + '</span></div>' : "") +
+      '<div class="r g"><span>รวมทั้งสิ้น</span><span>' + esc(S.money(o.total || 0)) + '</span></div></div>' +
+      '<div style="text-align:center;margin-top:10px"><span class="paid">ชำระเงินแล้ว</span></div>' +
+      (o.taxInvoice ? '<div style="font-size:12px;margin-top:10px;border-top:1px solid #ccc;padding-top:6px">ออกใบกำกับภาษีในนาม: <b>' + esc(o.taxInvoice.name) + '</b><br>เลขผู้เสียภาษี ' + esc(o.taxInvoice.taxId) + '<br>' + esc(o.taxInvoice.address) + '</div>' : "") +
+      '<div class="ft">ขอบคุณที่อุดหนุน ' + esc(st.company || "M.E.Tools") + ' 🙏<br>เก็บใบเสร็จไว้เป็นหลักฐานการรับประกัน</div>' +
+      '</div></body></html>';
+    printDocHtml(doc);
   }
   // next valid transitions for an order, per the pay→receive→(return) flow
   function statusOptions(o) {
