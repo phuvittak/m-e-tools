@@ -11,6 +11,10 @@
 
 // ===== ตั้งค่า =====
 // ลิงก์แชร์ไฟล์ Excel บน OneDrive (ตั้งให้ "ทุกคนที่มีลิงก์ดูได้")
+// ===== แหล่งข้อมูล Excel =====
+// ✅ แนะนำ: อัปโหลดไฟล์ Excel ขึ้น Google Drive (บัญชีเดียวกับที่ deploy) แล้ววางลิงก์ทั้งลิงก์ตรงนี้
+var DRIVE_FILE_URL = '';   // เช่น 'https://drive.google.com/file/d/XXXXXXXX/view?usp=sharing'
+// (สำรอง) ลิงก์ OneDrive — ใช้ก็ต่อเมื่อ DRIVE_FILE_URL ว่าง (มักโดน edu/องค์กรบล็อก)
 var EXCEL_SHARE_URL = 'https://1drv.ms/x/c/d4226e2b85a84b3d/IQB6emuhEbMFQpp4-GnsLzUtAeGHGgvWA-ajoQpW0LUehmE?e=yk8M3w';
 var REG_TAB = 'การลงทะเบียน';
 var MIN_INVEST = 1000;
@@ -72,8 +76,13 @@ function oneDriveDirect_(share){
   return 'https://api.onedrive.com/v1.0/shares/u!' + b64 + '/root/content';
 }
 
-/** ดึงไฟล์ Excel จาก OneDrive — ลองหลายวิธีจนกว่าจะได้ไฟล์จริง (ไม่ใช่หน้า HTML) */
+/** ดึงไฟล์ Excel — ใช้ Google Drive ก่อน (ชัวร์สุด) ถ้าไม่ตั้งค่อยลอง OneDrive */
 function fetchExcelBlob_(){
+  // ✅ วิธีหลัก: อ่านจาก Google Drive ด้วย ID ที่อยู่ในลิงก์ (บัญชีเดียวกัน ไม่ติดสิทธิ์)
+  var dm = String(DRIVE_FILE_URL||'').match(/[-\w]{25,}/);
+  if (dm) return DriveApp.getFileById(dm[0]).getBlob().setName('hula-src.xlsx');
+
+  // (สำรอง) OneDrive — ลองหลายวิธีจนกว่าจะได้ไฟล์จริง
   var share = EXCEL_SHARE_URL;
   var tries = [];
   // วิธี 1: api.onedrive.com/shares
