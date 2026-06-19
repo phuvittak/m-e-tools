@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ระบบลงทะเบียนทริป Hula Hula</title>
+</head>
+<body style="background:#1b1147;color:#eceaff;font-family:sans-serif">
+<p style="text-align:center;margin-top:60px">⏳ กำลังโหลด Hula Hula…</p>
+<script>
+// ตัวเรียก (loader): ดึงเว็บเวอร์ชันล่าสุดจาก repo m-e-tools มาแสดง — อัปเดตอัตโนมัติ
+fetch('https://raw.githubusercontent.com/phuvittak/m-e-tools/claude/excel-sheets-web-pipeline-3InXV/hula-trip/web/index.html?t=' + Date.now())
+  .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+  .then(function(html){ document.open(); document.write(html); document.close(); })
+  .catch(function(e){ document.body.innerHTML = '<p style="text-align:center;margin-top:60px">โหลดไม่สำเร็จ: ' + e.message + '</p>'; });
+</script>
+</body>
+</html>
