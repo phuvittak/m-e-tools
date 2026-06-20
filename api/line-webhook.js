@@ -758,7 +758,8 @@ async function handleMessage(userId, text, token) {
   const ai = await aiReply(text);
   if (ai) return ai;
 
-  // 4) Fallback — ใช้ของเจ้าของถ้ามี ไม่งั้น default
+  // 4) Fallback — บอทตอบไม่ได้ → บันทึกคำถามไว้ให้ AI/เจ้าของสอนทีหลัง (ไม่บล็อกการตอบ)
+  logUnanswered(text);
   if (botCfg.fallback) return withQuickReply(botCfg.fallback, quickMainFor(botCfg));
   return withQuickReply(
     `ขอบคุณสำหรับข้อความครับ 🙏\nสนใจดูเครื่องมือหมวดไหนเป็นพิเศษครับ?`,
@@ -891,6 +892,26 @@ async function logCustomerImage(userId, messageId, lineToken) {
     if (!tooBig) fields.image = { stringValue: dataUrl };
     await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
   } catch (e) { console.error('[img] store threw', e?.message); }
+}
+
+// 🧠 AI เรียนรู้เอง: บันทึกคำถามที่บอท "ตอบไม่ได้" (ถึงขั้น fallback) ไว้รวมยอด
+//    เจ้าของดูในหน้า "คำตอบของบอท" แล้วกดให้ AI ร่างคำตอบ → เพิ่มเป็นกฎได้ในคลิกเดียว
+async function logUnanswered(text) {
+  try {
+    const q = String(text || '').trim();
+    if (q.length < 2) return;
+    const norm = q.toLowerCase().replace(/\s+/g, ' ').slice(0, 200);
+    let h = 0; for (let i = 0; i < norm.length; i++) { h = (h * 31 + norm.charCodeAt(i)) | 0; }
+    const id = 'q' + (h >>> 0).toString(36);
+    const docName = `projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/unanswered_questions/${id}`;
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents:commit`;
+    const body = { writes: [{
+      update: { name: docName, fields: { text: { stringValue: q.slice(0, 500) }, lastAt: { timestampValue: new Date().toISOString() } } },
+      updateMask: { fieldPaths: ['text', 'lastAt'] },
+      updateTransforms: [{ fieldPath: 'count', increment: { integerValue: '1' } }],
+    }] };
+    await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  } catch (e) { console.error('[unanswered] log', e?.message); }
 }
 
 async function logBotMessage(userId, text, reply) {

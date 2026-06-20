@@ -1179,6 +1179,9 @@
             doc: fsMod.doc,
             getDoc: fsMod.getDoc,
             setDoc: fsMod.setDoc,
+            getDocs: fsMod.getDocs,
+            collection: fsMod.collection,
+            deleteDoc: fsMod.deleteDoc,
             serverTimestamp: fsMod.serverTimestamp
           };
           var ref = fsMod.doc(db, "bot_config", "replies");
@@ -1202,6 +1205,7 @@
           setAlert("ยังไม่มีการตั้งค่า — แสดงค่าเริ่มต้น (กดบันทึกเพื่อเริ่มใช้)", "ok");
         }
         render();
+        if (typeof loadUnanswered === "function") loadUnanswered();
       }).catch(function (e) {
         var code = e && e.code ? " [" + e.code + "]" : "";
         setAlert("โหลดไม่สำเร็จ" + code + ": " + (e.message || e), "err");
@@ -1304,6 +1308,81 @@
       render();
     });
     saveBtn.addEventListener("click", save);
+
+    // ===== AI เรียนรู้เอง: คำถามที่บอทตอบไม่ได้ → AI ร่างคำตอบ → เพิ่มเป็นกฎ =====
+    var unansList = document.querySelector("[data-unans-list]");
+    var unansStatus = document.querySelector("[data-unans-status]");
+    var unansReload = document.querySelector("[data-unans-reload]");
+    var unansData = [];
+    function setUnansStatus(m) { if (unansStatus) unansStatus.textContent = m || ""; }
+    function loadUnanswered() {
+      if (!unansList) return;
+      if (!state.fs || !state.fs.getDocs) { setUnansStatus("กำลังเชื่อม Firebase…"); return; }
+      setUnansStatus("กำลังโหลด…");
+      var fs = state.fs;
+      fs.getDocs(fs.collection(fs.db, "unanswered_questions")).then(function (snap) {
+        unansData = snap.docs.map(function (d) { var o = d.data() || {}; o._id = d.id; return o; })
+          .filter(function (q) { return !q.processed && q.text; })
+          .sort(function (a, b) { return (b.count || 0) - (a.count || 0); }).slice(0, 30);
+        renderUnanswered();
+        setUnansStatus(unansData.length ? ("ค้างอยู่ " + unansData.length + " คำถาม") : "ไม่มีคำถามค้าง 🎉");
+      }).catch(function (e) { setUnansStatus("โหลดไม่สำเร็จ: " + (e.message || e)); });
+    }
+    function renderUnanswered() {
+      if (!unansData.length) { unansList.innerHTML = '<div class="br-empty">ไม่มีคำถามที่บอทตอบไม่ได้ค้างอยู่ 🎉</div>'; return; }
+      unansList.innerHTML = unansData.map(function (q, i) {
+        return '<div class="br-rule" data-uq="' + i + '" style="border-left:3px solid #7c4dff">' +
+          '<div class="br-rule-head"><div><b>“' + esc(q.text) + '”</b>' +
+            (q.count > 1 ? ' <span style="color:#7c4dff;font-size:12px">· ถูกถาม ' + q.count + ' ครั้ง</span>' : '') + '</div>' +
+            '<button class="br-rule-del" type="button" data-uqskip="' + i + '" title="ข้าม/ทำเครื่องหมายว่าจัดการแล้ว">ข้าม</button></div>' +
+          '<div class="br-toolbar" style="margin:6px 0"><button class="btn btn-secondary" type="button" data-uqai="' + i + '">✨ ให้ AI ร่างคำตอบ</button>' +
+            '<span class="save-status" data-uqst="' + i + '"></span></div>' +
+          '<div data-uqdraft="' + i + '" style="display:none">' +
+            '<div class="br-field"><label>คำตอบ (แก้ได้)</label><textarea data-uqans rows="3"></textarea></div>' +
+            '<div class="br-field"><label>คีย์เวิร์ด (คั่นด้วย ,)</label><input data-uqkw></div>' +
+            '<div class="br-toolbar"><button class="btn btn-primary" type="button" data-uqadd="' + i + '">➕ เพิ่มเป็นคำตอบบอท</button></div>' +
+          '</div></div>';
+      }).join("");
+      unansData.forEach(function (q, i) {
+        var card = unansList.querySelector('[data-uq="' + i + '"]');
+        if (!card) return;
+        card.querySelector('[data-uqai="' + i + '"]').addEventListener("click", function () { aiDraft(i, card); });
+        card.querySelector('[data-uqadd="' + i + '"]').addEventListener("click", function () { addUnansAsRule(i, card); });
+        card.querySelector('[data-uqskip="' + i + '"]').addEventListener("click", function () { markUnansProcessed(q); unansData.splice(i, 1); renderUnanswered(); });
+      });
+    }
+    function aiDraft(i, card) {
+      var q = unansData[i], st = card.querySelector('[data-uqst="' + i + '"]');
+      st.textContent = "AI กำลังร่าง…";
+      fetch("/api/ai-suggest-reply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q.text }) })
+        .then(function (r) { return r.json(); }).then(function (res) {
+          if (res.configured === false) { st.textContent = "ยังไม่ได้ตั้ง ANTHROPIC_API_KEY ใน Vercel"; return; }
+          if (!res.ok) { st.textContent = "ร่างไม่สำเร็จ: " + (res.error || ""); return; }
+          var draft = card.querySelector('[data-uqdraft="' + i + '"]');
+          card.querySelector("[data-uqans]").value = res.answer || "";
+          card.querySelector("[data-uqkw]").value = (res.keywords || []).join(", ");
+          draft.style.display = ""; st.textContent = "✓ AI ร่างแล้ว — ตรวจ/แก้ได้";
+        }).catch(function () { st.textContent = "เชื่อมต่อ AI ไม่ได้"; });
+    }
+    function addUnansAsRule(i, card) {
+      var q = unansData[i];
+      var ans = card.querySelector("[data-uqans]").value.trim();
+      var kw = card.querySelector("[data-uqkw]").value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+      if (!ans) { if (U && U.toast) U.toast("ยังไม่มีคำตอบ", "err"); return; }
+      if (!kw.length) kw = q.text.split(/\s+/).filter(Boolean).slice(0, 3);
+      collectFromDom();
+      state.config.rules.push({ id: genId(), label: q.text.slice(0, 30), keywords: kw, answer: ans });
+      render();
+      markUnansProcessed(q);
+      unansData.splice(i, 1); renderUnanswered();
+      if (U && U.toast) U.toast('เพิ่มคำตอบแล้ว — กด "บันทึก" ด้านบนเพื่อให้บอทใช้งาน', "ok");
+    }
+    function markUnansProcessed(q) {
+      if (!state.fs || !q || !q._id) return;
+      var fs = state.fs;
+      try { fs.setDoc(fs.doc(fs.db, "unanswered_questions", q._id), { processed: true }, { merge: true }); } catch (e) {}
+    }
+    if (unansReload) unansReload.addEventListener("click", loadUnanswered);
 
     var rentToggleBtn = document.querySelector("[data-rent-toggle-btn]");
     if (rentToggleBtn) rentToggleBtn.addEventListener("click", function () {

@@ -91,6 +91,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // AI เรียนรู้เอง — คำถามที่บอทตอบไม่ได้ (LINE webhook upsert + นับยอด)
+    //   อ่าน/ลบ: แอดมิน · เขียน: shape-gated (text) หรือแอดมิน (ติดธง processed)
+    match /unanswered_questions/{qId} {
+      allow read, list, delete: if isAdmin();
+      allow create, update: if (request.resource.data.text is string && request.resource.data.text.size() < 600)
+                          || isAdmin();
+    }
+
     // โปรไฟล์ลูกค้า (ชื่อเล่นที่แอดมินตั้ง) — แยกจาก ID ใน bot_messages
     // อ่าน: แอดมินอ่านทั้งหมด, ลูกค้าอ่านของตัวเอง
     // เขียน: แอดมินเท่านั้น (ตั้งชื่อเล่นเป็นเรื่องหลังร้าน)
