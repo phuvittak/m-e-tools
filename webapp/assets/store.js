@@ -1271,6 +1271,19 @@
     syncOrdersToCloud(created, sess || {});
     // BigSeller: สร้างออเดอร์ขาออก (async, ไม่บล็อก, ทำงานเฉพาะเมื่อเปิด feature order)
     try { if (global.BigSellerSync) created.forEach(function (o) { global.BigSellerSync.syncOrder(o); }); } catch (e) {}
+    // Google Sheets: ต่อท้ายแถวออเดอร์แบบเรียลไทม์ (no-op ถ้ายังไม่ตั้ง SHEETS_WEBHOOK_URL)
+    try {
+      created.forEach(function (o) {
+        var c = o.customer || {};
+        var row = {
+          order: o.id, date: new Date(o.createdAt).toLocaleString("th-TH"), channel: "เว็บ M.E.Tools",
+          name: c.name || "", phone: c.phone || "",
+          items: (o.items || []).map(function (it) { return it.name + " x" + it.qty; }).join(", "),
+          total: o.total || 0, fulfillment: o.fulfillment || "",
+        };
+        fetch("/api/sheets-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "order", row: row }) }).catch(function () {});
+      });
+    } catch (e) {}
     return created;
   }
 

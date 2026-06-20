@@ -330,6 +330,47 @@ Broadcast ก็ตั้งใน LINE OA Manager เช่นกัน:
 
 ต้องตั้ง `ANTHROPIC_API_KEY` ใน Vercel (ตัวเดียวกับบอท LINE) — ถ้ายังไม่ตั้ง ปุ่มจะแจ้งเตือน ระบบส่วนอื่นไม่กระทบ
 
+## 💬 AI ตอบ Facebook Messenger + Instagram (`api/messenger-webhook.js`)
+
+ให้บอทตอบลูกค้าบน **Messenger/IG** ด้วยสมองตัวเดียวกับ LINE (กฎคีย์เวิร์ดของเจ้าของ → AI → fallback)
+
+**ตั้งค่า (ทำครั้งเดียว):**
+1. สร้าง Facebook App ที่ https://developers.facebook.com → เพิ่มผลิตภัณฑ์ **Messenger** (และ Instagram ถ้าใช้)
+2. ผูก Facebook Page → กด **Generate Token** ได้ **Page Access Token**
+3. Vercel → Environment Variables ตั้ง:
+   - `META_VERIFY_TOKEN` = ข้อความลับอะไรก็ได้ (ตั้งเอง)
+   - `META_PAGE_TOKEN` = Page Access Token จากข้อ 2
+   - `ANTHROPIC_API_KEY` = (มีอยู่แล้ว) เปิดให้ AI ตอบคำถามธรรมชาติ
+4. Meta → Webhooks → Callback URL: `https://<โดเมน>/api/messenger-webhook` · Verify Token: ใส่ให้ตรง `META_VERIFY_TOKEN`
+   → Subscribe ฟิลด์ `messages`
+> ไม่ตั้ง token ก็ deploy ได้ (verify ผ่าน แต่ยังไม่ส่งตอบ) — ไม่กระทบส่วนอื่น
+
+## 📊 ซิงค์ออเดอร์เข้า Google Sheets เรียลไทม์ (`api/sheets-sync.js`)
+
+ทุกออเดอร์ใหม่ต่อท้ายแถวใน Google Sheets อัตโนมัติ — สำรองข้อมูล/เปิดดูจากมือถือได้ทันที
+ใช้ **Google Apps Script Web App** (ไม่ต้องตั้ง service account ให้ยุ่งยาก)
+
+**ตั้งค่า (ทำครั้งเดียว):**
+1. เปิด Google Sheet ใหม่ → เมนู **ส่วนขยาย → Apps Script** → วางโค้ดนี้แล้ว Deploy เป็น **Web App**
+   (Execute as: *Me* · Who has access: *Anyone*) → คัดลอก URL ที่ได้
+
+```javascript
+function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(data.type || 'orders')
+        || SpreadsheetApp.getActiveSpreadsheet().insertSheet(data.type || 'orders');
+  var row = data.row || {};
+  if (sh.getLastRow() === 0) sh.appendRow(Object.keys(row).concat(['ซิงค์เมื่อ']));
+  sh.appendRow(Object.keys(row).map(function (k) { return row[k]; }).concat([data.at || new Date()]));
+  return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
+}
+```
+
+2. Vercel → Environment Variables → `SHEETS_WEBHOOK_URL` = URL จากข้อ 1
+> ไม่ตั้ง URL → ระบบข้ามเงียบ ๆ (no-op) ไม่กระทบความเร็วหน้าเว็บ
+> **สองทิศทาง:** ถ้าต้องการให้แก้ในชีตแล้วเด้งกลับเว็บ ให้เพิ่ม trigger `onEdit` ในสคริปต์เดียวกัน
+> ยิง POST กลับมาที่ `https://<โดเมน>/api/bigseller-webhook` (รูปแบบ event เดียวกับมาร์เก็ตเพลส)
+
 ## พิมพ์ใบปะหน้าซอง + ใบเสร็จ (หลังร้าน → คำสั่งซื้อ)
 
 ในหน้า **คำสั่งซื้อ** แต่ละออเดอร์มีปุ่ม:
