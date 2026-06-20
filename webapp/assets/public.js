@@ -2011,9 +2011,16 @@
         (b.primary ? '<div class="me-brand-stamp">ศูนย์แท้</div>' : "") + "</a>";
     }
     var one = list.map(card).join("");
-    // 3 ชุดต่อกัน เริ่มที่ชุดกลาง → เลื่อนเองด้วย rAF (ลื่น) และผู้ใช้เลื่อนมือเองก็ได้ (native scroll)
-    box.innerHTML = list.length ? ('<div class="me-brands-track">' + one + one + one + "</div>") : "";
-    setupBrandsAuto(box, list.length);
+    if (!list.length) { box.innerHTML = ""; setupBrandsAuto(box, 0); return; }
+    // ถ้ามีแบรนด์น้อย (≤2) แสดงแบบ static ไม่ต้อง loop ซ้ำ 3 รอบ
+    if (list.length <= 2) {
+      box.innerHTML = '<div class="me-brands-track me-brands-static">' + one + "</div>";
+      setupBrandsAuto(box, 0);
+    } else {
+      // 3 ชุดต่อกัน เริ่มที่ชุดกลาง → เลื่อนเองด้วย rAF (ลื่น) และผู้ใช้เลื่อนมือเองก็ได้ (native scroll)
+      box.innerHTML = '<div class="me-brands-track">' + one + one + one + "</div>";
+      setupBrandsAuto(box, list.length);
+    }
   }
   // เลื่อนแบรนด์อัตโนมัติแบบลื่น (requestAnimationFrame) + รองรับเลื่อนมือ + หยุดเมื่อแตะ/ชี้
   function setupBrandsAuto(box, n) {
