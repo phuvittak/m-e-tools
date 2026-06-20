@@ -2886,6 +2886,7 @@
     function cascadeOffShelf(name) {
       var prods = brandProducts(name);
       if (!prods.length) { U.toast('แบรนด์ "' + name + '" ยังไม่มีสินค้า', ""); return; }
+      if (prods.every(function (p) { return p.hidden; })) { U.toast('แบรนด์ "' + name + '" ปิดขายอยู่แล้ว', ""); return; }
       if (!window.confirm('ปิดการขายสินค้าแบรนด์ "' + name + '" ทั้งหมด ' + prods.length + ' รายการ?\n• ซ่อนจากหน้าเว็บ M.E.Tools\n• ส่งคำสั่งปิดการขาย (off-shelf) ไป BigSeller → Shopee/Lazada/TikTok (เฉพาะเมื่อเปิดซิงค์ API)')) return;
       var n = 0;
       prods.forEach(function (p) {
@@ -2899,6 +2900,7 @@
       var prods = brandProducts(name);
       if (!prods.length) { U.toast('แบรนด์ "' + name + '" ยังไม่มีสินค้า', ""); return; }
       var hiddenCount = prods.filter(function (p) { return p.hidden; }).length;
+      if (!hiddenCount) { U.toast('แบรนด์ "' + name + '" เปิดขายอยู่แล้ว', ""); return; }
       if (!window.confirm('เปิดการขายสินค้าแบรนด์ "' + name + '" กลับมา ' + hiddenCount + ' รายการ?\n• แสดงบนหน้าเว็บ M.E.Tools อีกครั้ง\n• ส่งคำสั่งเปิดการขาย (on-shelf) ไป BigSeller → Shopee/Lazada/TikTok (เฉพาะเมื่อเปิดซิงค์ API)')) return;
       var n = 0;
       prods.forEach(function (p) {
@@ -2907,10 +2909,17 @@
       });
       U.toast("เปิดการขายแบรนด์ " + name + " กลับมาแล้ว " + n + " รายการ", "ok");
     }
-    // แบรนด์อยู่ในสถานะ "ปิดขาย" เมื่อมีสินค้า และทุกตัวถูกซ่อน (hidden) → ใช้สลับปุ่มเปิด/ปิด
-    function brandOffShelf(name) {
+    // สถานะการขายของแบรนด์ → ไฮไลต์ปุ่มในตัวสลับ (segmented):
+    //   "off"  = สินค้าทุกตัวถูกซ่อน (ปิดขายทั้งแบรนด์)
+    //   "part" = บางตัวถูกซ่อน (ปิดบางส่วน)
+    //   "on"   = ขายอยู่ครบทุกตัว (หรือไม่มีสินค้า)
+    function brandShelfState(name) {
       var prods = brandProducts(name);
-      return prods.length > 0 && prods.every(function (p) { return p.hidden; });
+      if (!prods.length) return "on";
+      var hidden = prods.filter(function (p) { return p.hidden; }).length;
+      if (hidden === 0) return "on";
+      if (hidden === prods.length) return "off";
+      return "part";
     }
     function cascadeDeleteProducts(name) {
       var prods = brandProducts(name), n = 0;
@@ -2931,9 +2940,14 @@
           '<span style="font-size:11px;color:var(--fg-2);white-space:nowrap" title="จำนวนสินค้าในแบรนด์นี้">' + pc + ' สินค้า</span>' +
           '<label class="f-check" title="แบรนด์เด่น — โชว์เน้นบนหน้าเว็บ"><input type="checkbox" data-bp="' + i + '"' + (b.primary ? " checked" : "") + "> เด่น</label>" +
           '<label class="f-check" title="ซ่อนแบรนด์นี้ + สินค้าทุกตัวของแบรนด์ออกจากหน้าเว็บลูกค้า — ปลดซ่อนได้ทันที (ไม่กระทบ Shopee/Lazada/TikTok)"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อนทั้งแบรนด์</label>" +
-          (brandOffShelf(b.name)
-            ? '<button class="btn btn-sm" data-bon="' + i + '" style="background:#16a34a;border-color:#16a34a;color:#fff" title="เปิดการขายสินค้าแบรนด์นี้กลับมา (แสดงบนเว็บ + เปิดขายบน Shopee/Lazada/TikTok)">✅ เปิดขายทุกแพลตฟอร์ม</button>'
-            : '<button class="btn btn-sm btn-ghost" data-boff="' + i + '" title="นอกจากซ่อนบนเว็บ ยังสั่งปิดการขายบน Shopee/Lazada/TikTok ผ่าน BigSeller ด้วย">🚫 ปิดขายทุกแพลตฟอร์ม</button>') +
+          (function () {
+            var st = brandShelfState(b.name);
+            return '<div class="seg-shelf' + (st === "part" ? " is-part" : "") + '" title="เปิด/ปิดการขายแบรนด์นี้ทุกแพลตฟอร์ม (เว็บ M.E.Tools + Shopee/Lazada/TikTok)">' +
+              '<span class="seg-shelf-lbl">ขายทุกแพลตฟอร์ม</span>' +
+              '<button type="button" class="seg-on' + (st === "on" ? " active" : "") + '" data-bon="' + i + '">เปิด</button>' +
+              '<button type="button" class="seg-off' + (st === "off" ? " active" : "") + '" data-boff="' + i + '">ปิด</button>' +
+              "</div>";
+          })() +
           '<button class="btn btn-sm btn-danger" data-bdel="' + i + '">ลบ</button></div>';
       }).join("");
       brandList.querySelectorAll("[data-bdel]").forEach(function (b) {
