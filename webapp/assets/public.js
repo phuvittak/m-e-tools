@@ -987,7 +987,36 @@
       }
       var t = S.cartTotals();
       var payable = S.lineVat(t.lines).gross + t.deposit + shipping;
-      showPayment(payable, t, shipping, { name: co.name, phone: co.phone, fulfillment: co.fulfillment, address: address, shipping: shipping, taxInvoice: taxInvoice });
+      var proceed = function () {
+        showPayment(payable, t, shipping, { name: co.name, phone: co.phone, fulfillment: co.fulfillment, address: address, shipping: shipping, taxInvoice: taxInvoice });
+      };
+      // ยืนยันตัวตน (บัตรประชาชน) ก่อนสั่งซื้อ — เปิด/ปิดได้ในตั้งค่าหลังร้าน
+      if (S.getSettings && S.getSettings().requireIdVerify) requireIdThen(proceed);
+      else proceed();
+    }
+
+    // ตรวจว่าลูกค้าอัปโหลดบัตรประชาชน/ยืนยันตัวตนแล้วหรือยัง ก่อนปล่อยให้ชำระเงิน
+    // ออฟไลน์/ยังไม่ได้ตั้ง Firebase → ไม่บล็อก (กันเช็คเอาต์พังทั้งระบบ)
+    function requireIdThen(cb) {
+      if (!S.loadMyProfile) { cb(); return; }
+      S.loadMyProfile().then(function (r) {
+        var p = (r && r.profile) || {};
+        if (p.verifyStatus === "verified" || p.idCardImage) { cb(); return; }
+        showIdGateModal();
+      }).catch(function () { cb(); });
+    }
+
+    function showIdGateModal() {
+      var bg = document.createElement("div"); bg.className = "me-modal-bg";
+      bg.innerHTML = '<div class="me-modal"><div class="me-modal-head"><h3>🪪 ยืนยันตัวตนก่อนสั่งซื้อ</h3><button class="me-modal-x" aria-label="ปิด">×</button></div>' +
+        '<div style="padding:18px">' +
+          '<p style="margin:0 0 14px;line-height:1.6;color:#333">ทางร้านขอให้ลูกค้าอัปโหลด <b>รูปบัตรประชาชน</b> เพื่อยืนยันตัวตนก่อนทำการสั่งซื้อ (เก็บเป็นความลับ ใช้สำหรับการสั่งซื้อ/เช่าเท่านั้น)</p>' +
+          '<a class="me-btn me-btn-block" href="account.html">ไปอัปโหลดบัตรประชาชน →</a>' +
+          '<button class="me-btn me-btn-ghost me-btn-block me-id-cancel" style="margin-top:8px">ภายหลัง</button>' +
+        '</div></div>';
+      function close() { if (bg.parentNode) document.body.removeChild(bg); }
+      bg.addEventListener("click", function (e) { if (e.target === bg || e.target.classList.contains("me-modal-x") || e.target.classList.contains("me-id-cancel")) close(); });
+      document.body.appendChild(bg);
     }
 
     function showPayment(amount, totals, shipping, checkout) {

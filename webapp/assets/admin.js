@@ -1810,10 +1810,12 @@
       var byUser = {};
       state.orders.forEach(function (o) {
         var uid = o.userId || o.userEmail || (o.customer && o.customer.email) || "unknown";
-        if (!byUser[uid]) byUser[uid] = { uid: uid, name: "", email: "", phone: "", total: 0, count: 0, items: [] };
+        if (!byUser[uid]) byUser[uid] = { uid: uid, name: "", email: "", phone: "", total: 0, count: 0, items: [], firstAt: 0, lastAt: 0 };
         var rec = byUser[uid];
         rec.total += (o.revenue || o.subtotal || 0);
         rec.count += 1;
+        var oat = o.createdAt || 0;
+        if (oat) { if (!rec.firstAt || oat < rec.firstAt) rec.firstAt = oat; if (oat > rec.lastAt) rec.lastAt = oat; }
         if (!rec.name && o.customer && o.customer.name) rec.name = o.customer.name;
         if (!rec.email) rec.email = o.userEmail || (o.customer && o.customer.email) || "";
         if (!rec.phone && o.customer && o.customer.phone) rec.phone = o.customer.phone;
@@ -1823,7 +1825,7 @@
       Object.keys(state.profiles).forEach(function (uid) {
         var prof = state.profiles[uid] || {};
         var rec = byUser[uid];
-        if (!rec) { rec = byUser[uid] = { uid: uid, name: "", email: "", phone: "", total: 0, count: 0, items: [] }; }
+        if (!rec) { rec = byUser[uid] = { uid: uid, name: "", email: "", phone: "", total: 0, count: 0, items: [], firstAt: 0, lastAt: 0 }; }
         rec.verifyStatus = prof.verifyStatus || "";
         // ชื่อที่โชว์: ชื่อเล่นแอดมิน > ชื่อที่ลูกค้ากรอกเอง > ชื่อจากออเดอร์
         var selfName = ((prof.firstName || "") + " " + (prof.lastName || "")).trim();
@@ -1831,7 +1833,10 @@
         else if (selfName) rec.name = selfName;
         if (prof.phone) rec.phone = prof.phone;
         if (prof.email) rec.email = prof.email;
+        var pat = (prof.createdAt && prof.createdAt.toDate) ? prof.createdAt.toDate().getTime() : 0;
+        if (pat && (!rec.firstAt || pat < rec.firstAt)) rec.firstAt = pat;
       });
+      state.recs = byUser; // เก็บไว้ให้ป็อปอัปรายละเอียดลูกค้าใช้
       var ranked = Object.values(byUser).sort(function (a, b) { return b.total - a.total; });
       // filter ด้วย search (ดูชื่อ, อีเมล, รายการสินค้า)
       if (state.search) {
@@ -1859,7 +1864,7 @@
         return '<tr>' +
           '<td>#' + (i + 1) + '</td>' +
           '<td><code class="cus-code">' + esc(code) + '</code></td>' +
-          '<td>' + esc(r.name || "—") + '</td>' +
+          '<td><button class="cus-name-link" data-cus="' + esc(r.uid) + '">' + esc(r.name || "—") + '</button></td>' +
           '<td>' + esc(r.email || "—") + '</td>' +
           '<td>' + esc(r.phone || "—") + '</td>' +
           '<td>' + verifyChip(r) + '</td>' +
@@ -1868,25 +1873,54 @@
         '</tr>';
       }).join("");
       rankTbody.querySelectorAll("[data-vf]").forEach(function (b) {
-        b.onclick = function () { openVerifyModal(b.getAttribute("data-vf")); };
+        b.onclick = function () { openCustomerModal(b.getAttribute("data-vf")); };
+      });
+      rankTbody.querySelectorAll("[data-cus]").forEach(function (b) {
+        b.onclick = function () { openCustomerModal(b.getAttribute("data-cus")); };
       });
     }
 
-    // ตรวจ + อนุมัติเอกสารยืนยันตัวตนของลูกค้า
-    function openVerifyModal(uid) {
+    // ป็อปอัปรายละเอียดลูกค้า — ชื่อ, รหัสลูกค้า, เบอร์, วันที่เป็นสมาชิก, อีเมล (Gmail), สถานะยืนยันตัวตน
+    // + ตรวจ/อนุมัติเอกสารยืนยันตัวตนในที่เดียว
+    function openCustomerModal(uid) {
       var prof = state.profiles[uid] || {};
+      var rec = (state.recs && state.recs[uid]) || { name: "", email: "", phone: "", total: 0, count: 0, firstAt: 0, lastAt: 0 };
       var code = S.customerCode ? S.customerCode(uid) : uid;
-      var name = prof.nickname || ((prof.firstName || "") + " " + (prof.lastName || "")).trim() || "ลูกค้า";
+      var selfName = ((prof.firstName || "") + " " + (prof.lastName || "")).trim();
+      var name = prof.nickname || selfName || rec.name || "ลูกค้า";
+      var email = prof.email || rec.email || "";
+      var phone = prof.phone || rec.phone || "";
+      var address = prof.address || "";
+      function fmtDate(ms) { return ms ? new Date(ms).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" }) : "—"; }
+      var joinTxt = fmtDate(rec.firstAt);
+      var lastTxt = fmtDate(rec.lastAt);
+      var statusTxt = prof.verifyStatus === "verified" ? "ยืนยันแล้ว ✓" : prof.verifyStatus === "pending" ? "รอตรวจสอบ ●" : "ยังไม่ยืนยัน";
+      var statusCls = prof.verifyStatus === "verified" ? "ok" : prof.verifyStatus === "pending" ? "pending" : "none";
+
       var docs = "";
       if (prof.idCardImage) docs += '<div><div class="wl-doc-label">บัตรประชาชน</div><a href="' + esc(prof.idCardImage) + '" target="_blank" rel="noopener"><img class="wl-doc" src="' + esc(prof.idCardImage) + '"></a></div>';
       if (prof.licenseImage) docs += '<div><div class="wl-doc-label">ใบขับขี่/ใบรับรอง</div><a href="' + esc(prof.licenseImage) + '" target="_blank" rel="noopener"><img class="wl-doc" src="' + esc(prof.licenseImage) + '"></a></div>';
-      if (!docs) docs = '<div class="cus-empty">ลูกค้ายังไม่ได้อัปโหลดเอกสาร</div>';
-      var statusTxt = prof.verifyStatus === "verified" ? "ยืนยันแล้ว ✓" : prof.verifyStatus === "pending" ? "รอตรวจสอบ" : "ยังไม่ยืนยัน";
+      if (!docs) docs = '<div class="cus-empty">ลูกค้ายังไม่ได้อัปโหลดเอกสารยืนยันตัวตน</div>';
+
+      function infoRow(label, value) {
+        return '<div class="cus-info-row"><span class="cus-info-k">' + esc(label) + '</span><span class="cus-info-v">' + value + '</span></div>';
+      }
       var modal = document.createElement("div");
       modal.className = "wl-modal";
       modal.innerHTML = '<div class="wl-modal-card"><button class="wl-modal-x" aria-label="ปิด">×</button>' +
-        '<h2>ยืนยันตัวตน — ' + esc(name) + '</h2>' +
-        '<p style="margin:0 0 10px;color:#666">รหัสลูกค้า: <b>' + esc(code) + '</b> · สถานะ: ' + esc(statusTxt) + '</p>' +
+        '<h2>👤 ' + esc(name) + '</h2>' +
+        '<div class="cus-info">' +
+          infoRow("รหัสลูกค้า", '<code class="cus-code">' + esc(code) + '</code>') +
+          infoRow("ชื่อ", esc(selfName || rec.name || "—")) +
+          infoRow("เบอร์โทร", phone ? '<a href="tel:' + esc(phone.replace(/[^0-9+]/g, "")) + '">' + esc(phone) + '</a>' : "—") +
+          infoRow("อีเมล (Gmail)", email ? '<a href="mailto:' + esc(email) + '">' + esc(email) + '</a>' : "—") +
+          (address ? infoRow("ที่อยู่", esc(address)) : "") +
+          infoRow("เป็นสมาชิกตั้งแต่", esc(joinTxt)) +
+          infoRow("ซื้อล่าสุด", esc(lastTxt)) +
+          infoRow("คำสั่งซื้อ", rec.count + " ครั้ง · รวม " + S.money(rec.total)) +
+          infoRow("ยืนยันตัวตน", '<span class="cus-vf ' + statusCls + '">' + esc(statusTxt) + '</span>') +
+        '</div>' +
+        '<div class="wl-doc-label" style="margin-top:14px">เอกสารยืนยันตัวตน</div>' +
         '<div class="wl-docs">' + docs + '</div>' +
         '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">' +
           (prof.verifyStatus === "verified"
@@ -2865,6 +2899,7 @@
     var vatModeEl = root.querySelector("[data-vat-mode]"); if (vatModeEl) vatModeEl.value = st.vatMode || "add";
     var cardOnEl = root.querySelector("[data-card-on]"); if (cardOnEl) cardOnEl.checked = !!st.cardPayOn;
     var cardThrEl = root.querySelector("[data-card-threshold]"); if (cardThrEl) cardThrEl.value = (st.cardThreshold != null ? st.cardThreshold : 45000);
+    var reqIdEl = root.querySelector("[data-require-id]"); if (reqIdEl) reqIdEl.checked = !!st.requireIdVerify;
     var sdays = (st.specialDays || []).map(function (d) { return { date: d.date, open: !!d.open, note: d.note || "" }; });
     var sdayList = root.querySelector("[data-sdaylist]");
     function syncSdays() { if (!sdayList) return; sdayList.querySelectorAll("[data-sd]").forEach(function (r) { var i = +r.getAttribute("data-sd"); sdays[i].date = r.querySelector("[data-sd-date]").value; sdays[i].open = r.querySelector("[data-sd-open]").checked; sdays[i].note = r.querySelector("[data-sd-note]").value; }); }
@@ -3365,6 +3400,7 @@
       if (vatModeEl) patch.vatMode = vatModeEl.value;
       if (cardOnEl) patch.cardPayOn = cardOnEl.checked;
       if (cardThrEl) patch.cardThreshold = +cardThrEl.value || 0;
+      if (reqIdEl) patch.requireIdVerify = reqIdEl.checked;
       patch.specialDays = sdays.filter(function (d) { return d.date; });
       patch.heroPhrases = phrasesEl.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
       patch.faq = faq.filter(function (f) { return (f.q || "").trim(); });
