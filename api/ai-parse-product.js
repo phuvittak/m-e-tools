@@ -205,6 +205,31 @@ async function handleImport(res, url, textIn) {
 }
 
 /* ---------------- 4) บอทตอบแชตในเว็บ ---------------- */
+// Product catalog cache (5 min TTL) — เหมือน line-webhook.js
+let _catalogCache = null, _catalogAt = 0;
+async function getCatalog() {
+  if (_catalogCache && Date.now() - _catalogAt < 5 * 60 * 1000) return _catalogCache;
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/${FIRESTORE_DB}/documents/products/catalog`;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) { _catalogCache = []; _catalogAt = Date.now(); return []; }
+    const doc = await r.json();
+    const items = (doc?.fields?.items?.arrayValue?.values || []).map(unwrapFsValue);
+    _catalogCache = items; _catalogAt = Date.now();
+    return items;
+  } catch { return _catalogCache || []; }
+}
+
+// ค้นหาสินค้าจาก keyword แบบ fuzzy
+function searchProducts(products, text) {
+  const t = String(text || '').toLowerCase();
+  if (!t) return [];
+  // ถ้าตรงแบรนด์/ชื่อ/SKU
+  return products.filter(function (p) {
+    return [p.name, p.sku, p.brand, p.category].join(' ').toLowerCase().indexOf(t) >= 0;
+  });
+}
+
 let _cfgCache = null, _cfgAt = 0;
 async function getBotConfig() {
   if (_cfgCache && Date.now() - _cfgAt < 5 * 60 * 1000) return _cfgCache;
@@ -236,20 +261,38 @@ function keywordReply(text, cfg) {
   for (const r of cfg.rules) for (const kw of r.keywords) if (kw && t.indexOf(kw) >= 0) return r.answer;
   return null;
 }
-async function aiReply(text, cfg) {
+async function aiReply(text, cfg, products) {
   if (!ANTHROPIC_API_KEY) return null;
-  const systemPrompt = `คุณคือบอทผู้ช่วยของร้าน M.E.Tools ท่ารั้ว เชียงใหม่
-จำหน่ายและให้เช่าเครื่องมือช่าง DEWALT, MAKITA, BOSCH, STANLEY ของแท้ 100%
-ที่ตั้ง: 199/6 ม.7 ต.สันปูเลย อ.ดอยสะเก็ด จ.เชียงใหม่ 50220
-โทร: 081-3706466 (มือถือ) / 053-104699 (สำนักงาน)
+  const CATEGORY_LABELS = {
+    drill: 'สว่าน / ไขควง', saw: 'เลื่อย', grinder: 'เครื่องเจียร',
+    battery: 'แบตเตอรี่ / ชาร์จ', measure: 'เครื่องวัด', hand: 'เครื่องมือมือ', power: 'ไฟฟ้าอื่นๆ',
+  };
+  const catalogText = (products || []).slice(0, 80).map(function (p) {
+    const avail = p.available != null ? p.available : Math.max(0, (p.stock || 0) - (p.rented || 0));
+    const stock = avail > 0 ? `มี ${avail}` : 'หมด';
+    const price = p.forSale && p.price ? `ขาย:${Number(p.price).toLocaleString()}฿` : '';
+    const rent = p.forRent && p.rentPerDay ? `เช่า:${Number(p.rentPerDay).toLocaleString()}฿/วัน` : '';
+    return `${p.sku || '-'} | ${p.name} | ${p.brand || '-'} | ${CATEGORY_LABELS[p.category] || p.category || '-'} | ${[price, rent].filter(Boolean).join(' ') || '-'} | ${stock}`;
+  }).join('\n');
+  const systemPrompt = `คุณคือ "พี่ช่าง" พนักงานร้าน M.E.Tools ท่ารั้ว เชียงใหม่ จำหน่าย+เช่าเครื่องมือช่าง DEWALT, MAKITA, BOSCH
+ที่ตั้ง: 199/6 ม.7 ต.สันปูเลย อ.ดอยสะเก็ด จ.เชียงใหม่ 50220  โทร: 081-3706466 / 053-104699
 เวลาทำการ: จันทร์–เสาร์ 8:00–17:00 / อาทิตย์ 8:00–15:00
-${cfg.rentEnabled === false ? 'หมายเหตุ: ร้านนี้ไม่มีบริการเช่า มีแต่จำหน่ายขาด\n' : ''}
-ตอบเป็นภาษาไทย กระชับ เป็นมิตร ไม่เกิน 3 ประโยค
-ถ้าไม่แน่ใจ ให้แนะนำโทรมาถามร้านโดยตรง`;
+${cfg.rentEnabled === false ? 'หมายเหตุ: ตอนนี้ไม่มีบริการเช่า\n' : ''}
+${catalogText ? `== แคตตาล็อกปัจจุบัน (${(products || []).length} รุ่น) ==\n${catalogText}\n` : ''}
+== วิธีแนะนำ ==
+1. ลูกค้าบอกแค่ประเภท → ถามงบและแบรนด์ที่สนใจ
+2. ลูกค้าระบุแบรนด์+ประเภท → แนะนำ 1-3 รุ่นที่ดีที่สุด พร้อมจุดเด่น ราคา สต็อก
+3. ลูกค้าไม่รู้ว่าอยากได้ตัวไหน → ถามว่างานแบบไหน ใช้บ่อยแค่ไหน งบประมาณเท่าไร แล้วแนะนำ
+4. หากสินค้าหมด → บอกและแนะนำทางเลือกใกล้เคียง
+
+== บุคลิก ==
+- พูดเหมือนช่างจริง: สุภาพ อบอุ่น กระชับ ลงท้าย "ครับ"
+- ห้ามใช้คำว่า "ในฐานะ AI" — คุณเป็นพนักงานของร้าน
+- ถ้าไม่รู้ → แนะนำโทร 081-3706466`;
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 300, system: systemPrompt, messages: [{ role: 'user', content: text }] }),
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 500, system: systemPrompt, messages: [{ role: 'user', content: text }] }),
     });
     if (!r.ok) return null;
     const data = await r.json();
@@ -259,9 +302,31 @@ ${cfg.rentEnabled === false ? 'หมายเหตุ: ร้านนี้�
 async function handleWebChat(res, userId, text) {
   const session = await getSession(userId);
   if (session && session.mode === 'human') { res.status(200).json({ ok: true, skipped: 'human-mode' }); return; }
-  const cfg = await getBotConfig();
+  const [cfg, products] = await Promise.all([getBotConfig(), getCatalog()]);
   let reply = keywordReply(text, cfg);
-  if (reply === null) reply = await aiReply(text, cfg);
+  // ถ้า keyword ไม่ตรง → ค้นหาสินค้าใน catalog ก่อน AI
+  if (reply === null && products.length) {
+    const hits = searchProducts(products, text);
+    if (hits.length === 1) {
+      const p = hits[0];
+      const avail = p.available != null ? p.available : Math.max(0, (p.stock || 0) - (p.rented || 0));
+      const stockTxt = avail > 0 ? `มีในสต็อก ${avail} ชิ้น` : 'หมดชั่วคราว';
+      const priceTxt = p.forSale && p.price ? `ราคาขาย ${Number(p.price).toLocaleString()} บาท` : '';
+      const rentTxt = p.forRent && p.rentPerDay ? `เช่า ${Number(p.rentPerDay).toLocaleString()} บาท/วัน` : '';
+      const priceStr = [priceTxt, rentTxt].filter(Boolean).join(' · ') || '-';
+      reply = `${p.name}${p.sku ? ` (${p.sku})` : ''}\n${priceStr}\n${stockTxt}` +
+        (p.id ? `\nดูรายละเอียด: https://metoolsshop.vercel.app/product.html?id=${encodeURIComponent(p.id)}` : '');
+    } else if (hits.length > 1 && hits.length <= 5) {
+      reply = `พบสินค้าที่เกี่ยวข้อง ${hits.length} รุ่นครับ:\n` + hits.map(function (p) {
+        const avail = p.available != null ? p.available : Math.max(0, (p.stock || 0) - (p.rented || 0));
+        const priceTxt = p.forSale && p.price ? `${Number(p.price).toLocaleString()}฿` : '';
+        return `• ${p.name}${priceTxt ? ' — ' + priceTxt : ''} (${avail > 0 ? 'มีสินค้า' : 'หมด'})`;
+      }).join('\n');
+    } else if (hits.length > 5) {
+      reply = `พบสินค้า ${hits.length} รุ่นที่เกี่ยวข้องครับ ลองระบุรุ่น/แบรนด์เพิ่มเติม หรือเลือกดูในเว็บได้เลย`;
+    }
+  }
+  if (reply === null) reply = await aiReply(text, cfg, products);
   if (reply === null) reply = cfg.fallback || 'ขอบคุณสำหรับข้อความครับ 🙏 สนใจเครื่องมือหมวดไหนเป็นพิเศษครับ?';
   if (!reply) { res.status(200).json({ ok: true, skipped: 'no-reply' }); return; }
   try {

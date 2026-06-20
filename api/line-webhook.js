@@ -515,6 +515,37 @@ function uniqueBrandsForCategory(products, cat) {
   return Array.from(set).sort();
 }
 
+// ตรวจงบประมาณ (บาท) จากข้อความ
+function detectBudget(text) {
+  const t = String(text || '').replace(/,/g, '');
+  const m = t.match(/(\d{3,6})\s*(?:บาท|฿|bath|baht)?/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// ค้นหาสินค้าแบบ fuzzy จากคีย์เวิร์ด (ชื่อ/ยี่ห้อ/ประเภท/แต้ม)
+function fuzzySearchProducts(products, text) {
+  const t = String(text || '').toLowerCase();
+  if (!t || t.length < 2) return [];
+  // แยกคำ + คะแนน
+  const words = t.split(/\s+/).filter((w) => w.length >= 2);
+  if (!words.length) return [];
+  const scored = products.map((p) => {
+    const haystack = [p.name, p.sku, p.brand, p.category, CATEGORY_LABELS[p.category]].filter(Boolean).join(' ').toLowerCase();
+    const score = words.reduce((acc, w) => acc + (haystack.includes(w) ? 1 : 0), 0);
+    return { p, score };
+  }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+  return scored.map((x) => x.p);
+}
+
+// ตรวจ intent "ไม่รู้ว่าอยากได้อะไร / ขอคำแนะนำ / เปรียบเทียบ"
+function wantsAdvice(text) {
+  return /(แนะนำ|ไม่รู้|ไม่แน่ใจ|ตัวไหนดี|อันไหนดี|เลือกไม่ถูก|ควรซื้อ|recommend|compare|เปรียบเทียบ|ต่างกันยังไง|ต่างกันอย่างไร)/i.test(text);
+}
+
+function wantsBudget(text) {
+  return /(งบ|budget|ราคา.*เท่าไร|ราคา.*ถูก|ไม่เกิน|ประมาณ|แถว|ราคาถูก|คุ้มค่า)/i.test(text);
+}
+
 async function smartReply(userId, text) {
   const products = await getCatalog();
   const session = await getSession(userId);
@@ -523,7 +554,7 @@ async function smartReply(userId, text) {
   const category = detectCategory(text);
   const brand = detectBrand(text);
 
-  // 1) รหัสสินค้า → Flex card
+  // 1) รหัสสินค้าตรง → Flex card
   if (sku) {
     const matches = products.filter((p) => {
       const ps = String(p.sku || '').toUpperCase();
@@ -531,6 +562,16 @@ async function smartReply(userId, text) {
     });
     if (matches.length === 1) { await clearSession(userId); return flexProduct(matches[0]); }
     if (matches.length > 1) { await clearSession(userId); return flexProductCarousel(matches); }
+    // SKU ไม่เจอตรง → fuzzy search ช่วย
+    const fuzzy = fuzzySearchProducts(products, sku);
+    if (fuzzy.length) {
+      await clearSession(userId);
+      return [
+        { type: 'text', text: `ไม่พบรหัส ${sku} ตรงๆ ครับ — แต่มีสินค้าที่ใกล้เคียง` },
+        flexProductCarousel(fuzzy.slice(0, 6)),
+      ];
+    }
+    return `ขออภัยครับ ไม่พบรหัสสินค้า ${sku} ในระบบ 🙏 ลองถามชื่อรุ่นหรือประเภทสินค้าได้เลยครับ`;
   }
 
   // 2) Session รอแบรนด์
@@ -561,29 +602,80 @@ async function smartReply(userId, text) {
     );
   }
 
-  // 3) หมวด+แบรนด์ → แสดงผล
+  // 3) Session รอประเภทงาน/งบ (จาก wantsAdvice flow)
+  if (session && session.expecting === 'budget') {
+    const budget = detectBudget(text);
+    const cat = session.category;
+    let pool = products.filter((p) => !p.hidden);
+    if (cat) pool = pool.filter((p) => p.category === cat);
+    if (brand || session.brand) {
+      const b = brand || session.brand;
+      pool = pool.filter((p) => String(p.brand || '').toUpperCase() === b.toUpperCase());
+    }
+    if (budget) {
+      pool = pool.filter((p) => p.forSale && p.price && p.price <= budget * 1.1); // ±10%
+      pool.sort((a, b) => Math.abs(a.price - budget) - Math.abs(b.price - budget));
+    }
+    await clearSession(userId);
+    if (!pool.length) return `ขออภัยครับ ไม่พบสินค้าในงบ ${budget ? budget.toLocaleString() + '฿' : 'ที่ระบุ'} 🙏 ลองปรับงบหรือถามประเภทอื่นได้เลยครับ`;
+    return flexProductCarousel(pool.slice(0, 6));
+  }
+
+  // 4) หมวด+แบรนด์ → แสดงผล
   if (category && brand) {
     const filtered = products.filter((p) => p.category === category && String(p.brand || '').toUpperCase() === brand);
     if (filtered.length) { await clearSession(userId); return flexProductCarousel(filtered); }
+    // ไม่มี combo นั้น — แสดงสิ่งที่มีในหมวดนั้น
+    const fallback = products.filter((p) => p.category === category);
+    if (fallback.length) {
+      return [
+        { type: 'text', text: `ขออภัย ${brand} ในหมวด${CATEGORY_LABELS[category] || ''}ไม่มีสต็อกตอนนี้ครับ\nแต่มีแบรนด์อื่นน่าสนใจ` },
+        flexProductCarousel(fallback.slice(0, 6)),
+      ];
+    }
   }
 
-  // 4) แค่หมวด → ถามแบรนด์
+  // 5) แค่หมวด → ถามแบรนด์ หรือ ถามงบ
   if (category) {
     const brands = uniqueBrandsForCategory(products, category);
     await setSession(userId, { category, expecting: 'brand', mode: 'ai' });
     return withQuickReply(
       `สนใจ${CATEGORY_LABELS[category] || ''} ใช่ไหมครับ 🛠️\nอยากดูแบรนด์ไหนครับ?`,
-      brands.map((b) => ({ type: 'message', label: b, text: b }))
+      [...brands.map((b) => ({ type: 'message', label: b, text: b })), { type: 'message', label: 'ทุกแบรนด์', text: 'ทั้งหมด' }]
     );
   }
 
-  // 5) แค่แบรนด์
+  // 6) แค่แบรนด์
   if (brand) {
     const filtered = products.filter((p) => String(p.brand || '').toUpperCase() === brand);
     if (filtered.length) { await clearSession(userId); return flexProductCarousel(filtered); }
   }
 
-  // 6) คำสั่งทั่วไป
+  // 7) ขอคำแนะนำ / เปรียบเทียบ / ไม่รู้จะซื้ออะไร
+  if (wantsAdvice(text) || wantsBudget(text)) {
+    await setSession(userId, { expecting: 'budget', mode: 'ai' });
+    return withQuickReply(
+      `ยินดีช่วยแนะนำครับ 💪\nขอถามนิดนึงนะครับ — ใช้ทำงานแบบไหน และงบประมาณราวๆ เท่าไรครับ? (เช่น "เจาะคอนกรีต งบ 3000")`,
+      [
+        { type: 'message', label: '🔧 งานทั่วไป', text: 'แนะนำสว่านงานทั่วไป' },
+        { type: 'message', label: '🏗️ งานหนัก', text: 'แนะนำสว่านงานหนัก' },
+        { type: 'message', label: '💰 ดูทั้งหมด', text: 'ดูสินค้า' },
+      ]
+    );
+  }
+
+  // 8) Fuzzy keyword search — ค้นหาจากชื่อสินค้า
+  const fuzzyHits = fuzzySearchProducts(products, text);
+  if (fuzzyHits.length >= 1 && fuzzyHits.length <= 10) {
+    await clearSession(userId);
+    if (fuzzyHits.length === 1) return flexProduct(fuzzyHits[0]);
+    return [
+      { type: 'text', text: `พบสินค้าที่ตรงกับ "${text}" จำนวน ${fuzzyHits.length} รุ่นครับ` },
+      flexProductCarousel(fuzzyHits.slice(0, 6)),
+    ];
+  }
+
+  // 9) คำสั่งทั่วไป
   return basicReply(text);
 }
 

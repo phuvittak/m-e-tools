@@ -303,6 +303,96 @@
     return '<span class="chip paid">ชำระแล้ว</span> <span class="chip new">รอรับสินค้า</span>';
   }
 
+  /* ===================== RESTOCK MODAL ===================== */
+  function openRestockModal(productId, onDone) {
+    var selectedId = productId;
+    var canReduce = S.canReduceInventory();
+
+    var ov = document.createElement("div");
+    ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center";
+    ov.innerHTML =
+      '<div style="background:#fff;border-radius:12px;padding:24px;width:min(94vw,500px);box-shadow:0 8px 40px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:14px">' +
+        '<h3 style="margin:0;font-size:18px">📦 รับสินค้าเข้าสต็อก</h3>' +
+        '<div style="display:flex;flex-direction:column;gap:6px">' +
+          '<label style="font-size:13px;font-weight:600;color:#555">ค้นหาสินค้า (ชื่อ, SKU, แบรนด์)</label>' +
+          '<input id="rm-search" type="text" placeholder="พิมพ์คีย์เวิร์ด…" style="padding:9px 12px;border:2px solid #ccc;border-radius:6px;font-size:14px;width:100%;box-sizing:border-box" autocomplete="off">' +
+          '<div id="rm-results" style="max-height:180px;overflow-y:auto;border:1px solid #e5e5e5;border-radius:6px;display:none"></div>' +
+        '</div>' +
+        '<div id="rm-selected" style="background:#f5f5f5;border-radius:8px;padding:10px 14px;font-size:14px;font-weight:700;min-height:36px"></div>' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          '<label style="font-size:13px;font-weight:600;color:#555;white-space:nowrap">จำนวน (ชิ้น)</label>' +
+          '<input id="rm-qty" type="number" value="5" min="' + (canReduce ? "" : "1") + '" style="width:90px;padding:8px;border:2px solid #ccc;border-radius:6px;text-align:center;font-size:16px;font-weight:700">' +
+          (canReduce ? '<span style="color:#888;font-size:12px">จำนวนลบ = หักออก</span>' : "") +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+          '<button id="rm-cancel" style="padding:9px 22px;border:2px solid #ccc;border-radius:6px;cursor:pointer;background:#fff;font-size:14px">ยกเลิก</button>' +
+          '<button id="rm-confirm" style="padding:9px 22px;background:#1a7f37;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:14px">บันทึก</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+
+    function getProduct() { return S.getProduct(selectedId); }
+    function renderSelected() {
+      var p = getProduct();
+      var el = ov.querySelector("#rm-selected");
+      el.textContent = p ? (p.name || "") + (p.sku ? "  [" + p.sku + "]" : "") + (p.brand ? "  · " + p.brand : "") : "— ยังไม่ได้เลือกสินค้า —";
+      el.style.color = p ? "#1a7f37" : "#999";
+    }
+    renderSelected();
+
+    var searchEl = ov.querySelector("#rm-search");
+    var resultsEl = ov.querySelector("#rm-results");
+    searchEl.addEventListener("input", function () {
+      var q = searchEl.value.trim().toLowerCase();
+      if (!q) { resultsEl.style.display = "none"; resultsEl.innerHTML = ""; return; }
+      var hits = S.getProducts().filter(function (p) {
+        return [p.name, p.sku, p.brand, p.category].join(" ").toLowerCase().indexOf(q) >= 0;
+      }).slice(0, 10);
+      if (!hits.length) {
+        resultsEl.style.display = "block";
+        resultsEl.innerHTML = '<div style="padding:10px;color:#888;font-size:13px">ไม่พบสินค้า</div>';
+        return;
+      }
+      resultsEl.style.display = "block";
+      resultsEl.innerHTML = hits.map(function (p) {
+        return '<div data-rm-pick="' + p.id + '" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:13px;' +
+          (p.id === selectedId ? "background:#e8f5e9;font-weight:700" : "") + '">' +
+          (p.name || "") + (p.sku ? ' <span style="color:#888">[' + p.sku + ']</span>' : "") +
+          (p.brand ? ' <span style="color:#666">· ' + p.brand + '</span>' : "") +
+          '</div>';
+      }).join("");
+      resultsEl.querySelectorAll("[data-rm-pick]").forEach(function (row) {
+        row.addEventListener("click", function () {
+          selectedId = row.getAttribute("data-rm-pick");
+          searchEl.value = "";
+          resultsEl.style.display = "none";
+          renderSelected();
+        });
+        row.addEventListener("mouseenter", function () { row.style.background = "#fffde7"; });
+        row.addEventListener("mouseleave", function () { row.style.background = p && p.id === selectedId ? "#e8f5e9" : ""; });
+      });
+    });
+
+    function close() { ov.remove(); }
+    ov.querySelector("#rm-cancel").addEventListener("click", close);
+    ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
+    ov.querySelector("#rm-confirm").addEventListener("click", function () {
+      if (!selectedId) { U.toast("เลือกสินค้าก่อนครับ", "err"); return; }
+      var d = parseInt(ov.querySelector("#rm-qty").value, 10);
+      if (isNaN(d)) { U.toast("ระบุจำนวนให้ถูกต้อง", "err"); return; }
+      if (d < 0 && !canReduce) { U.toast("พนักงานหักสต๊อกออกไม่ได้ — เฉพาะเจ้าของร้าน", "err"); return; }
+      var ok = S.adjustStock(selectedId, d);
+      if (ok === false) { U.toast("ปรับสต็อกไม่สำเร็จ (ไม่มีสิทธิ์)", "err"); return; }
+      var pr = S.getProduct(selectedId);
+      if (S.pushProductToSheet && pr) S.pushProductToSheet(pr);
+      U.toast("ปรับสต็อก " + (pr ? pr.name : "") + " แล้ว", "ok");
+      close();
+      if (onDone) onDone();
+    });
+
+    requestAnimationFrame(function () { searchEl.focus(); });
+  }
+
   /* ===================== INVENTORY ===================== */
   function initInventory() {
     var state = { q: "", cat: "", noloc: false };
@@ -398,17 +488,7 @@
       tb.querySelectorAll("[data-edit]").forEach(function (b) { b.onclick = function () { openProductModal(S.getProduct(b.dataset.edit)); }; });
       tb.querySelectorAll("[data-hideprod]").forEach(function (b) { b.onclick = function () { var pr = S.getProduct(b.dataset.hideprod); if (!pr) return; S.saveProduct(Object.assign({}, pr, { hidden: !pr.hidden })); U.toast(pr.hidden ? "แสดงสินค้าแล้ว" : "ซ่อนสินค้าแล้ว", "ok"); render(); }; });
       tb.querySelectorAll("[data-restock]").forEach(function (b) {
-        b.onclick = function () {
-          var canReduce = S.canReduceInventory();
-          var n = prompt(canReduce ? "เพิ่มสต็อกกี่ชิ้น? (ใส่จำนวนลบเพื่อหักออก)" : "เพิ่มสต็อกกี่ชิ้น? (พนักงานเพิ่มได้อย่างเดียว)", "5");
-          if (n === null) return;
-          var d = parseInt(n, 10); if (isNaN(d)) return;
-          if (d < 0 && !canReduce) { U.toast("พนักงานหักสต๊อกออกไม่ได้ — เฉพาะเจ้าของร้าน", "err"); return; }
-          var ok = S.adjustStock(b.dataset.restock, d);
-          if (ok === false) { U.toast("ปรับสต็อกไม่สำเร็จ (ไม่มีสิทธิ์)", "err"); return; }
-          if (S.pushProductToSheet) S.pushProductToSheet(S.getProduct(b.dataset.restock)); // เว็บ → Google Sheet
-          U.toast("ปรับสต็อกแล้ว", "ok"); render();
-        };
+        b.onclick = function () { openRestockModal(b.dataset.restock, render); };
       });
       tb.querySelectorAll("[data-del]").forEach(function (b) {
         b.onclick = function () {

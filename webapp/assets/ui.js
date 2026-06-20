@@ -119,6 +119,8 @@
       '<a href="cart.html" class="me-cart-link" aria-label="ตะกร้า">' +
       '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>' +
       '<span class="me-cart-badge" data-cart-badge ' + (count ? "" : "hidden") + ">" + count + "</span></a>" +
+      '<button class="me-hamburger" data-hamburger aria-label="เมนู">' +
+      '<span class="me-hamburger-bar"></span><span class="me-hamburger-bar"></span><span class="me-hamburger-bar"></span></button>' +
       "</div></div></header>"
     );
   }
@@ -458,7 +460,15 @@
       b.addEventListener("click", function () { S.logout(); window.location.href = "index.html"; });
     });
     document.querySelectorAll("[data-open-chat]").forEach(function (b) {
-      b.addEventListener("click", function (e) { e.preventDefault(); openLineChat(); });
+      b.addEventListener("click", function (e) {
+        e.preventDefault();
+        openWebChat();
+        var wc = document.querySelector("[data-webchat]");
+        if (wc) wc.scrollIntoView({ behavior: "smooth", block: "end" });
+      });
+    });
+    document.querySelectorAll("[data-hamburger]").forEach(function (btn) {
+      btn.addEventListener("click", openNavDrawer);
     });
     renderTestBanner();
   }
@@ -675,10 +685,51 @@
     return new URLSearchParams(window.location.search).get(name);
   }
 
+  /* ---------- hamburger nav drawer ------------------------------ */
+  function openNavDrawer() {
+    var ov = document.getElementById("me-nav-overlay");
+    if (!ov) {
+      ov = document.createElement("div");
+      ov.className = "me-nav-overlay";
+      ov.id = "me-nav-overlay";
+      ov.innerHTML =
+        '<div class="me-nav-drawer">' +
+          '<div class="me-nav-drawer-head">' +
+            '<span class="me-nav-drawer-wm">M.E.<span style="color:var(--price-red)">T</span>ools</span>' +
+            '<button class="me-nav-drawer-close" data-nav-close aria-label="ปิด">×</button>' +
+          '</div>' +
+          '<div class="me-nav-drawer-links" id="me-nav-links"></div>' +
+        '</div>';
+      document.body.appendChild(ov);
+      ov.addEventListener("click", function (e) { if (e.target === ov) closeNavDrawer(); });
+      ov.querySelector("[data-nav-close]").addEventListener("click", closeNavDrawer);
+    }
+    var active = chromeActive;
+    var links = [
+      ["index.html", "หน้าแรก", active === "home"],
+      ["shop.html", "สินค้า / หมวดหมู่", active === "shop" || active === "categories"],
+      ["catalog.html", "แคตตาล็อก", active === "catalog"],
+      ["warranty.html", "ลงทะเบียนประกัน", active === "warranty"],
+      ["orders.html", "ติดตามคำสั่งซื้อ", active === "orders"],
+      ["account.html", "บัญชีของฉัน", false],
+      ["cart.html", "ตะกร้า 🛒", false],
+      ["login.html", "เข้าสู่ระบบ", false],
+    ];
+    var linksEl = document.getElementById("me-nav-links");
+    if (linksEl) linksEl.innerHTML = links.map(function (lk) {
+      return '<a href="' + lk[0] + '"' + (lk[2] ? ' class="on"' : "") + ">" + lk[1] + "</a>";
+    }).join("");
+    requestAnimationFrame(function () { ov.classList.add("open"); });
+  }
+  function closeNavDrawer() {
+    var ov = document.getElementById("me-nav-overlay");
+    if (ov) ov.classList.remove("open");
+  }
+
   global.MEUI = {
     iconSvg: iconSvg, productTile: productTile,
     renderHeader: renderHeader, renderFooter: renderFooter,
     mountChrome: mountChrome, refreshCartBadge: refreshCartBadge,
-    toast: toast, qp: qp,
+    toast: toast, qp: qp, openWebChat: openWebChat,
   };
 })(window);

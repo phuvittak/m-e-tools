@@ -414,7 +414,7 @@
     // FAQ accordion (editable in back office)
     var faqBox = document.querySelector("[data-faq]");
     if (faqBox) {
-      faqBox.innerHTML = (st.faq || []).filter(function (f) { return !f.hidden; }).map(function (f, i) {
+      faqBox.innerHTML = (st.faq || []).filter(function (f) { return !f.hidden && f.a; }).map(function (f, i) {
         return '<div class="faq-item"><button type="button" class="faq-q" data-faq-q="' + i + '"><span>' + esc(f.q) + '</span><span class="faq-ic">+</span></button>' +
           '<div class="faq-a">' + esc(f.a) + "</div></div>";
       }).join("");
@@ -764,9 +764,15 @@
         '<button class="sb-buy" data-sb-buy>ซื้อทันที · <b data-sb-price></b></button>';
       document.body.appendChild(bar);
       bar.querySelector("[data-sb-chat]").addEventListener("click", function () {
-        var fab = document.querySelector("[data-line-fab]");
-        if (fab) fab.click();
-        else { var oc = document.querySelector("[data-open-chat]"); if (oc) oc.click(); }
+        if (U.openWebChat) {
+          U.openWebChat();
+          var wc = document.querySelector("[data-webchat]");
+          if (wc) wc.scrollIntoView({ behavior: "smooth", block: "end" });
+        } else {
+          var wf = document.querySelector("[data-webchat-fab]");
+          if (wf) wf.click();
+          else { var fab = document.querySelector("[data-line-fab]"); if (fab) fab.click(); }
+        }
       });
       bar.querySelector("[data-sb-cart]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); U.toast("เพิ่ม <b>" + p.name + "</b> ลงตะกร้าแล้ว", "ok"); });
       bar.querySelector("[data-sb-buy]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); window.location.href = "cart.html"; });
@@ -1492,6 +1498,37 @@
         "</div>" +
         '<table class="cat-price">' + head + body + "</table>" +
       "</div></div>" +
+      (p.id ? '<div class="cat-actions"><a class="cat-buy-btn" href="product.html?id=' + encodeURIComponent(p.id) + '">🛒 ดูรายละเอียด / สั่งซื้อ ▸</a></div>' : "") +
+    "</div>";
+  }
+  function catDewaltCardHalf(p) {
+    if (!p) return "";
+    var imgs = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
+    var main = imgs[0] || "";
+    var photo = main
+      ? '<div class="cat-half-photo" style="' + cssBg(main) + '"></div>'
+      : '<div class="cat-half-photo cat-half-photo-ph">' + U.iconSvg(p.icon || "tool", 56) + "</div>";
+    var specs = (p.specs || []).map(specKV).filter(function (kv) { return kv[0] || kv[1]; }).slice(0, 5);
+    var specsHtml = specs.length
+      ? '<ul class="cat-half-specs">' +
+        specs.map(function (kv) { return "<li>" + esc(kv[0]) + (kv[1] ? " : " + esc(kv[1]) : "") + "</li>"; }).join("") + "</ul>"
+      : "";
+    return '<div class="cat-half">' +
+      '<div class="cat-half-name">' + esc(p.name || "") + catStockBadge(p) + "</div>" +
+      (p.sku ? '<div class="cat-half-sku">' + esc(p.sku) + "</div>" : "") +
+      photo +
+      specsHtml +
+      '<div class="cat-half-price">' + S.money(p.price || 0) +
+        (p.priceCtrl ? '<span class="cat-half-ctrl"> · ราคาคุม ' + S.money(p.priceCtrl) + "</span>" : "") +
+      "</div>" +
+      (p.id ? '<a class="cat-buy-btn" href="product.html?id=' + encodeURIComponent(p.id) + '">ดูรายละเอียด / สั่งซื้อ ▸</a>' : "") +
+    "</div>";
+  }
+  function catDewaltTwoPageHtml(p1, p2) {
+    var brand = (p1 && p1.brand) || (p2 && p2.brand) || "DEWALT";
+    return '<div class="cat-page">' +
+      '<div class="cat-brandbar">DEWALT · ' + esc(brand) + "</div>" +
+      '<div class="cat-two-grid">' + catDewaltCardHalf(p1) + catDewaltCardHalf(p2) + "</div>" +
     "</div>";
   }
   function catProductPageHtml(items, brand) {
@@ -1531,8 +1568,10 @@
     var pages = [catCoverHtml(st)];
     groups.forEach(function (g) {
       if (isDewalt(g.brand)) {
-        // DEWALT: 1 สินค้า/หน้า แบบละเอียด (เน้นขาย)
-        g.list.forEach(function (p) { pages.push(catDewaltPageHtml(p)); });
+        // DEWALT: 2 สินค้า/หน้า (compact + buy button)
+        for (var di = 0; di < g.list.length; di += 2) {
+          pages.push(catDewaltTwoPageHtml(g.list[di], g.list[di + 1] || null));
+        }
       } else {
         // แบรนด์อื่น: แบบ OSUKA 4 ช่อง/หน้า (เหมือนเดิม)
         for (var i = 0; i < g.list.length; i += 4) pages.push(catProductPageHtml(g.list.slice(i, i + 4), g.brand));
