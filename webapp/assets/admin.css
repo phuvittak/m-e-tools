@@ -230,39 +230,45 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
 .me-toast.show { transform: translateX(0); }
 .me-toast.ok { border-left-color: var(--tape-green); } .me-toast.err { border-left-color: var(--price-red); }
 
-/* ปุ่มเมนู 3 ขีด (เฉพาะหลังร้าน) — มุมขวาบน เปิด/ปิดเมนูข้างบนจอเล็ก */
+/* แถบบนสุด + ปุ่มเมนู 3 ขีด (เฉพาะหลังร้าน บนจอเล็ก) */
+.admin-topbar { display: none; }
 .admin-burger { display: none; }
 .admin-scrim { display: none; }
 @media (max-width: 900px) {
   .admin { grid-template-columns: 1fr; }
+  /* แถบบนสุดเต็มความกว้าง (อยู่บนสุดเสมอ) — เนื้อหาอยู่ใต้แถบ ไม่ถูกปุ่มลอยทับ */
+  .admin-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    position: fixed; top: 0; left: 0; right: 0; height: 52px; z-index: 95;
+    background: var(--ink); border-bottom: 3px solid var(--dw-yellow); padding: 0 8px 0 16px;
+  }
+  .admin-topbar-brand { font-family: var(--font-wordmark); font-weight: 900; font-size: 19px; color: var(--paper); letter-spacing: -.01em; white-space: nowrap; }
+  .admin-topbar-brand span { color: var(--price-red); }
   .admin-burger {
     display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center;
-    position: fixed; top: 10px; right: 12px; z-index: 80; width: 44px; height: 44px;
-    background: var(--ink); border: 2px solid var(--dw-yellow); border-radius: 9px; cursor: pointer;
+    width: 44px; height: 44px; background: none; border: none; cursor: pointer; flex: 0 0 auto;
   }
-  .admin-burger span { display: block; width: 20px; height: 2px; background: var(--dw-yellow); border-radius: 1px; transition: all .2s; }
+  .admin-burger span { display: block; width: 22px; height: 2px; background: var(--dw-yellow); border-radius: 1px; transition: all .2s; }
   .admin.nav-open .admin-burger span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
   .admin.nav-open .admin-burger span:nth-child(2) { opacity: 0; }
   .admin.nav-open .admin-burger span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
-  /* เมนูข้างกลายเป็นลิ้นชักเลื่อนจากซ้าย */
+  /* เมนูข้างกลายเป็นลิ้นชักเลื่อนจากซ้าย (ใต้แถบบนสุด) */
   .side {
-    position: fixed; top: 0; left: 0; bottom: 0; height: 100vh; width: min(82vw, 290px);
+    position: fixed; top: 52px; left: 0; bottom: 0; height: calc(100vh - 52px); width: min(82vw, 290px);
     flex-direction: column; flex-wrap: nowrap; align-items: stretch; z-index: 90;
-    transform: translateX(-100%); transition: transform .26s cubic-bezier(.2,.8,.2,1); overflow-y: auto;
+    transform: translateX(-105%); transition: transform .26s cubic-bezier(.2,.8,.2,1); overflow-y: auto;
   }
   .admin.nav-open .side { transform: translateX(0); }
   .side-nav { flex-direction: column; flex-wrap: nowrap; overflow-y: auto; min-height: 0; }
   .side-foot { border-top: 1px solid var(--concrete-700); padding-top: 12px; flex-direction: column; align-items: stretch; }
-  .admin.nav-open .admin-scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 85; }
+  .admin.nav-open .admin-scrim { display: block; position: fixed; top: 52px; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.5); z-index: 85; }
   .kpis { grid-template-columns: repeat(2,1fr); }
   .grid-2 { grid-template-columns: 1fr; }
-  .main { padding: 20px 18px 50px; }
-  /* โหมดทดลอง: ดันปุ่ม 3 ขีด + ลิ้นชักเมนู ลงมาใต้แถบทดลอง ไม่ให้ถูกบัง */
-  body.testmode-on .admin-burger { top: calc(var(--testbar-h, 34px) + 8px); }
-  body.testmode-on .side { top: var(--testbar-h, 34px); height: calc(100vh - var(--testbar-h, 34px)); }
+  /* เนื้อหาเริ่มใต้แถบบนสุด (52px) เสมอ */
+  .main { padding: 66px 18px 50px; }
 }
 @media (max-width: 720px) {
-  .main { padding: 16px 14px 40px; }
+  .main { padding: 62px 14px 40px; }
   .topbar h1 { font-size: 26px; }
   .topbar .sub { font-size: 13px; }
   table.data { font-size: 12px; }

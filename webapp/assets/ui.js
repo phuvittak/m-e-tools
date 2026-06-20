@@ -509,7 +509,14 @@
       if (menu.hidden) { menu.hidden = false; loadProfileInfo(box); } else { menu.hidden = true; }
     });
     menu.addEventListener("click", function (e) { e.stopPropagation(); });
-    document.addEventListener("click", function () { if (!menu.hidden) menu.hidden = true; });
+    // ปิดเมนูเมื่อคลิกที่อื่น — ผูก listener ระดับ document ครั้งเดียว (กันสะสมทุกครั้งที่ re-render หัวเว็บ)
+    if (!wireProfileMenu._docBound) {
+      wireProfileMenu._docBound = true;
+      document.addEventListener("click", function () {
+        var m = document.querySelector("[data-profile-menu]");
+        if (m && !m.hidden) m.hidden = true;
+      });
+    }
     var file = box.querySelector("[data-profile-file]");
     if (file) file.addEventListener("change", function () {
       var f = file.files && file.files[0]; if (!f) return;
