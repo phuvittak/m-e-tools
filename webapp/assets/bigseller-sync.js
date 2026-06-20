@@ -294,6 +294,13 @@
       enqueue("product.offshelf", { sku: merchantSku(p) });
     } catch (e) { log({ kind: "product.offshelf", status: "error", message: "exception: " + (e && e.message) }); }
   }
+  // เปิดการขายสินค้า (on-shelf) กลับมาบนทุกแพลตฟอร์ม — ใช้ตอน "เปิดขายทั้งแบรนด์" (คู่กับ offShelfProduct)
+  function onShelfProduct(p) {
+    try {
+      if (!featureOn("product")) return;
+      enqueue("product.onshelf", { sku: merchantSku(p) });
+    } catch (e) { log({ kind: "product.onshelf", status: "error", message: "exception: " + (e && e.message) }); }
+  }
   // ลบสินค้าต้นแบบใน BigSeller — ใช้ตอน "ลบทั้งแบรนด์" (ถอนรากถอนโคน)
   function removeProduct(p) {
     try {
@@ -354,7 +361,7 @@
     specToDescription: specToDescription, buildProductPayload: buildProductPayload,
     buildOrderPayload: buildOrderPayload, validateProduct: validateProduct, merchantSku: merchantSku,
     // outbound
-    syncProduct: syncProduct, syncOrder: syncOrder, offShelfProduct: offShelfProduct, removeProduct: removeProduct,
+    syncProduct: syncProduct, syncOrder: syncOrder, offShelfProduct: offShelfProduct, onShelfProduct: onShelfProduct, removeProduct: removeProduct,
     // read-only / checkout guard
     pullStock: pullStock, finalStockCheck: finalStockCheck,
     // queue/log

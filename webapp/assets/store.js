@@ -203,6 +203,7 @@
     firebaseConfig: "", // paste Firebase web config JSON to enable real online chat
     sheetWebAppUrl: "", // Google Apps Script web-app URL — ซิงค์สต๊อกสองทางกับ Google Sheet
     qrImage: "",
+    promptPayId: "", // เบอร์พร้อมเพย์ / เลขบัตรประชาชน → สร้าง QR ฟิกซ์ยอดเงินอัตโนมัติ
     bankInfo: "พร้อมเพย์ M.E.Tools",
     // ภาษีมูลค่าเพิ่ม (ร้านจดทะเบียน VAT) — คิด VAT กับการขายทุกช่องทาง
     // vatMode: "add" = ราคายังไม่รวม VAT แล้วบวกเพิ่ม · "include" = ราคารวม VAT แล้ว (แสดงแยกส่วน)

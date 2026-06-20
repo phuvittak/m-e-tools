@@ -2777,7 +2777,7 @@
       }
       draw();
     })();
-    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "sheetWebAppUrl", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
+    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "promptPayId", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "sheetWebAppUrl", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
     var openSunEl = root.querySelector("[data-open-sun]"); if (openSunEl) openSunEl.checked = st.openSun !== false;
     // VAT + การรับบัตร
     var vatOnEl = root.querySelector("[data-vat-on]"); if (vatOnEl) vatOnEl.checked = st.vatEnabled !== false;
@@ -2824,6 +2824,22 @@
     drawQR();
     root.querySelector("[data-qrfile]").addEventListener("change", function (e) { var f = e.target.files && e.target.files[0]; if (!f) return; readImageFile(f, function (d) { pendingQR = d; drawQR(); }); });
     root.querySelector("[data-qrclear]").addEventListener("click", function () { pendingQR = ""; drawQR(); });
+
+    // PromptPay ID → live preview ของ QR ฟิกซ์ยอด (ตัวอย่าง 100 บาท) — โชว์ว่า QR ใช้ได้จริง
+    var ppInput = root.querySelector('[data-set="promptPayId"]');
+    var ppPrev = root.querySelector("[data-pp-preview]");
+    function drawPPPreview() {
+      if (!ppPrev) return;
+      var id = ppInput ? ppInput.value.trim() : "";
+      if (!id) { ppPrev.innerHTML = '<span class="img-hint">ใส่เบอร์พร้อมเพย์ด้านบนเพื่อดูตัวอย่าง QR</span>'; return; }
+      if (!window.MEQR || !MEQR.isValidId(id)) { ppPrev.innerHTML = '<span class="img-hint" style="color:#b45309">⚠️ ต้องเป็นเบอร์มือถือ 10 หลัก หรือเลขบัตรประชาชน 13 หลัก</span>'; return; }
+      try {
+        ppPrev.innerHTML = '<div style="width:110px;height:110px;border:1px solid #d8d8d8;border-radius:8px;overflow:hidden;background:#fff;flex:0 0 auto">' +
+          MEQR.promptPaySvg(id, 100, { scale: 5, border: 2, cssSize: 110 }) + '</div>' +
+          '<div class="img-hint">✅ ตัวอย่าง QR ยอด 100 บาท (จริงในหน้าชำระเงินจะล็อกยอดตามแต่ละออเดอร์)</div>';
+      } catch (e) { ppPrev.innerHTML = '<span class="img-hint" style="color:#b45309">สร้าง QR ไม่สำเร็จ</span>'; }
+    }
+    if (ppInput) { ppInput.addEventListener("input", drawPPPreview); drawPPPreview(); }
 
     // FAQ editor
     var faq = (st.faq || []).map(function (f) { return { q: f.q, a: f.a, hidden: !!f.hidden }; });
@@ -2878,6 +2894,24 @@
       });
       U.toast("ปิดการขายแบรนด์ " + name + " แล้ว " + n + " รายการ", "ok");
     }
+    // เปิดขายแบรนด์กลับมา — ปลดซ่อนสินค้าทุกตัว + ยิงคำสั่ง on-shelf ไป BigSeller (คู่กับ cascadeOffShelf)
+    function cascadeOnShelf(name) {
+      var prods = brandProducts(name);
+      if (!prods.length) { U.toast('แบรนด์ "' + name + '" ยังไม่มีสินค้า', ""); return; }
+      var hiddenCount = prods.filter(function (p) { return p.hidden; }).length;
+      if (!window.confirm('เปิดการขายสินค้าแบรนด์ "' + name + '" กลับมา ' + hiddenCount + ' รายการ?\n• แสดงบนหน้าเว็บ M.E.Tools อีกครั้ง\n• ส่งคำสั่งเปิดการขาย (on-shelf) ไป BigSeller → Shopee/Lazada/TikTok (เฉพาะเมื่อเปิดซิงค์ API)')) return;
+      var n = 0;
+      prods.forEach(function (p) {
+        if (p.hidden && S.saveProduct(Object.assign({}, p, { hidden: false }))) n++;
+        try { if (window.BigSellerSync && window.BigSellerSync.onShelfProduct) window.BigSellerSync.onShelfProduct(p); } catch (e) {}
+      });
+      U.toast("เปิดการขายแบรนด์ " + name + " กลับมาแล้ว " + n + " รายการ", "ok");
+    }
+    // แบรนด์อยู่ในสถานะ "ปิดขาย" เมื่อมีสินค้า และทุกตัวถูกซ่อน (hidden) → ใช้สลับปุ่มเปิด/ปิด
+    function brandOffShelf(name) {
+      var prods = brandProducts(name);
+      return prods.length > 0 && prods.every(function (p) { return p.hidden; });
+    }
     function cascadeDeleteProducts(name) {
       var prods = brandProducts(name), n = 0;
       prods.forEach(function (p) {
@@ -2897,7 +2931,9 @@
           '<span style="font-size:11px;color:var(--fg-2);white-space:nowrap" title="จำนวนสินค้าในแบรนด์นี้">' + pc + ' สินค้า</span>' +
           '<label class="f-check" title="แบรนด์เด่น — โชว์เน้นบนหน้าเว็บ"><input type="checkbox" data-bp="' + i + '"' + (b.primary ? " checked" : "") + "> เด่น</label>" +
           '<label class="f-check" title="ซ่อนแบรนด์นี้ + สินค้าทุกตัวของแบรนด์ออกจากหน้าเว็บลูกค้า — ปลดซ่อนได้ทันที (ไม่กระทบ Shopee/Lazada/TikTok)"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อนทั้งแบรนด์</label>" +
-          '<button class="btn btn-sm btn-ghost" data-boff="' + i + '" title="นอกจากซ่อนบนเว็บ ยังสั่งปิดการขายบน Shopee/Lazada/TikTok ผ่าน BigSeller ด้วย">🚫 ปิดขายทุกแพลตฟอร์ม</button>' +
+          (brandOffShelf(b.name)
+            ? '<button class="btn btn-sm" data-bon="' + i + '" style="background:#16a34a;border-color:#16a34a;color:#fff" title="เปิดการขายสินค้าแบรนด์นี้กลับมา (แสดงบนเว็บ + เปิดขายบน Shopee/Lazada/TikTok)">✅ เปิดขายทุกแพลตฟอร์ม</button>'
+            : '<button class="btn btn-sm btn-ghost" data-boff="' + i + '" title="นอกจากซ่อนบนเว็บ ยังสั่งปิดการขายบน Shopee/Lazada/TikTok ผ่าน BigSeller ด้วย">🚫 ปิดขายทุกแพลตฟอร์ม</button>') +
           '<button class="btn btn-sm btn-danger" data-bdel="' + i + '">ลบ</button></div>';
       }).join("");
       brandList.querySelectorAll("[data-bdel]").forEach(function (b) {
@@ -2917,6 +2953,9 @@
       });
       brandList.querySelectorAll("[data-boff]").forEach(function (b) {
         b.onclick = function () { syncBrands(); cascadeOffShelf((brands[+b.dataset.boff].name || "").trim()); renderBrands(); };
+      });
+      brandList.querySelectorAll("[data-bon]").forEach(function (b) {
+        b.onclick = function () { syncBrands(); cascadeOnShelf((brands[+b.dataset.bon].name || "").trim()); renderBrands(); };
       });
       brandList.querySelectorAll("[data-bh]").forEach(function (i) { i.onchange = function () { syncBrands(); renderBrands(); }; });
       // drag-and-drop reorder

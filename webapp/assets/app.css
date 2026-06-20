@@ -603,6 +603,7 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 .qr-pp { font-family: var(--font-display-en); font-style: italic; font-weight: 700; letter-spacing: .06em; color: var(--workboot-blue); font-size: 16px; }
 .qr-pp b { color: var(--price-red); }
 .qr-amount { font-family: var(--font-display-th); font-style: italic; font-weight: 900; font-size: 30px; }
+.qr-locked { display: inline-block; vertical-align: middle; font-family: var(--font-body); font-style: normal; font-weight: 700; font-size: 11px; color: #157a3a; background: #def7e5; padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
 .qr-cap { font-family: var(--font-body); font-size: 12px; color: var(--fg-3); }
 .qr-img { width: 200px; height: 200px; object-fit: contain; display: block; }
 .qr-expired { width: 200px; height: 200px; display: grid; place-items: center; text-align: center; font-family: var(--font-body); font-weight: 700; color: var(--price-red); border: 2px dashed var(--price-red); }
