@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>คำสั่งซื้อ / เช่า — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260620c">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260620e">
 </head>
 <body data-admin="orders">
   <div class="admin" data-shell>
@@ -19,11 +19,14 @@
 
       <div class="panel" data-testbar style="margin-bottom:14px;border-left:6px solid #f0a500">
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;font-size:15px">
             <input type="checkbox" data-testmode style="width:18px;height:18px"> 🧪 โหมดทดลองสั่งซื้อ
           </label>
-          <span class="sub" style="flex:1;min-width:200px">เปิดไว้ตอน "ลองสั่งซื้อ" — ออเดอร์ที่สั่งจะติดป้าย <b>ทดลอง</b> ไม่นับเป็นยอดขายจริง แล้วกดล้างทิ้งทีหลังได้</span>
-          <button class="btn btn-sm btn-ghost" data-clear-test>🧪 ล้างออเดอร์ทดลองทั้งหมด</button>
+          <span class="sub" style="flex:1;min-width:200px">เปิดไว้ตอน "ลองสั่งซื้อ" — ออเดอร์ที่สั่งจะติดป้าย <b>ทดลอง</b> ไม่นับเป็นยอดขายจริง แล้วกดล้างทิ้งทีหลังได้ · เมื่อเปิดแล้วให้กด <b>"ดูหน้าร้านทดลอง"</b> เพื่อลองสั่งซื้อจริงๆ</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <a class="btn btn-ghost" href="../index.html" target="_blank" rel="noopener" data-preview-store style="background:#fffbeb;border-color:#f0a500;font-weight:700">🧪 ดูหน้าร้านทดลอง →</a>
+          <button class="btn btn-sm btn-ghost" data-clear-test>ล้างออเดอร์ทดลองทั้งหมด</button>
           <button class="btn btn-sm btn-danger" data-clear-all>🗑️ ล้างออเดอร์ทั้งหมด</button>
         </div>
       </div>
@@ -50,10 +53,10 @@
     </main>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="../assets/thai-geo.js?v=20260620c"></script>
-  <script src="../assets/store.js?v=20260620c"></script>
-  <script src="../assets/bigseller-sync.js?v=20260620c"></script>
-  <script src="../assets/ui.js?v=20260620c"></script>
-  <script src="../assets/admin.js?v=20260620c"></script>
+  <script src="../assets/thai-geo.js?v=20260620e"></script>
+  <script src="../assets/store.js?v=20260620e"></script>
+  <script src="../assets/bigseller-sync.js?v=20260620e"></script>
+  <script src="../assets/ui.js?v=20260620e"></script>
+  <script src="../assets/admin.js?v=20260620e"></script>
 </body>
 </html>

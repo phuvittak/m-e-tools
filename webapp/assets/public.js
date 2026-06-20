@@ -986,15 +986,28 @@
 
     function showPayment(amount, totals, shipping, checkout) {
       var st = S.getSettings();
-      var qrVisual = st.qrImage
-        ? '<img class="qr-img" src="' + st.qrImage + '" alt="QR ชำระเงิน">'
-        : genQR("METOOLS|" + amount + "|" + Date.now());
+      // ลำดับความสำคัญ: (1) PromptPay ID → QR จริงที่ "ฟิกซ์ยอดเงิน" ในตัว QR เลย
+      //                 (2) รูป QR ที่อัปโหลด (ยอดไม่ฟิกซ์ — ลูกค้าพิมพ์เอง)  (3) QR ตัวอย่าง
+      var amountLocked = false, qrVisual;
+      if (st.promptPayId && global.MEQR && MEQR.isValidId(st.promptPayId)) {
+        try { qrVisual = MEQR.promptPaySvg(st.promptPayId, amount, { scale: 6, border: 3, cssSize: 200 }); amountLocked = true; }
+        catch (e) { qrVisual = null; }
+      }
+      if (!qrVisual) {
+        qrVisual = st.qrImage
+          ? '<img class="qr-img" src="' + st.qrImage + '" alt="QR ชำระเงิน">'
+          : genQR("METOOLS|" + amount + "|" + Date.now());
+      }
       var bg = document.createElement("div");
       bg.className = "me-modal-bg";
       bg.innerHTML =
         '<div class="me-modal"><div class="me-modal-head"><h3>ชำระเงิน</h3><button class="me-modal-x">×</button></div>' +
         '<div class="me-modal-body"><div class="qr-pp"><b>PromptPay</b> · ' + esc(st.bankInfo || st.company || "M.E.Tools") + "</div>" +
-          '<div class="qr-card" data-qrcard>' + qrVisual + '<div class="qr-amount">' + S.money(amount) + '</div><div class="qr-cap">สแกน QR แล้วโอนยอดนี้ให้ครบ · หมดอายุใน <b data-qrtimer>10:00</b></div></div>' +
+          '<div class="qr-card" data-qrcard>' + qrVisual + '<div class="qr-amount">' + S.money(amount) +
+            (amountLocked ? ' <span class="qr-locked">🔒 ยอดถูกล็อกใน QR</span>' : "") + '</div>' +
+            '<div class="qr-cap">' + (amountLocked
+              ? 'สแกน QR แล้วยอดเงินจะขึ้นให้อัตโนมัติ ไม่ต้องพิมพ์เอง'
+              : 'สแกน QR แล้วโอนยอดนี้ให้ครบ') + ' · หมดอายุใน <b data-qrtimer>10:00</b></div></div>' +
           '<div class="pay-rows">' +
             (function () { var vi = S.lineVat(totals.lines);
               return '<div class="r"><span>ยอดสินค้า/ค่าเช่า' + (vi.enabled ? " (ก่อน VAT)" : "") + "</span><span>" + S.money(vi.net) + "</span></div>" +

@@ -2355,30 +2355,62 @@
         (testCount ? ' · <span style="color:#b45309">🧪 ทดลอง ' + testCount + " รายการ (ไม่นับยอด)</span>" : "");
 
       var tb = document.querySelector("[data-ordtable]");
-      if (!orders.length) { tb.innerHTML = '<tbody><tr><td colspan="7" style="text-align:center;padding:32px;color:var(--fg-2)">ไม่มีคำสั่งซื้อที่ตรงกับเงื่อนไข</td></tr></tbody>'; return; }
+      if (!orders.length) { tb.innerHTML = '<tbody><tr><td colspan="6" style="text-align:center;padding:32px;color:var(--fg-2)">ไม่มีคำสั่งซื้อที่ตรงกับเงื่อนไข</td></tr></tbody>'; return; }
+      // แยกวันที่ / เวลา จาก timestamp
+      var TH_MON = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+      function p2(n) { return n < 10 ? "0" + n : "" + n; }
+      function ordDateStr(ms) { var d = new Date(ms); return d.getDate() + " " + TH_MON[d.getMonth()] + " " + (d.getFullYear() + 543).toString().slice(2); }
+      function ordTimeStr(ms) { var d = new Date(ms); return p2(d.getHours()) + ":" + p2(d.getMinutes()) + " น."; }
+      function totalQty(o) { return (o.items || []).reduce(function (s, it) { return s + (it.qty || 0); }, 0); }
       tb.innerHTML =
-        "<thead><tr><th>คำสั่งซื้อ</th><th>ลูกค้า</th><th>รายการ</th><th class=num>ยอด</th><th class=num>กำไร</th><th>สถานะ</th><th>เปลี่ยนสถานะ</th></tr></thead><tbody>" +
+        "<thead><tr><th>วันที่ / เวลา</th><th>ลูกค้า</th><th>รายการสินค้า</th><th class=num>ยอดเงิน</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>" +
         orders.map(function (o) {
           var opts = statusOptions(o);
-          var addr = o.fulfillment === "delivery" && o.address ? "<br><span class=prod-sku>" + o.address.text + "</span>" : "";
-          var taxLine = o.taxInvoice ? '<br><span class="chip" style="background:#fff3cd;border-color:#ffe08a;color:#8a6d00">🧾 ใบกำกับภาษี</span><br><span class=prod-sku>' + esc(o.taxInvoice.name) + " · เลขผู้เสียภาษี " + esc(o.taxInvoice.taxId) + "<br>" + esc(o.taxInvoice.address) + "</span>" : "";
-          return "<tr" + (o.test ? ' style="background:#fffbeb"' : "") + "><td><b>" + o.id + '</b> ' +
-            (o.test ? '<span class="chip" style="background:#fde68a;border-color:#f0a500;color:#92400e">🧪 ทดลอง</span> ' : "") +
-            '<span class="chip ' + o.type + '">' + S.typeLabel(o.type) + "</span> " +
-            '<span class="chip ' + (o.fulfillment === "delivery" ? "rent" : "new") + '">' + S.fulfillmentLabel(o.fulfillment) + "</span>" +
-            "<br><span class=prod-sku>" + S.fmtDate(o.createdAt) + (o.type === "rent" ? " · " + o.days + " วัน" : "") + "</span></td>" +
-            "<td>" + o.customer.name + "<br><span class=prod-sku>" + o.customer.phone + "</span>" + addr + taxLine + "</td>" +
-            "<td>" + o.items.map(function (it) { return it.name + " ×" + it.qty; }).join("<br>") + (o.shipping ? '<br><span class="prod-sku">+ ค่าจัดส่ง ' + S.money(o.shipping) + "</span>" : "") + "</td>" +
-            '<td class="num">' + S.money(o.total) + "</td>" +
-            '<td class="num">' + S.money((o.revenue || 0) - (o.cost || 0)) + "</td>" +
+          var cCode = o.userId ? S.customerCode(o.userId) : "";
+          var hasAddr = o.fulfillment === "delivery" && o.address;
+          var qty = totalQty(o);
+          return "<tr" + (o.test ? ' style="background:#fffbeb"' : "") + ">" +
+            // ── วันที่ / เวลา ──
+            "<td style='white-space:nowrap'>" +
+              "<div style='font-weight:800;font-size:15px'>" + ordDateStr(o.createdAt) + "</div>" +
+              "<div style='color:var(--fg-2);font-size:12px'>" + ordTimeStr(o.createdAt) + "</div>" +
+              "<div style='margin-top:5px'><span class='prod-sku' style='font-size:11px'>" + esc(o.id) + "</span>" +
+              (o.test ? ' <span class="chip" style="background:#fde68a;border-color:#f0a500;color:#92400e;font-size:11px">🧪 ทดลอง</span>' : "") + "</div>" +
+              "<div style='margin-top:3px'><span class='chip " + o.type + "' style='font-size:11px'>" + S.typeLabel(o.type) + "</span> " +
+              "<span class='chip " + (o.fulfillment === "delivery" ? "rent" : "new") + "' style='font-size:11px'>" + S.fulfillmentLabel(o.fulfillment) + "</span></div>" +
+            "</td>" +
+            // ── ลูกค้า ──
+            "<td>" +
+              (cCode ? "<div style='margin-bottom:3px'><span class='cus-code'>" + esc(cCode) + "</span></div>" : "") +
+              "<div style='font-weight:700'>" + esc(o.customer.name) + "</div>" +
+              "<div class='prod-sku'>" + esc(o.customer.phone) + "</div>" +
+              (hasAddr ? "<div class='prod-sku' style='font-size:11px;margin-top:2px'>📍 " + esc(o.address.text) + "</div>" : "") +
+              (o.taxInvoice ? "<div style='margin-top:4px'><span class='chip' style='background:#fff3cd;border-color:#ffe08a;color:#8a6d00;font-size:11px'>🧾 ต้องการใบกำกับภาษี</span></div>" : "") +
+            "</td>" +
+            // ── รายการสินค้า ──
+            "<td>" +
+              "<div>" + o.items.map(function (it) { return "<span class='prod-sku'>" + esc(it.name) + "</span> ×<b>" + it.qty + "</b>"; }).join("<br>") + "</div>" +
+              "<div style='margin-top:5px;color:#2563eb;font-size:12px;font-weight:700'>" + qty + " ชิ้น" + (o.shipping ? " + ส่ง " + S.money(o.shipping) : "") + (o.type === "rent" ? " · เช่า " + o.days + " วัน" : "") + "</div>" +
+            "</td>" +
+            // ── ยอดเงิน ──
+            "<td class='num' style='white-space:nowrap'>" +
+              "<div style='font-size:17px;font-weight:800'>" + S.money(o.total) + "</div>" +
+              (o.vat ? "<div class='prod-sku'>VAT " + S.money(o.vat) + "</div>" : "") +
+              "<div class='prod-sku' style='color:var(--fg-2);font-size:11px'>กำไร " + S.money((o.revenue || 0) - (o.cost || 0)) + "</div>" +
+            "</td>" +
+            // ── สถานะ ──
             "<td>" + adminStatusBadges(o) + payInfo(o) + (o.staffMessage ? '<br><span class="prod-sku">📩 ' + esc(o.staffMessage) + "</span>" : "") + "</td>" +
-            '<td><div class="ord-act">' + (opts ? '<select class="statussel" data-os="' + o.id + '">' + opts + "</select>" : '<span class="prod-sku">—</span>') +
+            // ── จัดการ ──
+            '<td><div class="ord-act">' +
+              (opts ? '<select class="statussel" data-os="' + o.id + '">' + opts + "</select>" : "") +
               '<div class="ord-msg"><input data-msg="' + o.id + '" value="' + esc(o.staffMessage || "") + '" placeholder="ตอบลูกค้า เช่น ของถึงใน 2 วัน"><button class="btn btn-sm" data-sendmsg="' + o.id + '">ส่ง</button></div>' +
-              (o.slip ? '<button class="btn btn-sm btn-ghost" data-viewslip="' + o.id + '">📄 ดูสลิป</button>' : "") +
-              (o.payStatus === "pending" ? '<button class="btn btn-sm" data-confirmpay="' + o.id + '">✓ ยืนยันรับเงิน</button>' : "") +
-              '<button class="btn btn-sm" data-printlabel="' + o.id + '">🏷️ ใบปะหน้าซอง</button>' +
+              (o.slip ? '<button class="btn btn-sm btn-ghost" data-viewslip="' + o.id + '">📄 สลิป</button>' : "") +
+              (o.payStatus === "pending" ? '<button class="btn btn-sm" data-confirmpay="' + o.id + '">✓ รับเงิน</button>' : "") +
+              '<button class="btn btn-sm" data-printlabel="' + o.id + '">🏷️ ใบจัดส่ง</button>' +
               '<button class="btn btn-sm" data-printreceipt="' + o.id + '">🧾 ใบเสร็จ</button>' +
-              (S.hasPerm("orders_delete") ? '<button class="btn btn-sm btn-danger" data-delorder="' + o.id + '">ลบคำสั่งซื้อ</button>' : "") +
+              '<button class="btn btn-sm" data-printwarranty="' + o.id + '">🛡️ ใบรับประกัน</button>' +
+              (o.taxInvoice ? '<button class="btn btn-sm" data-printtax="' + o.id + '">📋 ใบกำกับภาษี</button>' : "") +
+              (S.hasPerm("orders_delete") ? '<button class="btn btn-sm btn-danger" data-delorder="' + o.id + '">ลบ</button>' : "") +
             "</div></td></tr>";
         }).join("") + "</tbody>";
 
@@ -2406,6 +2438,12 @@
       });
       tb.querySelectorAll("[data-printreceipt]").forEach(function (b) {
         b.onclick = function () { var ord = S.getOrders().filter(function (x) { return x.id === b.dataset.printreceipt; })[0]; if (ord) printReceipt(ord); };
+      });
+      tb.querySelectorAll("[data-printtax]").forEach(function (b) {
+        b.onclick = function () { var ord = S.getOrders().filter(function (x) { return x.id === b.dataset.printtax; })[0]; if (ord) printTaxInvoice(ord); };
+      });
+      tb.querySelectorAll("[data-printwarranty]").forEach(function (b) {
+        b.onclick = function () { var ord = S.getOrders().filter(function (x) { return x.id === b.dataset.printwarranty; })[0]; if (ord) printWarrantyCert(ord); };
       });
       tb.querySelectorAll("[data-viewslip]").forEach(function (b) {
         b.onclick = function () { var ord = S.getOrders().filter(function (x) { return x.id === b.dataset.viewslip; })[0]; if (ord && ord.slip) viewSlip(ord); };
@@ -2533,6 +2571,144 @@
       '</div></body></html>';
     printDocHtml(doc);
   }
+  // พิมพ์ใบกำกับภาษีเต็มรูปแบบ (Full Tax Invoice) — สำหรับลูกค้านิติบุคคล/ต้องใช้เอกสาร
+  function printTaxInvoice(o) {
+    var st = S.getSettings();
+    var c = o.customer || {};
+    var ti = o.taxInvoice || {};
+    var payTxt = o.payMethod === "promptpay" ? "โอน / PromptPay" : (o.payMethod === "cash" ? "เงินสด" : (o.payMethod || "เงินสด"));
+    var shopPhone = String(st.phone || "").replace(/\s*,\s*/g, ", ");
+    var TH_MONTHS = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+    var dd = new Date(o.createdAt || Date.now());
+    var thDate = dd.getDate() + " " + TH_MONTHS[dd.getMonth()] + " " + (dd.getFullYear() + 543);
+    var rows = (o.items || []).map(function (it) {
+      var lineNet = (it.unitPrice || 0) * it.qty;
+      var lineVat = (o.vat && o.subtotal) ? Math.round(lineNet / (o.subtotal || 1) * (o.vat || 0) * 100) / 100 : 0;
+      return "<tr><td>" + esc(it.name) + (it.days ? " (เช่า " + it.days + " วัน)" : "") + "</td>" +
+        '<td class="n">' + it.qty + "</td>" +
+        '<td class="n">' + esc(S.money(it.unitPrice || 0)) + "</td>" +
+        '<td class="n">' + esc(S.money(lineNet)) + "</td>" +
+        '<td class="n">' + (lineVat ? esc(S.money(lineVat)) : "—") + "</td>" +
+        '<td class="n">' + esc(S.money(lineNet + lineVat)) + "</td></tr>";
+    }).join("");
+    var doc =
+      '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบกำกับภาษี ' + esc(o.id) + '</title><style>' +
+      '@page{margin:14mm}*{box-sizing:border-box}body{font-family:"Sarabun",system-ui,sans-serif;margin:0;color:#000;font-size:14px}' +
+      '.page{max-width:195mm}' +
+      '.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #000;padding-bottom:12px;margin-bottom:14px}' +
+      '.hd-l .b{font-size:22px;font-weight:800}.hd-l .s{font-size:12px;color:#444;line-height:1.6;margin-top:3px}' +
+      '.hd-r{text-align:right}.hd-r .doc-t{font-size:20px;font-weight:900;color:#c00;line-height:1.1}' +
+      '.hd-r .doc-s{font-size:13px;color:#333;margin-top:3px}' +
+      '.parties{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;border:1px solid #ccc;padding:12px 14px;background:#fafafa;border-radius:4px}' +
+      '.ph{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#666;border-bottom:1px solid #ddd;padding-bottom:3px;margin-bottom:6px}' +
+      '.pn{font-size:15px;font-weight:800;margin-bottom:3px}.ps{font-size:12px;color:#444;line-height:1.6}' +
+      'table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px}' +
+      'th{background:#f0f0f0;border:1px solid #ccc;padding:6px 8px;font-size:12px;font-weight:700}' +
+      'td{border:1px solid #ccc;padding:5px 8px}.n{text-align:right;white-space:nowrap}' +
+      '.bot{display:flex;justify-content:space-between;align-items:flex-start;margin-top:8px}' +
+      '.stamp{border:3px solid #0a0;color:#0a0;border-radius:8px;padding:4px 16px;font-weight:800;font-size:18px;transform:rotate(-6deg);display:inline-block}' +
+      '.tot{width:230px}.tot .r{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #eee}' +
+      '.tot .g{font-weight:800;font-size:15px;border-top:2px solid #000;border-bottom:none;padding-top:6px}' +
+      '.sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:28px;font-size:12px;text-align:center}' +
+      '.sln{border-top:1px solid #000;padding-top:4px;margin-top:40px;font-weight:700}' +
+      '.ft{font-size:11px;color:#666;margin-top:12px;border-top:1px dashed #ccc;padding-top:8px}' +
+      '</style></head><body><div class="page">' +
+      '<div class="hd">' +
+        '<div class="hd-l"><div class="b">' + esc(st.company || "M.E.Tools") + '</div>' +
+        '<div class="s">' + esc(st.address || "") + (shopPhone ? "<br>โทร. " + esc(shopPhone) : "") + (st.taxId ? "<br>เลขประจำตัวผู้เสียภาษี: <b>" + esc(st.taxId) + "</b>" : "") + "</div></div>" +
+        '<div class="hd-r"><div class="doc-t">ใบกำกับภาษีเต็มรูปแบบ</div>' +
+        '<div class="doc-s">เลขที่: <b>' + esc(o.id) + '</b></div>' +
+        '<div class="doc-s">วันที่: ' + esc(thDate) + '</div>' +
+        '<div class="doc-s">ชำระโดย: ' + esc(payTxt) + '</div></div>' +
+      '</div>' +
+      '<div class="parties">' +
+        '<div><div class="ph">ผู้ขาย / Seller</div><div class="pn">' + esc(st.company || "M.E.Tools") + '</div>' +
+        '<div class="ps">' + esc(st.address || "") + (shopPhone ? "<br>โทร. " + esc(shopPhone) : "") + (st.taxId ? "<br>เลขผู้เสียภาษี: " + esc(st.taxId) : "") + "</div></div>" +
+        '<div><div class="ph">ผู้ซื้อ / Buyer</div><div class="pn">' + esc(ti.name || c.name || "—") + "</div>" +
+        '<div class="ps">' + esc(ti.address || "") + (c.phone ? "<br>โทร. " + esc(c.phone) : "") + (ti.taxId ? "<br>เลขผู้เสียภาษี: <b>" + esc(ti.taxId) + "</b>" : "") + "</div></div>" +
+      '</div>' +
+      '<table><thead><tr><th>รายการสินค้า / บริการ</th><th class="n">จำนวน</th><th class="n">ราคา/หน่วย</th><th class="n">ก่อน VAT</th><th class="n">VAT</th><th class="n">รวมสุทธิ</th></tr></thead>' +
+      '<tbody>' + (rows || '<tr><td colspan="6">—</td></tr>') + '</tbody></table>' +
+      '<div class="bot">' +
+        '<div><div class="stamp">ชำระเงินแล้ว</div></div>' +
+        '<div class="tot">' +
+          '<div class="r"><span>ยอดสินค้า</span><span>' + esc(S.money(o.subtotal || 0)) + '</span></div>' +
+          (o.deposit ? '<div class="r"><span>เงินมัดจำ</span><span>' + esc(S.money(o.deposit)) + '</span></div>' : "") +
+          (o.shipping ? '<div class="r"><span>ค่าจัดส่ง</span><span>' + esc(S.money(o.shipping)) + '</span></div>' : "") +
+          (o.vat ? '<div class="r"><span>VAT ' + (o.vatPct || 7) + '%</span><span>' + esc(S.money(o.vat)) + '</span></div>' : "") +
+          '<div class="r g"><span>รวมทั้งสิ้น</span><span>' + esc(S.money(o.total || 0)) + '</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="sigs">' +
+        '<div><div class="sln">ผู้จัดทำ / ผู้ขาย</div><div>' + esc(st.company || "M.E.Tools") + '</div></div>' +
+        '<div><div class="sln">ผู้รับสินค้า / ผู้ซื้อ</div><div>' + esc(ti.name || c.name || "—") + '</div></div>' +
+      '</div>' +
+      '<div class="ft">* ใบกำกับภาษีนี้ออกโดย ' + esc(st.company || "M.E.Tools") + ' · เลขที่ ' + esc(o.id) + ' · วันที่ ' + esc(thDate) + ' · กรุณาเก็บไว้เป็นหลักฐานการซื้อขาย</div>' +
+      '</div></body></html>';
+    printDocHtml(doc);
+  }
+
+  // พิมพ์ใบรับประกันสินค้า — ออกให้ลูกค้าพร้อมสินค้า
+  function printWarrantyCert(o) {
+    var st = S.getSettings();
+    var c = o.customer || {};
+    var shopPhone = String(st.phone || "").replace(/\s*,\s*/g, ", ");
+    var TH_MONTHS = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+    var dd = new Date(o.createdAt || Date.now());
+    var thDate = dd.getDate() + " " + TH_MONTHS[dd.getMonth()] + " " + (dd.getFullYear() + 543);
+    var itemsHtml = (o.items || []).map(function (it) {
+      return "<tr><td>" + esc(it.name) + "</td><td class='n'>" + it.qty + " " + (it.unit || "ชิ้น") + "</td></tr>";
+    }).join("");
+    var doc =
+      '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบรับประกัน ' + esc(o.id) + '</title><style>' +
+      '@page{margin:12mm}*{box-sizing:border-box}body{font-family:"Sarabun",system-ui,sans-serif;margin:0;color:#000}' +
+      '.cert{border:4px double #1d4ed8;border-radius:14px;padding:22px 28px;max-width:165mm}' +
+      '.cert-hd{text-align:center;border-bottom:2px solid #1d4ed8;padding-bottom:14px;margin-bottom:16px}' +
+      '.cert-icon{font-size:44px;line-height:1.1}' +
+      '.cert-t{font-size:26px;font-weight:900;color:#1d4ed8;letter-spacing:.01em}' +
+      '.cert-co{font-size:13px;color:#555;margin-top:2px}' +
+      '.cert-id{font-size:11px;font-family:monospace;background:#eef2ff;color:#3730a3;padding:2px 10px;border-radius:4px;display:inline-block;margin-top:4px}' +
+      '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}' +
+      '.info-box{background:#f8faff;border:1px solid #c7d2fe;border-radius:8px;padding:10px 12px}' +
+      '.info-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#555;margin-bottom:4px}' +
+      '.info-val{font-size:15px;font-weight:800;color:#1e293b}.info-sub{font-size:12px;color:#475569;margin-top:2px}' +
+      'table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px}' +
+      'th{background:#eef2ff;border:1px solid #c7d2fe;padding:6px 10px;font-weight:700;text-align:left}' +
+      'td{border:1px solid #c7d2fe;padding:5px 10px}.n{text-align:right}' +
+      '.wbox{background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px 14px;margin-bottom:16px}' +
+      '.wbox-t{font-size:14px;font-weight:800;color:#1d4ed8;margin-bottom:8px}' +
+      '.wi{font-size:13px;color:#1e293b;padding:3px 0;display:block}' +
+      '.wi::before{content:"✓ ";font-weight:700;color:#16a34a}' +
+      '.sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:28px;font-size:12px;text-align:center}' +
+      '.sln{border-top:2px solid #1d4ed8;padding-top:5px;margin-top:40px;font-weight:800;color:#1d4ed8}' +
+      '.ft{text-align:center;font-size:11px;color:#666;margin-top:14px;border-top:1px dashed #aaa;padding-top:8px}' +
+      '</style></head><body><div class="cert">' +
+      '<div class="cert-hd"><div class="cert-icon">🛡️</div>' +
+      '<div class="cert-t">ใบรับประกันสินค้า</div>' +
+      '<div class="cert-co">' + esc(st.company || "M.E.Tools") + '</div>' +
+      '<div class="cert-id">เลขที่: ' + esc(o.id) + '</div></div>' +
+      '<div class="info-grid">' +
+        '<div class="info-box"><div class="info-lbl">ชื่อลูกค้า</div><div class="info-val">' + esc(c.name || "—") + '</div><div class="info-sub">โทร. ' + esc(c.phone || "—") + '</div></div>' +
+        '<div class="info-box"><div class="info-lbl">วันที่ซื้อ / รับสินค้า</div><div class="info-val">' + esc(thDate) + '</div>' + (o.type === "rent" ? '<div class="info-sub">เช่า ' + esc(String(o.days || "")) + ' วัน</div>' : "") + '</div>' +
+      '</div>' +
+      '<table><thead><tr><th>รายการสินค้า</th><th class="n">จำนวน</th></tr></thead>' +
+      '<tbody>' + (itemsHtml || '<tr><td colspan="2">—</td></tr>') + '</tbody></table>' +
+      '<div class="wbox"><div class="wbox-t">เงื่อนไขการรับประกัน</div>' +
+        '<span class="wi">รับประกันจากผู้ผลิต ตามมาตรฐานของแต่ละแบรนด์</span>' +
+        '<span class="wi">กรุณานำใบรับประกันนี้มาแสดงทุกครั้งที่เข้ารับบริการ</span>' +
+        '<span class="wi">ไม่ครอบคลุมความเสียหายจากการใช้งานผิดวิธีหรืออุบัติเหตุ</span>' +
+        '<span class="wi">ชิ้นส่วนสึกหรอตามปกติไม่อยู่ในเงื่อนไขรับประกัน</span>' +
+        (st.warranty ? '<span class="wi">' + esc(st.warranty) + '</span>' : "") +
+      '</div>' +
+      '<div class="sigs">' +
+        '<div><div class="sln">ลายเซ็นผู้จำหน่าย</div><div style="margin-top:4px">' + esc(st.company || "M.E.Tools") + '</div></div>' +
+        '<div><div class="sln">ลายเซ็นลูกค้า</div><div style="margin-top:4px">' + esc(c.name || "—") + '</div></div>' +
+      '</div>' +
+      '<div class="ft">' + esc(st.company || "M.E.Tools") + (st.address ? ' · ' + esc(st.address) : "") + (shopPhone ? ' · โทร. ' + esc(shopPhone) : "") + '</div>' +
+      '</div></body></html>';
+    printDocHtml(doc);
+  }
+
   // next valid transitions for an order, per the pay→receive→(return) flow
   function statusOptions(o) {
     var opts = [];
@@ -2601,7 +2777,7 @@
       }
       draw();
     })();
-    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "sheetWebAppUrl", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
+    var simpleKeys = ["heroOverline", "heroTitle", "heroSub", "brandsTagline", "company", "address", "line", "facebook", "instagram", "tiktok", "hoursWeek", "hoursSun", "bankInfo", "promptPayId", "authLoginTitle", "authLoginSub", "authRegTitle", "authRegSub", "deletePin", "googleClientId", "facebookAppId", "firebaseConfig", "sheetWebAppUrl", "hoursWeekOpen", "hoursWeekClose", "hoursSunOpen", "hoursSunClose"];
     var openSunEl = root.querySelector("[data-open-sun]"); if (openSunEl) openSunEl.checked = st.openSun !== false;
     // VAT + การรับบัตร
     var vatOnEl = root.querySelector("[data-vat-on]"); if (vatOnEl) vatOnEl.checked = st.vatEnabled !== false;
@@ -2649,6 +2825,22 @@
     root.querySelector("[data-qrfile]").addEventListener("change", function (e) { var f = e.target.files && e.target.files[0]; if (!f) return; readImageFile(f, function (d) { pendingQR = d; drawQR(); }); });
     root.querySelector("[data-qrclear]").addEventListener("click", function () { pendingQR = ""; drawQR(); });
 
+    // PromptPay ID → live preview ของ QR ฟิกซ์ยอด (ตัวอย่าง 100 บาท) — โชว์ว่า QR ใช้ได้จริง
+    var ppInput = root.querySelector('[data-set="promptPayId"]');
+    var ppPrev = root.querySelector("[data-pp-preview]");
+    function drawPPPreview() {
+      if (!ppPrev) return;
+      var id = ppInput ? ppInput.value.trim() : "";
+      if (!id) { ppPrev.innerHTML = '<span class="img-hint">ใส่เบอร์พร้อมเพย์ด้านบนเพื่อดูตัวอย่าง QR</span>'; return; }
+      if (!window.MEQR || !MEQR.isValidId(id)) { ppPrev.innerHTML = '<span class="img-hint" style="color:#b45309">⚠️ ต้องเป็นเบอร์มือถือ 10 หลัก หรือเลขบัตรประชาชน 13 หลัก</span>'; return; }
+      try {
+        ppPrev.innerHTML = '<div style="width:110px;height:110px;border:1px solid #d8d8d8;border-radius:8px;overflow:hidden;background:#fff;flex:0 0 auto">' +
+          MEQR.promptPaySvg(id, 100, { scale: 5, border: 2, cssSize: 110 }) + '</div>' +
+          '<div class="img-hint">✅ ตัวอย่าง QR ยอด 100 บาท (จริงในหน้าชำระเงินจะล็อกยอดตามแต่ละออเดอร์)</div>';
+      } catch (e) { ppPrev.innerHTML = '<span class="img-hint" style="color:#b45309">สร้าง QR ไม่สำเร็จ</span>'; }
+    }
+    if (ppInput) { ppInput.addEventListener("input", drawPPPreview); drawPPPreview(); }
+
     // FAQ editor
     var faq = (st.faq || []).map(function (f) { return { q: f.q, a: f.a, hidden: !!f.hidden }; });
     var faqList = root.querySelector("[data-faqlist]");
@@ -2694,6 +2886,7 @@
     function cascadeOffShelf(name) {
       var prods = brandProducts(name);
       if (!prods.length) { U.toast('แบรนด์ "' + name + '" ยังไม่มีสินค้า', ""); return; }
+      if (prods.every(function (p) { return p.hidden; })) { U.toast('แบรนด์ "' + name + '" ปิดขายอยู่แล้ว', ""); return; }
       if (!window.confirm('ปิดการขายสินค้าแบรนด์ "' + name + '" ทั้งหมด ' + prods.length + ' รายการ?\n• ซ่อนจากหน้าเว็บ M.E.Tools\n• ส่งคำสั่งปิดการขาย (off-shelf) ไป BigSeller → Shopee/Lazada/TikTok (เฉพาะเมื่อเปิดซิงค์ API)')) return;
       var n = 0;
       prods.forEach(function (p) {
@@ -2701,6 +2894,32 @@
         try { if (window.BigSellerSync) window.BigSellerSync.offShelfProduct(p); } catch (e) {}
       });
       U.toast("ปิดการขายแบรนด์ " + name + " แล้ว " + n + " รายการ", "ok");
+    }
+    // เปิดขายแบรนด์กลับมา — ปลดซ่อนสินค้าทุกตัว + ยิงคำสั่ง on-shelf ไป BigSeller (คู่กับ cascadeOffShelf)
+    function cascadeOnShelf(name) {
+      var prods = brandProducts(name);
+      if (!prods.length) { U.toast('แบรนด์ "' + name + '" ยังไม่มีสินค้า', ""); return; }
+      var hiddenCount = prods.filter(function (p) { return p.hidden; }).length;
+      if (!hiddenCount) { U.toast('แบรนด์ "' + name + '" เปิดขายอยู่แล้ว', ""); return; }
+      if (!window.confirm('เปิดการขายสินค้าแบรนด์ "' + name + '" กลับมา ' + hiddenCount + ' รายการ?\n• แสดงบนหน้าเว็บ M.E.Tools อีกครั้ง\n• ส่งคำสั่งเปิดการขาย (on-shelf) ไป BigSeller → Shopee/Lazada/TikTok (เฉพาะเมื่อเปิดซิงค์ API)')) return;
+      var n = 0;
+      prods.forEach(function (p) {
+        if (p.hidden && S.saveProduct(Object.assign({}, p, { hidden: false }))) n++;
+        try { if (window.BigSellerSync && window.BigSellerSync.onShelfProduct) window.BigSellerSync.onShelfProduct(p); } catch (e) {}
+      });
+      U.toast("เปิดการขายแบรนด์ " + name + " กลับมาแล้ว " + n + " รายการ", "ok");
+    }
+    // สถานะการขายของแบรนด์ → ไฮไลต์ปุ่มในตัวสลับ (segmented):
+    //   "off"  = สินค้าทุกตัวถูกซ่อน (ปิดขายทั้งแบรนด์)
+    //   "part" = บางตัวถูกซ่อน (ปิดบางส่วน)
+    //   "on"   = ขายอยู่ครบทุกตัว (หรือไม่มีสินค้า)
+    function brandShelfState(name) {
+      var prods = brandProducts(name);
+      if (!prods.length) return "on";
+      var hidden = prods.filter(function (p) { return p.hidden; }).length;
+      if (hidden === 0) return "on";
+      if (hidden === prods.length) return "off";
+      return "part";
     }
     function cascadeDeleteProducts(name) {
       var prods = brandProducts(name), n = 0;
@@ -2721,7 +2940,14 @@
           '<span style="font-size:11px;color:var(--fg-2);white-space:nowrap" title="จำนวนสินค้าในแบรนด์นี้">' + pc + ' สินค้า</span>' +
           '<label class="f-check" title="แบรนด์เด่น — โชว์เน้นบนหน้าเว็บ"><input type="checkbox" data-bp="' + i + '"' + (b.primary ? " checked" : "") + "> เด่น</label>" +
           '<label class="f-check" title="ซ่อนแบรนด์นี้ + สินค้าทุกตัวของแบรนด์ออกจากหน้าเว็บลูกค้า — ปลดซ่อนได้ทันที (ไม่กระทบ Shopee/Lazada/TikTok)"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อนทั้งแบรนด์</label>" +
-          '<button class="btn btn-sm btn-ghost" data-boff="' + i + '" title="นอกจากซ่อนบนเว็บ ยังสั่งปิดการขายบน Shopee/Lazada/TikTok ผ่าน BigSeller ด้วย">🚫 ปิดขายทุกแพลตฟอร์ม</button>' +
+          (function () {
+            var st = brandShelfState(b.name);
+            return '<div class="seg-shelf' + (st === "part" ? " is-part" : "") + '" title="เปิด/ปิดการขายแบรนด์นี้ทุกแพลตฟอร์ม (เว็บ M.E.Tools + Shopee/Lazada/TikTok)">' +
+              '<span class="seg-shelf-lbl">ขายทุกแพลตฟอร์ม</span>' +
+              '<button type="button" class="seg-on' + (st === "on" ? " active" : "") + '" data-bon="' + i + '">เปิด</button>' +
+              '<button type="button" class="seg-off' + (st === "off" ? " active" : "") + '" data-boff="' + i + '">ปิด</button>' +
+              "</div>";
+          })() +
           '<button class="btn btn-sm btn-danger" data-bdel="' + i + '">ลบ</button></div>';
       }).join("");
       brandList.querySelectorAll("[data-bdel]").forEach(function (b) {
@@ -2741,6 +2967,9 @@
       });
       brandList.querySelectorAll("[data-boff]").forEach(function (b) {
         b.onclick = function () { syncBrands(); cascadeOffShelf((brands[+b.dataset.boff].name || "").trim()); renderBrands(); };
+      });
+      brandList.querySelectorAll("[data-bon]").forEach(function (b) {
+        b.onclick = function () { syncBrands(); cascadeOnShelf((brands[+b.dataset.bon].name || "").trim()); renderBrands(); };
       });
       brandList.querySelectorAll("[data-bh]").forEach(function (i) { i.onchange = function () { syncBrands(); renderBrands(); }; });
       // drag-and-drop reorder

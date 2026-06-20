@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ตั้งค่าเว็บไซต์ — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260620c">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260620e">
 </head>
 <body data-admin="settings">
   <div class="admin" data-shell>
@@ -126,14 +126,25 @@
         <div class="panel">
           <div class="panel-head"><h2>QR ชำระเงิน (PromptPay)</h2></div>
           <div class="field"><label>ชื่อบัญชี / พร้อมเพย์ (แสดงบนหน้าชำระเงิน)</label><input data-set="bankInfo"></div>
-          <div class="img-edit">
-            <div class="img-preview" data-qrprev></div>
-            <div class="img-edit-controls">
-              <label class="btn btn-ghost btn-sm filebtn">อัปโหลดรูป QR…<input type="file" accept="image/*" data-qrfile></label>
-              <button type="button" class="btn btn-ghost btn-sm" data-qrclear>ลบ QR</button>
-              <div class="img-hint">อัปโหลด QR PromptPay จริงของร้าน — ลูกค้าจะเห็น QR นี้ตอนชำระเงิน (ถ้าไม่ใส่ ระบบจะสร้าง QR ตัวอย่างให้)</div>
-            </div>
+
+          <div class="field" style="background:#eefaf0;border:1px solid #b8e6c4;border-radius:10px;padding:12px 14px">
+            <label style="font-weight:700">⭐ เบอร์พร้อมเพย์ / เลขบัตรประชาชน (แนะนำ — ฟิกซ์ยอดเงินอัตโนมัติ)</label>
+            <input data-set="promptPayId" inputmode="numeric" placeholder="เช่น 0812345678 หรือ เลขบัตร 13 หลัก">
+            <div class="img-hint" style="margin-top:6px">ใส่แค่เบอร์/เลขบัตรของร้าน ระบบจะสร้าง QR <b>พร้อมยอดเงินที่ล็อกไว้</b> ให้ลูกค้าทุกออเดอร์ — ลูกค้าสแกนแล้วยอดขึ้นเอง ไม่ต้องพิมพ์ (ไม่ต้องอัปโหลดรูป QR แล้ว)</div>
+            <div data-pp-preview style="margin-top:10px;display:flex;align-items:center;gap:12px"></div>
           </div>
+
+          <details style="margin-top:8px">
+            <summary style="cursor:pointer;font-size:13px;color:var(--fg-2)">หรือใช้รูป QR ที่อัปโหลดเอง (ยอดเงินไม่ล็อก ลูกค้าต้องพิมพ์ยอดเอง)</summary>
+            <div class="img-edit" style="margin-top:10px">
+              <div class="img-preview" data-qrprev></div>
+              <div class="img-edit-controls">
+                <label class="btn btn-ghost btn-sm filebtn">อัปโหลดรูป QR…<input type="file" accept="image/*" data-qrfile></label>
+                <button type="button" class="btn btn-ghost btn-sm" data-qrclear>ลบ QR</button>
+                <div class="img-hint">ใช้เฉพาะกรณีไม่อยากใส่เบอร์พร้อมเพย์ — รูปนี้ยอดเงินจะไม่ล็อก ลูกค้าต้องพิมพ์ยอดเอง · ถ้าตั้งเบอร์พร้อมเพย์ไว้ด้านบนแล้ว ระบบจะใช้ QR ฟิกซ์ยอดแทน</div>
+              </div>
+            </div>
+          </details>
         </div>
 
         <div class="panel">
@@ -151,10 +162,11 @@
       </div>
     </main>
   </div>
-  <script src="../assets/thai-geo.js?v=20260620c"></script>
-  <script src="../assets/store.js?v=20260620c"></script>
-  <script src="../assets/bigseller-sync.js?v=20260620c"></script>
-  <script src="../assets/ui.js?v=20260620c"></script>
-  <script src="../assets/admin.js?v=20260620c"></script>
+  <script src="../assets/thai-geo.js?v=20260620e"></script>
+  <script src="../assets/store.js?v=20260620e"></script>
+  <script src="../assets/bigseller-sync.js?v=20260620e"></script>
+  <script src="../assets/qr.js?v=20260620e"></script>
+  <script src="../assets/ui.js?v=20260620e"></script>
+  <script src="../assets/admin.js?v=20260620e"></script>
 </body>
 </html>
