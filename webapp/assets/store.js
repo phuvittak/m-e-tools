@@ -2094,6 +2094,59 @@
       });
     });
   }
+
+  /* ---------- โปรไฟล์ลูกค้า (ลูกค้าแก้เอง → ซิงค์หลังร้าน) ---------- */
+  // รหัสลูกค้าแบบคงที่ — ได้จาก uid (deterministic) เพื่อให้เจ้าของอ้างอิงตัวลูกค้าได้
+  // แม้ลูกค้าจะเปลี่ยนชื่อเอง รหัสนี้ก็ไม่เปลี่ยน ("เจ้าของรู้ว่าใคร แต่ไม่ต้องรู้ว่าเปลี่ยนชื่อ")
+  function customerCode(uid) {
+    uid = String(uid || "");
+    if (!uid) return "CUST—";
+    var h = 0; for (var i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0;
+    return "CUST" + (h % 9000 + 1000); // 4 หลัก คงที่ 1000–9999
+  }
+  // โหลดโปรไฟล์ของ uid ตัวเอง — ใช้ uid เดียวกับที่ออเดอร์/แชทใช้ (หลังร้าน join ได้ตรง)
+  // คืน { uid, code, profile } — profile = { firstName, lastName, phone, email, address, verifyStatus, ... }
+  function loadMyProfile() {
+    return loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var uid = m.auth && m.auth.currentUser && m.auth.currentUser.uid;
+      if (!uid) return Promise.reject(new Error("ยังไม่ได้เข้าสู่ระบบ"));
+      var fs = m.fsMod;
+      return fs.getDoc(fs.doc(m.db, "customer_profiles", uid)).then(function (snap) {
+        var data = (snap && snap.exists && snap.exists()) ? (snap.data() || {}) : {};
+        return { uid: uid, code: customerCode(uid), profile: data };
+      });
+    });
+  }
+  // บันทึกโปรไฟล์ตัวเอง — merge เพื่อไม่ทับ "ชื่อเล่น" (nickname) ที่แอดมินตั้งไว้หลังร้าน
+  // ถ้ามีอัปโหลดเอกสารยืนยันตัวตน → ตั้งสถานะ "pending" (รอแอดมินตรวจ)
+  function saveMyProfile(data) {
+    data = data || {};
+    return loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var uid = m.auth && m.auth.currentUser && m.auth.currentUser.uid;
+      if (!uid) return Promise.reject(new Error("ยังไม่ได้เข้าสู่ระบบ"));
+      var fs = m.fsMod;
+      var payload = {
+        firstName: String(data.firstName || "").slice(0, 80),
+        lastName: String(data.lastName || "").slice(0, 80),
+        phone: String(data.phone || "").slice(0, 40),
+        email: String(data.email || "").slice(0, 120),
+        address: String(data.address || "").slice(0, 400),
+        updatedAt: fs.serverTimestamp(),
+      };
+      // จำกัดความยาว base64 ต่อรูป — กันเอกสารเกินลิมิต Firestore 1MiB (รวม 2 รูป)
+      if (data.idCardImage) payload.idCardImage = String(data.idCardImage).slice(0, 700000);
+      if (data.licenseImage) payload.licenseImage = String(data.licenseImage).slice(0, 700000);
+      if (data.idCardImage || data.licenseImage) payload.verifyStatus = "pending";
+      return fs.setDoc(fs.doc(m.db, "customer_profiles", uid), payload, { merge: true }).then(function () {
+        // อัปเดตชื่อใน session ให้หัวเว็บ/หน้าอื่นเห็นทันที (ไม่กระทบรหัสลูกค้า)
+        var full = (payload.firstName + " " + payload.lastName).trim();
+        var s = session();
+        if (s && full) { s.name = full; setSession(s); }
+        return { ok: true, uid: uid, code: customerCode(uid) };
+      });
+    });
+  }
+
   // gate an admin page by a permission key (employees) — owner always allowed
   function requirePerm(key, redirect) {
     if (!isStaff()) { window.location.href = redirect || "../login.html"; return false; }
@@ -2186,6 +2239,7 @@
     getSettings: getSettings, saveSettings: saveSettings, fillPromoTokens: fillPromoTokens, promoWindow: promoWindow, promoActiveNow: promoActiveNow, promoDateText: promoDateText, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
     registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loginGoogleCloud: loginGoogleCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
+    customerCode: customerCode, loadMyProfile: loadMyProfile, saveMyProfile: saveMyProfile,
     cloudLoadAdminData: cloudLoadAdminData, cloudPushAdminData: cloudPushAdminData,
     cloudLoadPublicSettings: cloudLoadPublicSettings,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,

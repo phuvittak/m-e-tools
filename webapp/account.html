@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>บัญชีของฉัน — M.E.Tools</title>
+  <link rel="stylesheet" href="assets/app.css?v=20260620b">
+</head>
+<body data-page="account">
+  <div data-header></div>
+  <main class="acct-page wrap">
+    <div class="shop-head">
+      <div class="me-overline"><span class="me-overline-bar"></span>บัญชีของฉัน</div>
+      <h1 class="me-section-h">ข้อมูล<span class="me-hl">ลูกค้า</span></h1>
+    </div>
+
+    <!-- ต้องเข้าสู่ระบบก่อน -->
+    <div class="empty" data-acct-guard hidden>
+      <h3>กรุณาเข้าสู่ระบบ</h3>
+      <p>เข้าสู่ระบบเพื่อดูและแก้ไขข้อมูลบัญชีของคุณ</p>
+      <a class="me-btn" href="login.html?next=account.html">เข้าสู่ระบบ</a>
+    </div>
+
+    <div data-acct-root hidden>
+      <!-- การ์ดหัว: ชื่อ + รหัสลูกค้า + สถานะยืนยันตัวตน -->
+      <div class="acct-hero">
+        <div class="acct-hero-ava">👤</div>
+        <div class="acct-hero-info">
+          <div class="acct-hero-name" data-acct-name>—</div>
+          <div class="acct-hero-code">รหัสลูกค้า: <b data-acct-code>—</b></div>
+          <span class="acct-badge" data-acct-verify>● รอตรวจสอบ</span>
+        </div>
+      </div>
+
+      <form data-acct-form>
+        <!-- ข้อมูลส่วนตัว -->
+        <section class="acct-card">
+          <div class="acct-card-h"><span class="acct-bar"></span>ข้อมูลส่วนตัว</div>
+          <div class="f2">
+            <div class="field"><label>ชื่อ</label><input data-f="firstName" placeholder="ชื่อจริง" maxlength="80"></div>
+            <div class="field"><label>นามสกุล</label><input data-f="lastName" placeholder="นามสกุล" maxlength="80"></div>
+          </div>
+        </section>
+
+        <!-- ข้อมูลติดต่อ -->
+        <section class="acct-card">
+          <div class="acct-card-h"><span class="acct-bar"></span>ข้อมูลติดต่อ</div>
+          <div class="field"><label>เบอร์โทรศัพท์</label><input data-f="phone" type="tel" inputmode="tel" placeholder="08x-xxx-xxxx" maxlength="40"></div>
+          <div class="field"><label>อีเมล</label><input data-f="email" type="email" placeholder="you@example.com" maxlength="120"></div>
+          <div class="field"><label>ที่อยู่</label><textarea data-f="address" rows="3" placeholder="บ้านเลขที่ / ถนน / ตำบล / อำเภอ / จังหวัด / รหัสไปรษณีย์" maxlength="400"></textarea></div>
+        </section>
+
+        <!-- ยืนยันตัวตน (เปิดเฉพาะตอนเปิดบริการเช่า) -->
+        <section class="acct-card acct-verify" data-acct-verify-card>
+          <div class="acct-verify-row">
+            <div class="acct-verify-ic">🪪</div>
+            <div class="acct-verify-text">
+              <div class="acct-verify-h">ยืนยันตัวตนเพื่อปลดล็อคการเช่า</div>
+              <div class="acct-verify-sub">อัปโหลดบัตรประชาชน + ใบขับขี่/ใบรับรอง (เก็บเป็นความลับ ใช้สำหรับการเช่าเท่านั้น)</div>
+            </div>
+            <button type="button" class="me-btn me-btn-sm" data-acct-verify-toggle>ยืนยันตัวตน</button>
+          </div>
+          <div class="acct-verify-body" data-acct-verify-body hidden>
+            <div class="f2">
+              <label class="acct-upload"><span data-acct-id-label>📄 บัตรประชาชน</span><input type="file" accept="image/*" data-acct-id hidden></label>
+              <label class="acct-upload"><span data-acct-lic-label>📄 ใบขับขี่/ใบรับรอง</span><input type="file" accept="image/*" data-acct-lic hidden></label>
+            </div>
+          </div>
+        </section>
+
+        <div class="acct-save-bar">
+          <button type="submit" class="me-btn acct-save-btn">💾 บันทึก</button>
+        </div>
+        <div class="acct-msg" data-acct-msg></div>
+      </form>
+    </div>
+  </main>
+  <div data-footer></div>
+  <script src="assets/thai-geo.js?v=20260620b"></script>
+  <script src="assets/store.js?v=20260620b"></script>
+  <script src="assets/ui.js?v=20260620b"></script>
+  <script src="assets/public.js?v=20260620b"></script>
+</body>
+</html>

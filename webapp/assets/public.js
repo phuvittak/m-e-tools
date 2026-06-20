@@ -141,14 +141,14 @@
     });
   }
 
-  U.mountChrome(page === "home" ? "home" : page === "categories" ? "categories" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : "");
+  U.mountChrome(page === "home" ? "home" : page === "categories" ? "categories" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : page === "account" ? "account" : "");
 
   // เมื่อแคตตาล็อกจาก cloud มาถึง (ลูกค้า) → วาดส่วนที่ขึ้นกับสินค้าใหม่
   // ต้องประกาศ + ผูก listener "ก่อน" เรียก route เพราะ route จะตั้งค่า pageRefresh เอง
   var pageRefresh = null;
   window.addEventListener("me-products-loaded", function () { if (pageRefresh) try { pageRefresh(); } catch (e) {} });
 
-  var routes = { home: initHome, categories: initCategories, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog, warranty: initWarranty, "warranty-status": initWarrantyStatus };
+  var routes = { home: initHome, categories: initCategories, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog, warranty: initWarranty, "warranty-status": initWarrantyStatus, account: initAccount };
 
   // หน้า "หมวดหมู่" — กริดช่องหมวดแบบซ้อนหลายชั้น (เหมือน iToolmart)
   //   ?cat=<key> = ดูหมวดย่อยภายใต้หมวดนั้น. กดหมวดที่มีลูก → ลงลึกต่อ, กดหมวดที่ไม่มีลูก → ดูสินค้า
@@ -1192,6 +1192,119 @@
       wireRating(root);
     }
     render();
+  }
+
+  /* ===================== ACCOUNT (โปรไฟล์ลูกค้า — แก้เอง ซิงค์หลังร้าน) ===================== */
+  function initAccount() {
+    var guard = document.querySelector("[data-acct-guard]");
+    var root = document.querySelector("[data-acct-root]");
+    if (!root) return;
+
+    var sess = S.session();
+    if (!sess) { if (guard) guard.hidden = false; root.hidden = true; return; }
+    // พนักงาน/เจ้าของใช้หลังร้านอยู่แล้ว — ส่งไป dashboard
+    if (sess.role === "owner" || sess.role === "employee") { location.href = "admin/dashboard.html"; return; }
+
+    var form = root.querySelector("[data-acct-form]");
+    var msgEl = root.querySelector("[data-acct-msg]");
+    var nameEl = root.querySelector("[data-acct-name]");
+    var codeEl = root.querySelector("[data-acct-code]");
+    var verifyEl = root.querySelector("[data-acct-verify]");
+    var pending = { idCardImage: "", licenseImage: "" };
+
+    function f(name) { return form.querySelector('[data-f="' + name + '"]'); }
+    function setMsg(t, kind) { if (!msgEl) return; msgEl.textContent = t || ""; msgEl.className = "acct-msg" + (kind ? " " + kind : ""); }
+    function verifyBadge(status) {
+      if (status === "verified") return { cls: "ok", txt: "● ยืนยันตัวตนแล้ว" };
+      if (status === "pending") return { cls: "pending", txt: "● รอตรวจสอบ" };
+      return { cls: "none", txt: "● ยังไม่ยืนยันตัวตน" };
+    }
+
+    // เติมค่าเริ่มต้นจาก session ทันที (ก่อน cloud มาถึง) — ลื่นไหล
+    root.hidden = false;
+    if (guard) guard.hidden = true;
+    nameEl.textContent = sess.name || "ลูกค้า";
+    if (f("email")) f("email").value = sess.email || "";
+
+    setMsg("กำลังโหลดข้อมูล…");
+    S.loadMyProfile().then(function (r) {
+      setMsg("");
+      codeEl.textContent = r.code;
+      var p = r.profile || {};
+      // ชื่อ-นามสกุล: ใช้ค่าที่เคยกรอก ถ้าไม่มีลองแยกจากชื่อ session
+      var fn = p.firstName, ln = p.lastName;
+      if (!fn && !ln && sess.name) { var parts = String(sess.name).trim().split(/\s+/); fn = parts.shift() || ""; ln = parts.join(" "); }
+      if (f("firstName")) f("firstName").value = fn || "";
+      if (f("lastName")) f("lastName").value = ln || "";
+      if (f("phone")) f("phone").value = p.phone || "";
+      if (f("email")) f("email").value = p.email || sess.email || "";
+      if (f("address")) f("address").value = p.address || "";
+      var disp = ((fn || "") + " " + (ln || "")).trim() || sess.name || "ลูกค้า";
+      nameEl.textContent = disp;
+      var vb = verifyBadge(p.verifyStatus);
+      verifyEl.className = "acct-badge " + vb.cls;
+      verifyEl.textContent = vb.txt;
+      // ถ้าเคยอัปโหลดเอกสารแล้ว — โชว์ว่ามีไฟล์
+      if (p.idCardImage) { var il = root.querySelector("[data-acct-id-label]"); if (il) il.textContent = "✓ บัตรประชาชน (อัปโหลดแล้ว)"; }
+      if (p.licenseImage) { var ll = root.querySelector("[data-acct-lic-label]"); if (ll) ll.textContent = "✓ ใบขับขี่/ใบรับรอง (อัปโหลดแล้ว)"; }
+    }).catch(function (err) {
+      // ยังไม่ได้ตั้ง Firebase / ออฟไลน์ — แก้แบบ local ได้ แต่เตือนว่าซิงค์ไม่ได้
+      setMsg("โหมดออฟไลน์: บันทึกได้แต่จะยังไม่ซิงค์ขึ้นระบบหลังร้าน (" + (err && err.message ? err.message : "ไม่ได้เชื่อมต่อ") + ")", "warn");
+      codeEl.textContent = S.customerCode((sess && sess.uid) || (sess && sess.email) || "");
+    });
+
+    // อัปโหลดเอกสารยืนยันตัวตน → อ่านเป็น base64 เก็บไว้ส่งตอนบันทึก
+    function wireUpload(inputSel, labelSel, key, label) {
+      var input = root.querySelector(inputSel);
+      var lab = root.querySelector(labelSel);
+      if (!input) return;
+      input.addEventListener("change", function () {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        // ย่อรูป (≤1000px, JPEG) ก่อน — กันเอกสารเกินลิมิต Firestore 1MiB
+        compressImage(file, function (dataUrl) {
+          pending[key] = dataUrl;
+          if (lab) lab.textContent = "✓ " + label + " (พร้อมอัปโหลด)";
+        });
+      });
+    }
+    wireUpload("[data-acct-id]", "[data-acct-id-label]", "idCardImage", "บัตรประชาชน");
+    wireUpload("[data-acct-lic]", "[data-acct-lic-label]", "licenseImage", "ใบขับขี่/ใบรับรอง");
+
+    var vToggle = root.querySelector("[data-acct-verify-toggle]");
+    var vBody = root.querySelector("[data-acct-verify-body]");
+    if (vToggle && vBody) vToggle.addEventListener("click", function () { vBody.hidden = !vBody.hidden; });
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var data = {
+        firstName: (f("firstName") && f("firstName").value || "").trim(),
+        lastName: (f("lastName") && f("lastName").value || "").trim(),
+        phone: (f("phone") && f("phone").value || "").trim(),
+        email: (f("email") && f("email").value || "").trim(),
+        address: (f("address") && f("address").value || "").trim(),
+        idCardImage: pending.idCardImage,
+        licenseImage: pending.licenseImage,
+      };
+      if (!data.firstName) { U.toast("กรุณากรอกชื่อ", "err"); return; }
+      var btn = form.querySelector(".acct-save-btn");
+      if (btn) { btn.disabled = true; btn.textContent = "กำลังบันทึก…"; }
+      setMsg("");
+      S.saveMyProfile(data).then(function (r) {
+        if (btn) { btn.disabled = false; btn.textContent = "💾 บันทึก"; }
+        U.toast("บันทึกข้อมูลแล้ว", "ok");
+        var disp = (data.firstName + " " + data.lastName).trim();
+        nameEl.textContent = disp || (sess.name || "ลูกค้า");
+        if (r && r.code) codeEl.textContent = r.code;
+        if (data.idCardImage || data.licenseImage) {
+          verifyEl.className = "acct-badge pending"; verifyEl.textContent = "● รอตรวจสอบ";
+          pending.idCardImage = ""; pending.licenseImage = "";
+        }
+      }).catch(function (err) {
+        if (btn) { btn.disabled = false; btn.textContent = "💾 บันทึก"; }
+        U.toast("บันทึกไม่สำเร็จ: " + (err && err.message ? err.message : "ลองใหม่อีกครั้ง"), "err");
+      });
+    });
   }
 
   // ขอใบเสนอราคา — จากตะกร้า (B2B/ซื้อจำนวนมาก)

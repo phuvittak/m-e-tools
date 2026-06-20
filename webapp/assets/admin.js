@@ -1623,7 +1623,7 @@
     var byBrandBox = document.querySelector("[data-by-brand]");
     var rankTbody = document.querySelector("[data-rank] tbody");
     var searchInput = document.querySelector("[data-search]");
-    var state = { orders: [], profiles: {}, search: "" };
+    var state = { orders: [], profiles: {}, search: "", m: null };
 
     if (searchInput) searchInput.addEventListener("input", function () {
       state.search = (searchInput.value || "").trim().toLowerCase();
@@ -1640,6 +1640,7 @@
     if (!S.loadFirebaseAuthAndDb) { setAlert("ยังไม่ได้ตั้ง Firebase", "err"); return; }
     S.loadFirebaseAuthAndDb("admin").then(function (m) {
       var fs = m.fsMod;
+      state.m = m; // เก็บไว้ใช้อนุมัติการยืนยันตัวตน
       // โหลด orders + customer_profiles
       fs.onSnapshot(fs.collection(m.db, "orders"), function (snap) {
         state.orders = snap.docs
@@ -1737,31 +1738,92 @@
         if (!rec.email) rec.email = o.userEmail || (o.customer && o.customer.email) || "";
         if (!rec.phone && o.customer && o.customer.phone) rec.phone = o.customer.phone;
         (o.items || []).forEach(function (it) { rec.items.push(it.name || ""); });
-        // override ด้วย nickname จาก customer_profiles ถ้ามี
-        if (state.profiles[uid] && state.profiles[uid].nickname) rec.name = state.profiles[uid].nickname;
+      });
+      // ผสานโปรไฟล์ที่ "ลูกค้าแก้เอง" + "ชื่อเล่นที่แอดมินตั้ง" — รวมลูกค้าที่มีโปรไฟล์แต่ยังไม่เคยสั่งซื้อด้วย
+      Object.keys(state.profiles).forEach(function (uid) {
+        var prof = state.profiles[uid] || {};
+        var rec = byUser[uid];
+        if (!rec) { rec = byUser[uid] = { uid: uid, name: "", email: "", phone: "", total: 0, count: 0, items: [] }; }
+        rec.verifyStatus = prof.verifyStatus || "";
+        // ชื่อที่โชว์: ชื่อเล่นแอดมิน > ชื่อที่ลูกค้ากรอกเอง > ชื่อจากออเดอร์
+        var selfName = ((prof.firstName || "") + " " + (prof.lastName || "")).trim();
+        if (prof.nickname) rec.name = prof.nickname;
+        else if (selfName) rec.name = selfName;
+        if (prof.phone) rec.phone = prof.phone;
+        if (prof.email) rec.email = prof.email;
       });
       var ranked = Object.values(byUser).sort(function (a, b) { return b.total - a.total; });
       // filter ด้วย search (ดูชื่อ, อีเมล, รายการสินค้า)
       if (state.search) {
         ranked = ranked.filter(function (r) {
-          var h = (r.name + " " + r.email + " " + r.phone + " " + r.items.join(" ")).toLowerCase();
+          var code = (r.uid && S.customerCode) ? S.customerCode(r.uid) : "";
+          var h = (r.name + " " + r.email + " " + r.phone + " " + code + " " + r.items.join(" ")).toLowerCase();
           return h.indexOf(state.search) >= 0;
         });
       }
       if (!ranked.length) {
-        rankTbody.innerHTML = '<tr><td colspan="6" class="cus-empty">' + (state.search ? "ไม่พบลูกค้า" : "ยังไม่มีลูกค้า") + '</td></tr>';
+        rankTbody.innerHTML = '<tr><td colspan="8" class="cus-empty">' + (state.search ? "ไม่พบลูกค้า" : "ยังไม่มีลูกค้า") + '</td></tr>';
         return;
       }
+      function verifyChip(r) {
+        var s = r.verifyStatus;
+        var prof = state.profiles[r.uid] || {};
+        var hasDocs = !!(prof.idCardImage || prof.licenseImage);
+        if (s === "verified") return '<button class="cus-vf ok" data-vf="' + esc(r.uid) + '">✓ ยืนยันแล้ว</button>';
+        if (s === "pending") return '<button class="cus-vf pending" data-vf="' + esc(r.uid) + '">● รอตรวจสอบ</button>';
+        if (hasDocs) return '<button class="cus-vf none" data-vf="' + esc(r.uid) + '">ดูเอกสาร</button>';
+        return '<span class="cus-vf none">—</span>';
+      }
       rankTbody.innerHTML = ranked.map(function (r, i) {
+        var code = (r.uid && r.uid !== "unknown") ? (S.customerCode ? S.customerCode(r.uid) : "—") : "—";
         return '<tr>' +
           '<td>#' + (i + 1) + '</td>' +
+          '<td><code class="cus-code">' + esc(code) + '</code></td>' +
           '<td>' + esc(r.name || "—") + '</td>' +
           '<td>' + esc(r.email || "—") + '</td>' +
           '<td>' + esc(r.phone || "—") + '</td>' +
+          '<td>' + verifyChip(r) + '</td>' +
           '<td class="num">' + r.count + '</td>' +
           '<td class="num">' + S.money(r.total) + '</td>' +
         '</tr>';
       }).join("");
+      rankTbody.querySelectorAll("[data-vf]").forEach(function (b) {
+        b.onclick = function () { openVerifyModal(b.getAttribute("data-vf")); };
+      });
+    }
+
+    // ตรวจ + อนุมัติเอกสารยืนยันตัวตนของลูกค้า
+    function openVerifyModal(uid) {
+      var prof = state.profiles[uid] || {};
+      var code = S.customerCode ? S.customerCode(uid) : uid;
+      var name = prof.nickname || ((prof.firstName || "") + " " + (prof.lastName || "")).trim() || "ลูกค้า";
+      var docs = "";
+      if (prof.idCardImage) docs += '<div><div class="wl-doc-label">บัตรประชาชน</div><a href="' + esc(prof.idCardImage) + '" target="_blank" rel="noopener"><img class="wl-doc" src="' + esc(prof.idCardImage) + '"></a></div>';
+      if (prof.licenseImage) docs += '<div><div class="wl-doc-label">ใบขับขี่/ใบรับรอง</div><a href="' + esc(prof.licenseImage) + '" target="_blank" rel="noopener"><img class="wl-doc" src="' + esc(prof.licenseImage) + '"></a></div>';
+      if (!docs) docs = '<div class="cus-empty">ลูกค้ายังไม่ได้อัปโหลดเอกสาร</div>';
+      var statusTxt = prof.verifyStatus === "verified" ? "ยืนยันแล้ว ✓" : prof.verifyStatus === "pending" ? "รอตรวจสอบ" : "ยังไม่ยืนยัน";
+      var modal = document.createElement("div");
+      modal.className = "wl-modal";
+      modal.innerHTML = '<div class="wl-modal-card"><button class="wl-modal-x" aria-label="ปิด">×</button>' +
+        '<h2>ยืนยันตัวตน — ' + esc(name) + '</h2>' +
+        '<p style="margin:0 0 10px;color:#666">รหัสลูกค้า: <b>' + esc(code) + '</b> · สถานะ: ' + esc(statusTxt) + '</p>' +
+        '<div class="wl-docs">' + docs + '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">' +
+          (prof.verifyStatus === "verified"
+            ? '<button class="btn btn-ghost" data-vf-reject>ยกเลิกการยืนยัน</button>'
+            : '<button class="btn btn-ghost" data-vf-reject>ปฏิเสธ</button><button class="btn" data-vf-approve>✓ อนุมัติ</button>') +
+        '</div></div>';
+      modal.addEventListener("click", function (e) { if (e.target === modal || e.target.classList.contains("wl-modal-x")) document.body.removeChild(modal); });
+      document.body.appendChild(modal);
+      function setStatus(status) {
+        if (!state.m) { U.toast("ยังเชื่อม Firebase ไม่สำเร็จ", "err"); return; }
+        var fs = state.m.fsMod;
+        fs.setDoc(fs.doc(state.m.db, "customer_profiles", uid), { verifyStatus: status, updatedAt: fs.serverTimestamp() }, { merge: true })
+          .then(function () { U.toast(status === "verified" ? "อนุมัติแล้ว" : "อัปเดตสถานะแล้ว", "ok"); if (modal.parentNode) document.body.removeChild(modal); })
+          .catch(function (err) { U.toast("บันทึกไม่สำเร็จ: " + (err.message || err), "err"); });
+      }
+      var ap = modal.querySelector("[data-vf-approve]"); if (ap) ap.onclick = function () { setStatus("verified"); };
+      var rj = modal.querySelector("[data-vf-reject]"); if (rj) rj.onclick = function () { setStatus("none"); };
     }
   }
 

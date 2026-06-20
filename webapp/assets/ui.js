@@ -126,9 +126,9 @@
     var s = S.session();
     if (s) {
       var staff = s.role === "employee" || s.role === "owner";
-      return '<div class="me-acct"><span class="me-acct-name">' +
-        (s.role === "owner" ? "⭐ " : staff ? "👷 " : "👤 ") + esc(s.name) + "</span>" +
-        (staff ? '<a class="me-acct-link" href="admin/dashboard.html">ระบบหลังร้าน</a>' : "") +
+      return '<div class="me-acct"><a class="me-acct-name" href="' + (staff ? "admin/dashboard.html" : "account.html") + '">' +
+        (s.role === "owner" ? "⭐ " : staff ? "👷 " : "👤 ") + esc(s.name) + "</a>" +
+        (staff ? '<a class="me-acct-link" href="admin/dashboard.html">ระบบหลังร้าน</a>' : '<a class="me-acct-link" href="account.html">บัญชีของฉัน</a>') +
         '<button class="me-acct-link" data-logout type="button">ออกจากระบบ</button></div>';
     }
     return '<div class="me-acct">' +
@@ -171,7 +171,7 @@
           '<a href="catalog.html">แคตตาล็อก</a><a href="warranty.html">ลงทะเบียนประกัน</a><a href="cart.html">ตะกร้า</a><a href="orders.html">ติดตามคำสั่งซื้อ</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">ช่วยเหลือ</div>' +
           '<a href="guide.html">ความรู้ช่าง · ตารางช่วยช่าง</a><a href="index.html#faq">คำถามที่พบบ่อย</a><a href="#" data-open-chat>ติดต่อร้าน (แชท)</a>' +
-          '<a href="login.html">เข้าสู่ระบบ</a><a href="register.html">สมัครสมาชิก</a></div>' +
+          '<a href="account.html">บัญชีของฉัน</a><a href="login.html">เข้าสู่ระบบ</a><a href="register.html">สมัครสมาชิก</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">เวลาทำการ</div>' +
           "<div>" + esc(st.hoursWeek) + "</div><div>" + esc(st.hoursSun) + "</div>" +
           (function () { var op = S.isOpenNow(); return '<div class="me-footer-pill ' + (op.open ? "open" : "closed") + '"><span class="dot' + (op.open ? "" : " dot-closed") + '"></span> ' + (op.open ? "เปิดอยู่" : "ปิดอยู่" + (op.reason ? " · " + esc(op.reason) : "")) + "</div>"; })() + "</div>" +
