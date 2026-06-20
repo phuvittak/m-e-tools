@@ -2611,8 +2611,8 @@
           '<input data-bn="' + i + '" value="' + esc(b.name) + '" placeholder="ชื่อแบรนด์" style="flex:1">' +
           '<input data-bt="' + i + '" value="' + esc(b.tag || "") + '" placeholder="คำอธิบายสั้น (โชว์บนเว็บเท่านั้น)" style="flex:1.4">' +
           '<span style="font-size:11px;color:var(--fg-2);white-space:nowrap" title="จำนวนสินค้าในแบรนด์นี้">' + pc + ' สินค้า</span>' +
-          '<label class="f-check" title="ซ่อนเฉพาะป้ายแบรนด์บนหน้าเว็บ (ไม่กระทบสินค้า/แพลตฟอร์มอื่น)"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อนป้าย</label>" +
-          '<button class="btn btn-sm btn-ghost" data-boff="' + i + '" title="ซ่อนสินค้าทั้งแบรนด์จากเว็บ + ปิดการขายบน Shopee/Lazada/TikTok ผ่าน BigSeller">🚫 ปิดขายทั้งแบรนด์</button>' +
+          '<label class="f-check" title="ซ่อนแบรนด์นี้ + สินค้าทุกตัวของแบรนด์ออกจากหน้าเว็บลูกค้า — ปลดซ่อนได้ทันที (ไม่กระทบ Shopee/Lazada/TikTok)"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อนทั้งแบรนด์</label>" +
+          '<button class="btn btn-sm btn-ghost" data-boff="' + i + '" title="นอกจากซ่อนบนเว็บ ยังสั่งปิดการขายบน Shopee/Lazada/TikTok ผ่าน BigSeller ด้วย">🚫 ปิดขายทุกแพลตฟอร์ม</button>' +
           '<button class="btn btn-sm btn-danger" data-bdel="' + i + '">ลบ</button></div>';
       }).join("");
       brandList.querySelectorAll("[data-bdel]").forEach(function (b) {
@@ -2710,30 +2710,47 @@
         var lineage = depth === 0
           ? '⭐ หมวดหลัก (ชั้นบนสุด)'
           : 'ชั้นที่ ' + (depth + 1) + ' · ' + (depth === 1 ? 'หมวดรองของ' : 'หมวดย่อยของ') + ' ▸ ' + esc(catPathLocal(c.parent));
-        return '<div class="row-edit' + (c.hidden ? " is-hidden" : "") + '" draggable="true" data-crow="' + i + '" style="cursor:grab;align-items:center;padding-left:' + (8 + depth * 20) + 'px;' + (depth ? "border-left:3px solid var(--dw-yellow-deep,#E8A800);" : "") + '">' +
-          '<div style="flex:1 1 100%;font-family:var(--font-mono);font-size:11px;color:' + (depth ? "var(--fg-2)" : "var(--price-red,#D7261E)") + ';margin-bottom:2px">' + lineage + '</div>' +
-          '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 4px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
-          '<span class="cat-lvl" title="ชั้นที่ ' + (depth + 1) + '" style="flex:0 0 auto;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--ink);min-width:26px">L' + (depth + 1) + '</span>' +
-          '<span style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:var(--bg-1,#f5f5f5);border-radius:6px">' + catPreview(c) + "</span>" +
-          '<input data-cn="' + i + '" list="cat-name-presets" value="' + esc(c.label) + '" placeholder="ชื่อหมวด (เลือกหรือพิมพ์)" style="flex:1;min-width:110px">' +
-          (function () {
-            var forbidden = catDescLocal(c.key);
-            return '<select data-cp="' + i + '" title="หมวดแม่ (เว้นว่าง = หมวดบนสุด) — เลือกหมวดลึกเท่าไรก็ได้" style="flex:0 0 180px">' +
-              '<option value="">— หมวดบนสุด (ชั้น 1) —</option>' +
-              cats.filter(function (x) { return !forbidden[x.key]; }).map(function (x) {
-                return '<option value="' + x.key + '"' + ((c.parent || "") === x.key ? " selected" : "") + ">" + esc(catPathLocal(x.key)) + "</option>";
-              }).join("") + "</select>";
-          })() +
-          '<span style="font-size:12px;color:#888;white-space:nowrap;align-self:center">ไอคอน:</span>' +
-          '<select data-ci="' + i + '"' + (c.image ? " disabled" : "") + ' title="เลือกรูปไอคอนของหมวดนี้ (รูปการ์ตูนหน้าหมวด)" style="flex:0 0 130px">' +
-            CAT_ICONS.map(function (ic) { return '<option value="' + ic + '"' + ((c.icon || "tool") === ic ? " selected" : "") + ">" + (CAT_ICON_TH[ic] || ic) + "</option>"; }).join("") + "</select>" +
-          '<label class="btn btn-sm" style="cursor:pointer;white-space:nowrap">⬆ รูป<input type="file" accept="image/*" data-cimg="' + i + '" style="display:none"></label>' +
-          (c.image ? '<button type="button" class="btn btn-sm" data-cimgclr="' + i + '">ลบรูป</button>' : "") +
-          '<label class="f-check" style="white-space:nowrap" title="หมวดนี้คิด VAT ไหม"><input type="checkbox" data-cv="' + i + '"' + (c.vat !== false ? " checked" : "") + "> VAT</label>" +
-          '<input data-cbs="' + i + '" value="' + esc(c.bsCatId || "") + '" placeholder="BigSeller Cat ID" title="รหัสหมวดหมู่ใน BigSeller — ผูกให้สินค้าหมวดนี้วิ่งเข้าหมวดที่ถูกต้องบน Shopee/Lazada/TikTok (ไม่ใส่ก็ได้)" style="flex:0 0 120px;font-family:var(--font-mono,monospace);font-size:12px">' +
+        var parentSel = (function () {
+          var forbidden = catDescLocal(c.key);
+          return '<select data-cp="' + i + '" title="หมวดแม่ (เว้นว่าง = หมวดบนสุด)" style="flex:1;min-width:150px">' +
+            '<option value="">— หมวดบนสุด (ชั้น 1) —</option>' +
+            cats.filter(function (x) { return !forbidden[x.key]; }).map(function (x) {
+              return '<option value="' + x.key + '"' + ((c.parent || "") === x.key ? " selected" : "") + ">" + esc(catPathLocal(x.key)) + "</option>";
+            }).join("") + "</select>";
+        })();
+        var iconSel = '<select data-ci="' + i + '"' + (c.image ? " disabled" : "") + ' title="ไอคอนของหมวด" style="flex:0 0 130px">' +
+          CAT_ICONS.map(function (ic) { return '<option value="' + ic + '"' + ((c.icon || "tool") === ic ? " selected" : "") + ">" + (CAT_ICON_TH[ic] || ic) + "</option>"; }).join("") + "</select>";
+        // แถวกระชับ: บรรทัดเดียว (ลาก · L · ไอคอน · ชื่อ · ซ่อน · ⚙️ · ลบ) — รายละเอียดที่เหลือซ่อนไว้ใน ⚙️
+        return '<div class="row-edit' + (c.hidden ? " is-hidden" : "") + '" draggable="true" data-crow="' + i + '" style="cursor:grab;align-items:center;flex-wrap:wrap;gap:6px;padding-left:' + (8 + depth * 16) + 'px;' + (depth ? "border-left:3px solid var(--dw-yellow-deep,#E8A800);" : "") + '">' +
+          '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 2px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
+          '<span class="cat-lvl" title="' + esc(lineage) + '" style="flex:0 0 auto;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--ink);min-width:22px">L' + (depth + 1) + '</span>' +
+          '<span style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--bg-1,#f5f5f5);border-radius:6px">' + catPreview(c) + "</span>" +
+          '<input data-cn="' + i + '" list="cat-name-presets" value="' + esc(c.label) + '" placeholder="ชื่อหมวด" style="flex:1;min-width:90px">' +
           '<label class="f-check" style="white-space:nowrap"><input type="checkbox" data-ch="' + i + '"' + (c.hidden ? " checked" : "") + "> ซ่อน</label>" +
-          '<button type="button" class="btn btn-sm btn-danger" data-cdel="' + i + '">ลบ</button></div>';
+          '<button type="button" class="btn btn-sm" data-cmore="' + i + '" title="ตั้งค่าเพิ่มเติม (หมวดแม่ · ไอคอน · รูป · VAT · BigSeller ID)">⚙️</button>' +
+          '<button type="button" class="btn btn-sm btn-danger" data-cdel="' + i + '">ลบ</button>' +
+          // กล่องรายละเอียด (ซ่อนไว้ — input ยังอยู่ใน DOM ให้ syncCats อ่านได้)
+          '<div data-cmorebox="' + i + '" style="display:none;flex-basis:100%;width:100%;margin-top:6px;padding-top:8px;border-top:1px dashed var(--border-3,#ddd)">' +
+            '<div style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2);margin-bottom:6px">' + lineage + '</div>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+              '<span style="font-size:11px;color:#888">หมวดแม่</span>' + parentSel +
+              '<span style="font-size:11px;color:#888">ไอคอน</span>' + iconSel +
+              '<label class="btn btn-sm" style="cursor:pointer;white-space:nowrap">⬆ รูป<input type="file" accept="image/*" data-cimg="' + i + '" style="display:none"></label>' +
+              (c.image ? '<button type="button" class="btn btn-sm" data-cimgclr="' + i + '">ลบรูป</button>' : "") +
+              '<label class="f-check" style="white-space:nowrap" title="หมวดนี้คิด VAT ไหม"><input type="checkbox" data-cv="' + i + '"' + (c.vat !== false ? " checked" : "") + "> VAT</label>" +
+              '<span style="font-size:11px;color:#888">BigSeller ID</span><input data-cbs="' + i + '" value="' + esc(c.bsCatId || "") + '" placeholder="รหัสหมวด BigSeller" title="ผูกหมวดนี้กับรหัสหมวดใน BigSeller (ไม่ใส่ก็ได้)" style="flex:0 0 130px;font-family:var(--font-mono,monospace);font-size:12px">' +
+            '</div>' +
+          '</div>' +
+        '</div>';
       }).join("");
+      // ปุ่ม ⚙️ เปิด/ปิดกล่องรายละเอียดของแต่ละหมวด
+      catList.querySelectorAll("[data-cmore]").forEach(function (b) {
+        b.addEventListener("click", function (e) {
+          e.preventDefault();
+          var box = catList.querySelector('[data-cmorebox="' + b.dataset.cmore + '"]');
+          if (box) box.style.display = (box.style.display === "block") ? "none" : "block";
+        });
+      });
       catList.querySelectorAll("[data-cdel]").forEach(function (b) { b.onclick = function () { syncCats(); cats.splice(+b.dataset.cdel, 1); renderCats(); }; });
       catList.querySelectorAll("[data-cimgclr]").forEach(function (b) { b.onclick = function () { syncCats(); cats[+b.dataset.cimgclr].image = ""; renderCats(); }; });
       catList.querySelectorAll("[data-ci]").forEach(function (sel) { sel.addEventListener("change", function () { syncCats(); renderCats(); }); });

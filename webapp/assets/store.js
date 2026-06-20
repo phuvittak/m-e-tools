@@ -903,8 +903,22 @@
   // นับสินค้าในหมวด (รวมหมวดย่อยทุกชั้น)
   function productCountInCat(key) {
     var set = catDescendants(key);
-    return getProducts().filter(function (p) { return !p.hidden && set[p.category]; }).length;
+    return getProducts().filter(function (p) { return isVisible(p) && set[p.category]; }).length;
   }
+
+  // ----- การมองเห็นสินค้าฝั่งลูกค้า (ซ่อนสินค้า + ซ่อนทั้งแบรนด์) -----
+  // ซ่อนแบรนด์ในหน้า "แบรนด์ในร้าน" → สินค้าทุกตัวของแบรนด์นั้นหายจากหน้าเว็บลูกค้า
+  // (เป็นการกรองตอนแสดงผล — ไม่แตะข้อมูลสินค้า ปลดซ่อนแล้วกลับมาทันที)
+  function hiddenBrandSet() {
+    var out = {};
+    ((getSettings() || {}).brands || []).forEach(function (b) {
+      if (b && b.hidden && b.name) out[String(b.name).trim().toLowerCase()] = 1;
+    });
+    return out;
+  }
+  function brandHidden(name) { return !!hiddenBrandSet()[String(name || "").trim().toLowerCase()]; }
+  function isVisible(p) { return !!p && !p.hidden && !brandHidden(p.brand); }
+  function getVisibleProducts() { return getProducts().filter(isVisible); }
   function categoryLabel(key) {
     var cats = getCategories();
     for (var i = 0; i < cats.length; i++) if (cats[i].key === key) return cats[i].label;
@@ -2148,6 +2162,7 @@
     typeLabel: typeLabel, statusLabel: statusLabel, fulfillmentLabel: fulfillmentLabel,
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
     getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,
+    isVisible: isVisible, brandHidden: brandHidden, getVisibleProducts: getVisibleProducts,
     saveProduct: saveProduct, deleteProduct: deleteProduct, adjustStock: adjustStock,
     cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, autoCatchUpSync: autoCatchUpSync, cloudPushProduct: cloudPushProduct, restoreProductsFromCloud: restoreProductsFromCloud, pushProductToSheet: pushProductToSheet, pushSheetDelete: pushSheetDelete, migrateImagesToStorage: migrateImagesToStorage,
     startAdminRealtime: startAdminRealtime,

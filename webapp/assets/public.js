@@ -187,7 +187,7 @@
       }).join("");
 
       // สินค้าในหมวดนี้ (รวมหมวดย่อยทุกชั้น) — ทุกหมวดมีสินค้าโชว์ แค่แคบลงเมื่อลงลึก
-      var prods = S.getProducts().filter(function (p) { return !p.hidden; });
+      var prods = S.getVisibleProducts();
       if (curKey) { var set = S.catDescendants(curKey); prods = prods.filter(function (p) { return set[p.category]; }); }
       var prodBox = document.querySelector("[data-cat-products]");
       var prodHead = document.querySelector("[data-cat-prodhead]");
@@ -396,13 +396,13 @@
       }
       var feat = document.querySelector("[data-featured]");
       if (feat) {
-        feat.innerHTML = S.getProducts().filter(function (p) { return !p.hidden; }).slice(0, 6).map(cardHtml).join("");
+        feat.innerHTML = S.getVisibleProducts().slice(0, 6).map(cardHtml).join("");
         wireCards(feat);
       }
       // สินค้าใหม่ล่าสุด — เรียงตามวันที่เพิ่ม (createdAt) โชว์เฉพาะที่มี createdAt
       var na = document.querySelector("[data-newarrivals]");
       if (na) {
-        var newest = S.getProducts().filter(function (p) { return !p.hidden && p.createdAt; })
+        var newest = S.getVisibleProducts().filter(function (p) { return p.createdAt; })
           .sort(function (a, b) { return b.createdAt - a.createdAt; }).slice(0, 6);
         var sec = document.querySelector("[data-newarrivals-sec]");
         if (newest.length >= 3) { na.innerHTML = newest.map(cardHtml).join(""); wireCards(na); if (sec) sec.hidden = false; }
@@ -486,7 +486,7 @@
 
     // สร้าง/วาดแถบตัวกรองใหม่จากสินค้าปัจจุบัน (เรียกซ้ำได้เมื่อ cloud มาถึง)
     function buildSidebar() {
-      var products = S.getProducts().filter(function (p) { return !p.hidden; });
+      var products = S.getVisibleProducts();
       var productBrands = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
       var settingBrands = S.getSettings().brands || [];
       var hiddenBrands = settingBrands.filter(function (b) { return b.hidden; }).map(function (b) { return b.name; });
@@ -568,7 +568,7 @@
         return hay + add;
       }
       var list = S.getProducts().filter(function (p) {
-        if (p.hidden) return false;
+        if (!S.isVisible(p)) return false;
         if (state.q) { var hay = expandSlang((p.name + " " + p.brand + " " + p.sku + " " + S.categoryLabel(p.category)).toLowerCase()); if (hay.indexOf(state.q.toLowerCase()) < 0) return false; }
         if (acceptCats && !acceptCats[p.category]) return false;
         if (state.brands.length && state.brands.indexOf(p.brand) < 0) return false;
@@ -603,7 +603,7 @@
     var id = U.qp("id");
     var p = S.getProduct(id);
     var root = document.querySelector("[data-product]");
-    if (!p || p.hidden) { root.innerHTML = '<div class="empty"><h3>ไม่พบสินค้านี้</h3><a class="me-btn" href="shop.html">กลับไปหน้าสินค้า</a></div>'; return; }
+    if (!p || !S.isVisible(p)) { root.innerHTML = '<div class="empty"><h3>ไม่พบสินค้านี้</h3><a class="me-btn" href="shop.html">กลับไปหน้าสินค้า</a></div>'; return; }
 
     document.title = p.name + " — M.E.Tools";
     var avail = S.available(p);
@@ -673,12 +673,12 @@
       var sec = root.querySelector("[data-cross]"); var box = root.querySelector("[data-cross-list]"); if (!sec || !box) return;
       var byId = {}; S.getProducts().forEach(function (x) { byId[x.id] = x; });
       var picked = [], seen = {};
-      function add(id) { var x = byId[id]; if (x && !x.hidden && x.id !== p.id && !seen[id] && picked.length < 4) { seen[id] = 1; picked.push(x); } }
+      function add(id) { var x = byId[id]; if (x && S.isVisible(x) && x.id !== p.id && !seen[id] && picked.length < 4) { seen[id] = 1; picked.push(x); } }
       (p.relatedIds || []).forEach(add);                                  // 1) แอดมินตั้งเอง
       var cob = p.coBought || {};                                          // 2) เรียนรู้จากออเดอร์จริง (เรียงตามความถี่)
       Object.keys(cob).sort(function (x, y) { return (cob[y] || 0) - (cob[x] || 0); }).forEach(add);
       if (picked.length < 4) {                                            // 3) สำรอง: หมวด/แบรนด์เดียวกัน
-        var all = S.getProducts().filter(function (x) { return !x.hidden && x.id !== p.id; });
+        var all = S.getProducts().filter(function (x) { return S.isVisible(x) && x.id !== p.id; });
         all.filter(function (x) { return x.category === p.category; }).forEach(function (x) { add(x.id); });
         all.filter(function (x) { return x.brand === p.brand; }).forEach(function (x) { add(x.id); });
       }
@@ -690,7 +690,7 @@
     (function renderBattMates() {
       if (!p.batteryPlatform) return;
       var sec = root.querySelector("[data-battmates]"); var box = root.querySelector("[data-battmates-list]"); if (!sec || !box) return;
-      var mates = S.getProducts().filter(function (x) { return !x.hidden && x.id !== p.id && (x.batteryPlatform || "").toLowerCase() === p.batteryPlatform.toLowerCase(); }).slice(0, 4);
+      var mates = S.getProducts().filter(function (x) { return S.isVisible(x) && x.id !== p.id && (x.batteryPlatform || "").toLowerCase() === p.batteryPlatform.toLowerCase(); }).slice(0, 4);
       if (!mates.length) return;
       box.innerHTML = mates.map(cardHtml).join("");
       wireCards(box); sec.hidden = false;
@@ -1382,7 +1382,7 @@
     if (!box) return;
     pageRefresh = initCatalog; // re-วาดเมื่อแคตตาล็อกจาก cloud มาถึง
     var st = S.getSettings();
-    var products = S.getProducts().filter(function (p) { return !p.hidden; });
+    var products = S.getVisibleProducts();
 
     var brandOrder = (st.brands || []).filter(function (b) { return !b.hidden; }).map(function (b) { return b.name; });
     var present = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
