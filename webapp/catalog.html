@@ -79,6 +79,53 @@
     .cat-cover p { margin:0; color:rgba(255,255,255,.7); font-size:clamp(12px,1.5vw,15px) }
     .cat-cover-hint { margin-top:10px; color:rgba(255,255,255,.5); font-size:12px }
 
+
+    /* ---- DEWALT 2-per-page: บน/ล่าง, แต่ละการ์ดแนวนอน (รูปซ้าย ข้อมูลขวา) ---- */
+    .cat-two-grid { flex:1; min-height:0; display:flex; flex-direction:column; }
+    .cat-half { flex:1; min-height:0; border-bottom:1px solid #e0e0e0; padding:clamp(7px,1vw,12px); display:flex; flex-direction:row; gap:clamp(8px,1.2vw,14px); overflow:hidden; align-items:flex-start; }
+    .cat-half:last-child { border-bottom:none; }
+    .cat-half-thumb { flex:0 0 auto; width:clamp(80px,22%,140px); display:flex; flex-direction:column; }
+    .cat-half-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:clamp(2px,.4vw,5px); }
+    .cat-half-name { background:var(--cat-red); color:#fff; font-weight:700; line-height:1.2; border-radius:3px; padding:5px 8px; font-size:clamp(10px,1.2vw,14px); flex:0 0 auto; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+    .cat-half-sku { font-size:clamp(8px,.85vw,11px); color:#888; flex:0 0 auto; }
+    .cat-half-photo { width:100%; aspect-ratio:1/1; background:#f4f4f4 center/contain no-repeat; border:1px solid #ececec; border-radius:5px; }
+    .cat-half-photo-ph { display:flex; align-items:center; justify-content:center; color:#c9c9c9; }
+    .cat-half-specs { margin:0; padding:0; list-style:none; font-size:clamp(9px,1vw,12px); line-height:1.4; flex:1 1 auto; overflow:hidden; }
+    .cat-half-specs li { position:relative; padding-left:11px; }
+    .cat-half-specs li::before { content:"•"; position:absolute; left:0; color:var(--cat-red); font-weight:700; }
+    .cat-half-price { font-weight:800; font-size:clamp(11px,1.3vw,15px); color:var(--cat-ink); flex:0 0 auto; }
+    .cat-half-ctrl { font-size:.82em; color:var(--cat-red); font-weight:600; }
+    .cat-buy-btn { display:block; margin-top:3px; background:var(--cat-red); color:#fff; font-weight:700; font-size:clamp(9px,1vw,12px); text-align:center; padding:4px 6px; border-radius:3px; text-decoration:none; flex:0 0 auto; }
+    .cat-buy-btn:hover { background:#a01a20; }
+    .cat-actions { padding:0 clamp(10px,1.6vw,18px) clamp(6px,1vw,12px); flex:0 0 auto; }
+    .cat-actions .cat-buy-btn { font-size:clamp(11px,1.3vw,15px); padding:8px; }
+
+    /* ---- goto + zoom + print controls ---- */
+    .book-goto { width:52px; background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:6px; padding:4px 6px; font-size:13px; text-align:center; font-family:var(--font-mono,monospace); -moz-appearance:textfield; }
+    .book-goto::-webkit-inner-spin-button,.book-goto::-webkit-outer-spin-button { -webkit-appearance:none; }
+    .book-ctrl { background:rgba(255,255,255,.15); color:#fff; border:none; width:36px; height:36px; border-radius:8px; font-size:16px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+    .book-ctrl:hover { background:rgba(255,255,255,.28); }
+
+    /* ---- thumbnail strip ---- */
+    .cat-thumb-strip { display:flex; gap:5px; padding:10px 14px; overflow-x:auto; background:#1a1d22; scrollbar-width:thin; scrollbar-color:#444 #1a1d22; }
+    .cat-thumb-item { flex:0 0 48px; height:64px; background:#2a2d33; border:2px solid #3a3d43; border-radius:4px; cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; transition:border-color .15s; font-size:11px; color:#aaa; font-family:monospace; background-size:cover; background-position:center; }
+    .cat-thumb-item.active { border-color:var(--dw-yellow,#FFB81C); color:var(--dw-yellow,#FFB81C); }
+    .cat-thumb-item:hover:not(.active) { border-color:#666; }
+    .cat-thumb-num { position:absolute; bottom:2px; right:4px; font-size:9px; color:#fff; background:rgba(0,0,0,.55); padding:0 3px; border-radius:2px; line-height:1.6; }
+
+    /* ---- print ---- */
+    .cat-print-all { display:none; }
+    @media print {
+      [data-header],[data-footer],.catalog-hero,.catalog-nav,.book-nav,.cat-thumb-strip { display:none !important; }
+      .catalog-wrap { background:#fff !important; min-height:auto !important; }
+      .book-stage { padding:0 !important; background:#fff !important; display:block !important; }
+      .book,.book-fancy { display:none !important; }
+      .cat-print-all { display:block !important; }
+      .cat-print-page { page-break-after:always; break-after:page; width:100%; min-height:180mm; }
+      .cat-print-page .cat-page { position:static !important; min-height:180mm; }
+      .cat-print-page .cat-half { flex:none !important; min-height:80mm; }
+    }
+
     /* ---- bottom links ---- */
     .catalog-nav { background:var(--ink,#0b0b0b); padding:12px 20px; display:flex; justify-content:center; gap:16px; flex-wrap:wrap }
     .catalog-nav a { color:var(--dw-yellow,#FFB81C); font-weight:600; font-size:14px; text-decoration:none }
@@ -161,10 +208,10 @@
 
   <div data-footer></div>
 
-  <script src="assets/thai-geo.js?v=20260620e"></script>
-  <script src="assets/store.js?v=20260620e"></script>
-  <script src="assets/ui.js?v=20260620e"></script>
-  <script src="assets/qr.js?v=20260620e"></script>
-  <script src="assets/public.js?v=20260620e"></script>
+  <script src="assets/thai-geo.js?v=20260620j"></script>
+  <script src="assets/store.js?v=20260620j"></script>
+  <script src="assets/ui.js?v=20260620j"></script>
+  <script src="assets/qr.js?v=20260620j"></script>
+  <script src="assets/public.js?v=20260620k"></script>
 </body>
 </html>

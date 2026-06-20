@@ -1492,6 +1492,39 @@
         "</div>" +
         '<table class="cat-price">' + head + body + "</table>" +
       "</div></div>" +
+      (p.id ? '<div class="cat-actions"><a class="cat-buy-btn" href="product.html?id=' + encodeURIComponent(p.id) + '">🛒 ดูรายละเอียด / สั่งซื้อ ▸</a></div>' : "") +
+    "</div>";
+  }
+  function catDewaltCardHalf(p) {
+    if (!p) return "";
+    var imgs = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
+    var main = imgs[0] || "";
+    var photo = main
+      ? '<div class="cat-half-photo" style="' + cssBg(main) + '"></div>'
+      : '<div class="cat-half-photo cat-half-photo-ph">' + U.iconSvg(p.icon || "tool", 48) + "</div>";
+    var specs = (p.specs || []).map(specKV).filter(function (kv) { return kv[0] || kv[1]; }).slice(0, 6);
+    var specsHtml = specs.length
+      ? '<ul class="cat-half-specs">' +
+        specs.map(function (kv) { return "<li>" + esc(kv[0]) + (kv[1] ? " : " + esc(kv[1]) : "") + "</li>"; }).join("") + "</ul>"
+      : "";
+    return '<div class="cat-half">' +
+      '<div class="cat-half-thumb">' + photo + "</div>" +
+      '<div class="cat-half-body">' +
+        '<div class="cat-half-name">' + esc(p.name || "") + catStockBadge(p) + "</div>" +
+        (p.sku ? '<div class="cat-half-sku">' + esc(p.sku) + "</div>" : "") +
+        specsHtml +
+        '<div class="cat-half-price">' + S.money(p.price || 0) +
+          (p.priceCtrl ? '<span class="cat-half-ctrl"> · ราคาคุม ' + S.money(p.priceCtrl) + "</span>" : "") +
+        "</div>" +
+        (p.id ? '<a class="cat-buy-btn" href="product.html?id=' + encodeURIComponent(p.id) + '">ดูรายละเอียด / สั่งซื้อ ▸</a>' : "") +
+      "</div>" +
+    "</div>";
+  }
+  function catDewaltTwoPageHtml(p1, p2) {
+    var brand = (p1 && p1.brand) || (p2 && p2.brand) || "DEWALT";
+    return '<div class="cat-page">' +
+      '<div class="cat-brandbar">DEWALT · ' + esc(brand) + "</div>" +
+      '<div class="cat-two-grid">' + catDewaltCardHalf(p1) + catDewaltCardHalf(p2) + "</div>" +
     "</div>";
   }
   function catProductPageHtml(items, brand) {
@@ -1568,30 +1601,47 @@
   function renderFancyBook(box, pages) {
     box.innerHTML =
       '<div class="book book-fancy"><div class="flip-book" data-flip></div></div>' +
-      '<div class="book-nav"><button type="button" data-prev aria-label="ก่อนหน้า">‹</button>' +
+      '<div class="book-nav">' +
+        '<button type="button" data-prev aria-label="ก่อนหน้า">‹</button>' +
+        '<input type="number" class="book-goto" data-goto min="1" placeholder="#">' +
         '<span class="book-pageno" data-pageno></span>' +
-        '<button type="button" data-next aria-label="ถัดไป">›</button></div>';
+        '<button type="button" data-next aria-label="ถัดไป">›</button>' +
+        '<button type="button" class="book-ctrl" data-zoom-out title="ซูมออก">−</button>' +
+        '<button type="button" class="book-ctrl" data-zoom-in title="ซูมเข้า">+</button>' +
+        '<button type="button" class="book-ctrl" data-print title="พิมพ์แคตตาล็อก">🖨️</button>' +
+      '</div>' +
+      '<div class="cat-thumb-strip" data-thumbs></div>';
+
+    // สร้าง div สำหรับพิมพ์ (ซ่อนบนหน้าจอ แสดงตอน print)
+    var printDiv = document.createElement("div");
+    printDiv.className = "cat-print-all";
+    pages.forEach(function (html) {
+      var pp = document.createElement("div"); pp.className = "cat-print-page"; pp.innerHTML = html;
+      printDiv.appendChild(pp);
+    });
+    box.appendChild(printDiv);
+
     var el = box.querySelector("[data-flip]");
     pages.forEach(function (html, i) {
       var d = document.createElement("div");
       d.className = "page";
-      if (i === 0 || i === pages.length - 1) d.setAttribute("data-density", "hard"); // ปก/ปกหลังแข็ง ที่เหลือพลิกโค้งได้
+      if (i === 0 || i === pages.length - 1) d.setAttribute("data-density", "hard");
       d.innerHTML = html;
       el.appendChild(d);
     });
 
     var pf = new window.St.PageFlip(el, {
-      width: 545, height: 771,            // อัตราส่วน ~A4 (กระดาษแนวตั้ง)
+      width: 545, height: 771,
       size: "stretch",
       minWidth: 255, maxWidth: 1000,
       minHeight: 360, maxHeight: 1414,
       maxShadowOpacity: 0.5,
-      showCover: true,                    // หน้าแรก = ปก เปิดเดี่ยว
-      usePortrait: true,                  // จอแคบ (มือถือ) → ทีละหน้า
+      showCover: true,
+      usePortrait: true,
       mobileScrollSupport: false,
       flippingTime: 650,
       drawShadow: true,
-      showPageCorners: true,              // มุมหน้าโผล่ตอนวางเมาส์
+      showPageCorners: true,
       swipeDistance: 30,
       autoSize: true,
     });
@@ -1600,20 +1650,110 @@
     var prevBtn = box.querySelector("[data-prev]");
     var nextBtn = box.querySelector("[data-next]");
     var pageno = box.querySelector("[data-pageno]");
+    var gotoInput = box.querySelector("[data-goto]");
+    var thumbsEl = box.querySelector("[data-thumbs]");
+    var bookEl = box.querySelector(".book-fancy");
+    var zoom = 1, zoomMin = 0.4, zoomMax = 3;
+
+    // thumbnail strip
+    function thumbBg(html) {
+      var m = html.match(/url\('([^']+)'\)/); return m ? "background-image:url('" + m[1] + "')" : "";
+    }
+    function buildThumbs(cur) {
+      if (!thumbsEl) return;
+      thumbsEl.innerHTML = pages.map(function (html, i) {
+        return '<div class="cat-thumb-item' + (i === cur ? " active" : "") + '" data-ti="' + i + '" style="' + thumbBg(html) + '">' +
+          '<span class="cat-thumb-num">' + (i + 1) + '</span></div>';
+      }).join("");
+      thumbsEl.querySelectorAll("[data-ti]").forEach(function (item) {
+        item.addEventListener("click", function () { try { pf.flip(+item.dataset.ti); } catch (e) {} });
+      });
+      var active = thumbsEl.querySelector(".active");
+      if (active) active.scrollIntoView({ inline: "center", behavior: "smooth" });
+    }
+
     function upd() {
       var cur = (pf.getCurrentPageIndex && pf.getCurrentPageIndex()) || 0;
       var total = pages.length;
       pageno.textContent = "หน้า " + (cur + 1) + " / " + total;
+      if (gotoInput) gotoInput.value = cur + 1;
       prevBtn.disabled = cur <= 0;
       nextBtn.disabled = cur >= total - 1;
+      if (thumbsEl) {
+        thumbsEl.querySelectorAll("[data-ti]").forEach(function (item) {
+          item.classList.toggle("active", +item.dataset.ti === cur);
+        });
+        var active = thumbsEl.querySelector(".active");
+        if (active) active.scrollIntoView({ inline: "center", behavior: "smooth" });
+      }
     }
+
     prevBtn.addEventListener("click", function () { try { pf.flipPrev(); } catch (e) {} });
     nextBtn.addEventListener("click", function () { try { pf.flipNext(); } catch (e) {} });
     pf.on("flip", upd);
+
+    // goto page
+    if (gotoInput) {
+      gotoInput.max = pages.length;
+      function doGoto() {
+        var n = Math.max(1, Math.min(pages.length, parseInt(gotoInput.value) || 1));
+        gotoInput.value = n;
+        try { pf.flip(n - 1); } catch (e) {}
+      }
+      gotoInput.addEventListener("change", doGoto);
+      gotoInput.addEventListener("keydown", function (e) { if (e.key === "Enter") doGoto(); });
+    }
+
+    // zoom
+    function applyZoom() {
+      if (bookEl) { bookEl.style.transform = "scale(" + zoom.toFixed(2) + ")"; bookEl.style.transformOrigin = "top center"; }
+    }
+    box.querySelector("[data-zoom-in]").addEventListener("click", function () {
+      zoom = Math.min(zoomMax, Math.round((zoom + 0.2) * 10) / 10); applyZoom();
+    });
+    box.querySelector("[data-zoom-out]").addEventListener("click", function () {
+      zoom = Math.max(zoomMin, Math.round((zoom - 0.2) * 10) / 10); applyZoom();
+    });
+
+    // pinch to zoom (mobile)
+    var pinchD0 = 0, pinchZ0 = 1;
+    box.addEventListener("touchstart", function (e) {
+      if (e.touches.length === 2) {
+        pinchD0 = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        pinchZ0 = zoom;
+      }
+    }, { passive: true });
+    box.addEventListener("touchmove", function (e) {
+      if (e.touches.length === 2) {
+        var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        zoom = Math.min(zoomMax, Math.max(zoomMin, pinchZ0 * (d / pinchD0)));
+        applyZoom(); e.preventDefault();
+      }
+    }, { passive: false });
+
+    // mouse wheel → flip pages (only when not zoomed in)
+    var lastWheel = 0;
+    box.addEventListener("wheel", function (e) {
+      if (zoom > 1.05) return;
+      var now = Date.now();
+      if (now - lastWheel < 600) { e.preventDefault(); return; }
+      if (Math.abs(e.deltaY) < 30) return;
+      e.preventDefault(); lastWheel = now;
+      if (e.deltaY > 0) { try { pf.flipNext(); } catch (e2) {} }
+      else { try { pf.flipPrev(); } catch (e2) {} }
+    }, { passive: false });
+
+    // keyboard
     document.addEventListener("keydown", function (e) {
+      if (gotoInput && document.activeElement === gotoInput) return;
       if (e.key === "ArrowRight") { try { pf.flipNext(); } catch (e2) {} }
       else if (e.key === "ArrowLeft") { try { pf.flipPrev(); } catch (e2) {} }
     });
+
+    // print
+    box.querySelector("[data-print]").addEventListener("click", function () { window.print(); });
+
+    buildThumbs(0);
     upd();
   }
 
@@ -1623,9 +1763,25 @@
         '<div class="book-page book-left"><div class="book-page-inner" data-pleft></div></div>' +
         '<div class="book-page book-right"><div class="book-page-inner" data-pright></div></div>' +
       "</div></div>" +
-      '<div class="book-nav"><button type="button" data-prev aria-label="ก่อนหน้า">‹</button>' +
+      '<div class="book-nav">' +
+        '<button type="button" data-prev aria-label="ก่อนหน้า">‹</button>' +
+        '<input type="number" class="book-goto" data-goto min="1" placeholder="#">' +
         '<span class="book-pageno" data-pageno></span>' +
-        '<button type="button" data-next aria-label="ถัดไป">›</button></div>';
+        '<button type="button" data-next aria-label="ถัดไป">›</button>' +
+        '<button type="button" class="book-ctrl" data-zoom-out title="ซูมออก">−</button>' +
+        '<button type="button" class="book-ctrl" data-zoom-in title="ซูมเข้า">+</button>' +
+        '<button type="button" class="book-ctrl" data-print title="พิมพ์แคตตาล็อก">🖨️</button>' +
+      '</div>' +
+      '<div class="cat-thumb-strip" data-thumbs></div>';
+
+    // สร้าง div สำหรับพิมพ์
+    var printDiv = document.createElement("div");
+    printDiv.className = "cat-print-all";
+    pages.forEach(function (html) {
+      var pp = document.createElement("div"); pp.className = "cat-print-page"; pp.innerHTML = html;
+      printDiv.appendChild(pp);
+    });
+    box.appendChild(printDiv);
 
     var spread = box.querySelector("[data-spread]");
     var pleft = box.querySelector("[data-pleft]");
@@ -1633,20 +1789,49 @@
     var prevBtn = box.querySelector("[data-prev]");
     var nextBtn = box.querySelector("[data-next]");
     var pageno = box.querySelector("[data-pageno]");
+    var gotoInput = box.querySelector("[data-goto]");
+    var thumbsEl = box.querySelector("[data-thumbs]");
+    var bookEl = box.querySelector(".book");
     var pos = 0, animating = false;
+    var zoom = 1, zoomMin = 0.4, zoomMax = 3;
 
     function perSpread() { return window.matchMedia("(max-width:760px)").matches ? 1 : 2; }
     function renderStatic() {
       if (perSpread() === 1) { pright.innerHTML = pages[pos] || BLANK; pleft.innerHTML = ""; }
       else { pleft.innerHTML = pages[pos] || BLANK; pright.innerHTML = pages[pos + 1] || BLANK; }
     }
+
+    function thumbBg(html) {
+      var m = html.match(/url\('([^']+)'\)/); return m ? "background-image:url('" + m[1] + "')" : "";
+    }
+    function buildThumbs() {
+      if (!thumbsEl) return;
+      thumbsEl.innerHTML = pages.map(function (html, i) {
+        return '<div class="cat-thumb-item" data-ti="' + i + '" style="' + thumbBg(html) + '">' +
+          '<span class="cat-thumb-num">' + (i + 1) + '</span></div>';
+      }).join("");
+      thumbsEl.querySelectorAll("[data-ti]").forEach(function (item) {
+        item.addEventListener("click", function () { flipTo(+item.dataset.ti); });
+      });
+    }
+
     function updateNav() {
       var step = perSpread() === 1 ? 1 : 2;
       prevBtn.disabled = pos <= 0;
       nextBtn.disabled = pos + step >= pages.length;
       if (perSpread() === 1) pageno.textContent = "หน้า " + (pos + 1) + " / " + pages.length;
       else pageno.textContent = "หน้า " + (pos + 1) + "–" + Math.min(pos + 2, pages.length) + " / " + pages.length;
+      if (gotoInput) gotoInput.value = pos + 1;
+      if (thumbsEl) {
+        thumbsEl.querySelectorAll("[data-ti]").forEach(function (item) {
+          var n = +item.dataset.ti;
+          item.classList.toggle("active", n === pos || (perSpread() === 2 && n === pos + 1));
+        });
+        var active = thumbsEl.querySelector(".active");
+        if (active) active.scrollIntoView({ inline: "center", behavior: "smooth" });
+      }
     }
+
     function makeLeaf(frontHtml, backHtml, left, width, origin) {
       var leaf = document.createElement("div");
       leaf.className = "book-leaf";
@@ -1700,6 +1885,12 @@
         runFlip(leaf, 0, 180, function () { pos -= step; renderStatic(); updateNav(); animating = false; });
       }
     }
+    function flipTo(n) {
+      var single = perSpread() === 1;
+      n = Math.max(0, Math.min(pages.length - 1, n));
+      if (!single && n % 2 !== 0) n = Math.max(0, n - 1);
+      pos = n; renderStatic(); updateNav();
+    }
 
     prevBtn.addEventListener("click", flipPrev);
     nextBtn.addEventListener("click", flipNext);
@@ -1709,6 +1900,7 @@
       if ((e.clientX - r.left) > r.width / 2) flipNext(); else flipPrev();
     });
     document.addEventListener("keydown", function (e) {
+      if (gotoInput && document.activeElement === gotoInput) return;
       if (e.key === "ArrowRight") flipNext();
       else if (e.key === "ArrowLeft") flipPrev();
     });
@@ -1727,6 +1919,59 @@
       }, 150);
     });
 
+    // goto page
+    if (gotoInput) {
+      gotoInput.max = pages.length;
+      function doGoto() {
+        var n = Math.max(1, Math.min(pages.length, parseInt(gotoInput.value) || 1)) - 1;
+        flipTo(n);
+      }
+      gotoInput.addEventListener("change", doGoto);
+      gotoInput.addEventListener("keydown", function (e) { if (e.key === "Enter") doGoto(); });
+    }
+
+    // zoom
+    function applyZoom() {
+      if (bookEl) { bookEl.style.transform = "scale(" + zoom.toFixed(2) + ")"; bookEl.style.transformOrigin = "top center"; }
+    }
+    box.querySelector("[data-zoom-in]").addEventListener("click", function () {
+      zoom = Math.min(zoomMax, Math.round((zoom + 0.2) * 10) / 10); applyZoom();
+    });
+    box.querySelector("[data-zoom-out]").addEventListener("click", function () {
+      zoom = Math.max(zoomMin, Math.round((zoom - 0.2) * 10) / 10); applyZoom();
+    });
+
+    // pinch to zoom (mobile)
+    var pinchD0 = 0, pinchZ0 = 1;
+    box.addEventListener("touchstart", function (e) {
+      if (e.touches.length === 2) {
+        pinchD0 = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        pinchZ0 = zoom;
+      }
+    }, { passive: true });
+    box.addEventListener("touchmove", function (e) {
+      if (e.touches.length === 2) {
+        var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        zoom = Math.min(zoomMax, Math.max(zoomMin, pinchZ0 * (d / pinchD0)));
+        applyZoom(); e.preventDefault();
+      }
+    }, { passive: false });
+
+    // mouse wheel → flip pages (only when not zoomed in)
+    var lastWheel = 0;
+    box.addEventListener("wheel", function (e) {
+      if (zoom > 1.05) return;
+      var now = Date.now();
+      if (now - lastWheel < 600) { e.preventDefault(); return; }
+      if (Math.abs(e.deltaY) < 30) return;
+      e.preventDefault(); lastWheel = now;
+      if (e.deltaY > 0) flipNext(); else flipPrev();
+    }, { passive: false });
+
+    // print
+    box.querySelector("[data-print]").addEventListener("click", function () { window.print(); });
+
+    buildThumbs();
     renderStatic(); updateNav();
   }
 
