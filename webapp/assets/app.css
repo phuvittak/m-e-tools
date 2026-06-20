@@ -846,3 +846,11 @@ button.cus-vf { background: #f0f0f0; }
 .cus-vf.pending { background: #fff7da; color: #8a6d00; }
 .cus-vf.none { background: #f0f0f0; color: #999; }
 span.cus-vf.none { cursor: default; }
+
+/* ---------- โหมดทดลอง: header storefront tint ---------- */
+body.testmode-on .me-header { border-bottom: 3px solid #f59e0b; }
+body.testmode-on .me-header-inner::before {
+  content: "🧪 ทดลอง";
+  font-family: var(--font-body); font-size: 11px; font-weight: 800;
+  background: #fde68a; color: #92400e; padding: 1px 8px; border-radius: 4px; margin-right: 8px;
+}

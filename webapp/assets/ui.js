@@ -462,18 +462,39 @@
     });
     renderTestBanner();
   }
-  // แถบเตือน "โหมดทดลอง" — โชว์ทั่วเว็บเมื่อเจ้าของเปิดโหมดทดลองสั่งซื้อ
+  // แถบเตือน "โหมดทดลอง" — โชว์ทั่วเว็บ (หน้าร้าน + หลังร้าน) เมื่อเจ้าของเปิดโหมดทดลองสั่งซื้อ
   function renderTestBanner() {
     var on = !!(S.getSettings && S.getSettings().testMode);
     var el = document.querySelector("[data-test-banner]");
-    if (!on) { if (el) el.remove(); return; }
+    if (!on) {
+      if (el) el.remove();
+      document.body.classList.remove("testmode-on");
+      var oldPad = document.body.getAttribute("data-testpad");
+      if (oldPad) { document.body.style.paddingTop = ""; document.body.removeAttribute("data-testpad"); }
+      return;
+    }
+    document.body.classList.add("testmode-on");
     if (el) return;
+    var isAdmin = /\/admin\//.test(location.pathname);
     var bar = document.createElement("div");
     bar.setAttribute("data-test-banner", "");
-    bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#f0a500;color:#3a2a00;font-family:var(--font-body),sans-serif;font-weight:700;font-size:13px;text-align:center;padding:5px 12px;box-shadow:0 2px 6px rgba(0,0,0,.2)";
-    bar.textContent = "🧪 โหมดทดลองสั่งซื้อเปิดอยู่ — ออเดอร์ที่สั่งตอนนี้เป็นการทดลอง ลบทิ้งได้ทีหลัง";
+    bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;" +
+      "background:linear-gradient(90deg,#d97706 0%,#f59e0b 50%,#d97706 100%);" +
+      "color:#1c1000;font-family:var(--font-body),sans-serif;font-weight:800;font-size:13px;" +
+      "display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;" +
+      "padding:6px 16px;box-shadow:0 3px 10px rgba(217,119,6,.45);min-height:32px";
+    bar.innerHTML =
+      '<span style="display:inline-flex;align-items:center;gap:6px">' +
+        '<span style="font-size:16px">🧪</span>' +
+        '<b>โหมดทดลอง</b>' +
+        '<span style="font-weight:400;opacity:.85">— ออเดอร์ทุกรายการที่สั่งตอนนี้เป็นการทดลอง ไม่นับยอดขายจริง</span>' +
+      '</span>' +
+      (isAdmin
+        ? '<a href="../index.html" target="_blank" rel="noopener" style="background:rgba(0,0,0,.18);color:#1c1000;text-decoration:none;padding:3px 12px;border-radius:6px;font-size:12px;font-weight:700;white-space:nowrap">ดูหน้าร้านทดลอง →</a>'
+        : '<span style="background:rgba(0,0,0,.15);padding:3px 10px;border-radius:6px;font-size:12px">🏪 หน้าร้านทดลอง</span>');
+    document.body.setAttribute("data-testpad", "1");
     document.body.appendChild(bar);
-    document.body.style.paddingTop = "26px";
+    document.body.style.paddingTop = "34px";
   }
 
   /* ---------- chat widget (rule-based "AI", owner-configurable) ---------- */
