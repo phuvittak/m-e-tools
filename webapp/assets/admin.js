@@ -2611,6 +2611,7 @@
           '<input data-bn="' + i + '" value="' + esc(b.name) + '" placeholder="ชื่อแบรนด์" style="flex:1">' +
           '<input data-bt="' + i + '" value="' + esc(b.tag || "") + '" placeholder="คำอธิบายสั้น (โชว์บนเว็บเท่านั้น)" style="flex:1.4">' +
           '<span style="font-size:11px;color:var(--fg-2);white-space:nowrap" title="จำนวนสินค้าในแบรนด์นี้">' + pc + ' สินค้า</span>' +
+          '<label class="f-check" title="แบรนด์เด่น — โชว์เน้นบนหน้าเว็บ"><input type="checkbox" data-bp="' + i + '"' + (b.primary ? " checked" : "") + "> เด่น</label>" +
           '<label class="f-check" title="ซ่อนแบรนด์นี้ + สินค้าทุกตัวของแบรนด์ออกจากหน้าเว็บลูกค้า — ปลดซ่อนได้ทันที (ไม่กระทบ Shopee/Lazada/TikTok)"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อนทั้งแบรนด์</label>" +
           '<button class="btn btn-sm btn-ghost" data-boff="' + i + '" title="นอกจากซ่อนบนเว็บ ยังสั่งปิดการขายบน Shopee/Lazada/TikTok ผ่าน BigSeller ด้วย">🚫 ปิดขายทุกแพลตฟอร์ม</button>' +
           '<button class="btn btn-sm btn-danger" data-bdel="' + i + '">ลบ</button></div>';

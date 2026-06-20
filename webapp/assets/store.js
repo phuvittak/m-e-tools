@@ -305,6 +305,7 @@
   ];
   function write(key, val, opts) {
     localStorage.setItem(key, JSON.stringify(val));
+    if (key === KEY.settings) _hiddenBrandSet = null; // settings เปลี่ยน → ล้างแคชแบรนด์ซ่อน
     if (!opts || !opts.skipCloud) {
       if (ADMIN_CLOUD_KEYS.indexOf(key) >= 0) cloudPushAdminData(key, val);
     }
@@ -909,11 +910,16 @@
   // ----- การมองเห็นสินค้าฝั่งลูกค้า (ซ่อนสินค้า + ซ่อนทั้งแบรนด์) -----
   // ซ่อนแบรนด์ในหน้า "แบรนด์ในร้าน" → สินค้าทุกตัวของแบรนด์นั้นหายจากหน้าเว็บลูกค้า
   // (เป็นการกรองตอนแสดงผล — ไม่แตะข้อมูลสินค้า ปลดซ่อนแล้วกลับมาทันที)
+  // แคชชุดแบรนด์ที่ซ่อน — สร้างใหม่เฉพาะเมื่อ settings เปลี่ยน (write() ล้างแคชให้)
+  // กัน getSettings()/JSON.parse ทำงานต่อสินค้าทุกชิ้นในทุก ๆ การกรอง/พิมพ์ค้นหา
+  var _hiddenBrandSet = null;
   function hiddenBrandSet() {
+    if (_hiddenBrandSet) return _hiddenBrandSet;
     var out = {};
     ((getSettings() || {}).brands || []).forEach(function (b) {
       if (b && b.hidden && b.name) out[String(b.name).trim().toLowerCase()] = 1;
     });
+    _hiddenBrandSet = out;
     return out;
   }
   function brandHidden(name) { return !!hiddenBrandSet()[String(name || "").trim().toLowerCase()]; }
