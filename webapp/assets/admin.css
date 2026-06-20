@@ -257,6 +257,9 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
   .kpis { grid-template-columns: repeat(2,1fr); }
   .grid-2 { grid-template-columns: 1fr; }
   .main { padding: 20px 18px 50px; }
+  /* โหมดทดลอง: ดันปุ่ม 3 ขีด + ลิ้นชักเมนู ลงมาใต้แถบทดลอง ไม่ให้ถูกบัง */
+  body.testmode-on .admin-burger { top: calc(var(--testbar-h, 34px) + 8px); }
+  body.testmode-on .side { top: var(--testbar-h, 34px); height: calc(100vh - var(--testbar-h, 34px)); }
 }
 @media (max-width: 720px) {
   .main { padding: 16px 14px 40px; }

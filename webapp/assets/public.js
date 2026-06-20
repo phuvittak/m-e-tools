@@ -1282,8 +1282,9 @@
     var avaInner = root.querySelector("[data-acct-ava-inner]");
     var avaFile = root.querySelector("[data-acct-ava-file]");
     function showAvatar(dataUrl) { if (avaInner && dataUrl) avaInner.innerHTML = '<img src="' + dataUrl + '" alt="โปรไฟล์">'; }
+    function showInitial(name) { if (avaInner) { var nm = String(name || "").trim(); avaInner.textContent = nm ? nm.charAt(0).toUpperCase() : "👤"; } }
     var cachedAva = (S.cachedAvatar && S.cachedAvatar()) || "";
-    if (cachedAva) showAvatar(cachedAva);
+    if (cachedAva) showAvatar(cachedAva); else showInitial(sess.name);
     if (avaFile) avaFile.addEventListener("change", function () {
       var f = avaFile.files && avaFile.files[0]; if (!f) return; avaFile.value = "";
       compressAvatar(f, function (dataUrl) {
@@ -1328,7 +1329,7 @@
       // ถ้าเคยอัปโหลดเอกสารแล้ว — โชว์ว่ามีไฟล์
       if (p.idCardImage) { var il = root.querySelector("[data-acct-id-label]"); if (il) il.textContent = "✓ บัตรประชาชน (อัปโหลดแล้ว)"; }
       if (p.licenseImage) { var ll = root.querySelector("[data-acct-lic-label]"); if (ll) ll.textContent = "✓ ใบขับขี่/ใบรับรอง (อัปโหลดแล้ว)"; }
-      if (p.avatarImage) showAvatar(p.avatarImage);
+      if (p.avatarImage) showAvatar(p.avatarImage); else if (!cachedAva) showInitial(disp);
     }).catch(function (err) {
       // ยังไม่ได้ตั้ง Firebase / ออฟไลน์ — แก้แบบ local ได้ แต่เตือนว่าซิงค์ไม่ได้
       setMsg("โหมดออฟไลน์: บันทึกได้แต่จะยังไม่ซิงค์ขึ้นระบบหลังร้าน (" + (err && err.message ? err.message : "ไม่ได้เชื่อมต่อ") + ")", "warn");

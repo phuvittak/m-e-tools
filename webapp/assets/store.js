@@ -2073,6 +2073,15 @@
           phone: u.phone || "",
           createdAt: m.fsMod.serverTimestamp(),
         }).then(function () {
+          // เขียน customer_profiles ด้วย → หน้า "บัญชีของฉัน" โชว์ข้อมูลที่กรอกตอนสมัครได้ทันที
+          var parts = String(u.name || "").trim().split(/\s+/);
+          var firstName = parts.shift() || "";
+          var lastName = parts.join(" ");
+          return m.fsMod.setDoc(m.fsMod.doc(m.db, "customer_profiles", uid), {
+            firstName: firstName, lastName: lastName, phone: u.phone || "", email: email,
+            createdAt: m.fsMod.serverTimestamp(), updatedAt: m.fsMod.serverTimestamp(),
+          }, { merge: true }).catch(function () {});
+        }).then(function () {
           // อัปเดต localStorage เผื่อ offline / fallback (ไม่เก็บ password ใน plain ที่ cloud)
           var users = getUsers();
           if (!users.some(function (x) { return x.email === email; })) {

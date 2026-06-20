@@ -229,11 +229,12 @@ img { max-width: 100%; display: block; }
 .faq-item.open .faq-a { max-height: 360px; padding: 0 20px 18px; }
 
 /* ---------- header profile avatar + dropdown ---------- */
-.me-profile { position: relative; flex: 0 0 auto; }
-.me-avatar { width: 38px; height: 38px; border-radius: 999px; overflow: hidden; background: var(--ink-soft); border: 2px solid var(--dw-yellow); padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--paper); }
+.me-profile { position: relative; flex: 0 0 auto; margin-left: 2px; }
+.me-avatar { width: 38px; height: 38px; border-radius: 999px; overflow: hidden; background: var(--dw-yellow); border: 2px solid var(--dw-yellow); padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
 .me-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.me-avatar-ph { font-size: 18px; line-height: 1; }
+.me-avatar-ph { font-family: var(--font-display-th), var(--font-body); font-weight: 900; font-size: 19px; line-height: 1; text-transform: uppercase; color: var(--ink); }
 .me-avatar.lg { width: 64px; height: 64px; border-width: 3px; }
+.me-avatar.lg .me-avatar-ph { font-size: 32px; }
 .me-profile-menu { position: absolute; top: calc(100% + 10px); right: 0; width: 280px; background: var(--paper); color: var(--ink); border: 3px solid var(--ink); box-shadow: 8px 8px 0 0 rgba(0,0,0,.35); z-index: 300; }
 .me-profile-head { display: flex; gap: 14px; align-items: center; padding: 16px; background: var(--ink); color: var(--paper); }
 .me-avatar-edit { position: relative; cursor: pointer; flex: 0 0 auto; }
@@ -665,7 +666,7 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 .otp-status.ok { color: var(--tape-green); font-weight: 700; }
 
 /* ---------- header right + account ---------- */
-.me-header-right { display: flex; align-items: center; gap: 16px; }
+.me-header-right { display: flex; align-items: center; gap: 16px; margin-left: auto; flex: 0 0 auto; }
 .me-acct { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .me-acct-name { font-family: var(--font-body); font-size: 13px; color: var(--dw-yellow); font-weight: 700; text-decoration: none; }
 .me-acct-name:hover { text-decoration: underline; }
@@ -870,7 +871,8 @@ button.cus-vf { background: #f0f0f0; }
 span.cus-vf.none { cursor: default; }
 
 /* ---------- โหมดทดลอง: header storefront tint ---------- */
-body.testmode-on .me-header { border-bottom: 3px solid #f59e0b; }
+/* หัวเว็บ sticky ต้องเลื่อนลงมาอยู่ใต้แถบทดลอง (ความสูงจริงคำนวณด้วย JS) ไม่ให้ทับกัน */
+body.testmode-on .me-header { border-bottom: 3px solid #f59e0b; top: var(--testbar-h, 34px); }
 body.testmode-on .me-header-inner::before {
   content: "🧪 ทดลอง";
   font-family: var(--font-body); font-size: 11px; font-weight: 800;

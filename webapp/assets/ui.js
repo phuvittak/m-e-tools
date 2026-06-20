@@ -132,10 +132,11 @@
     }
     var staff = s.role === "employee" || s.role === "owner";
     var av = (S.cachedAvatar && S.cachedAvatar()) || "";
-    function avInner(cls) {
-      return av
-        ? '<img src="' + esc(av) + '" alt="โปรไฟล์">'
-        : '<span class="me-avatar-ph">' + (s.role === "owner" ? "⭐" : staff ? "👷" : "👤") + "</span>";
+    function avInner() {
+      if (av) return '<img src="' + esc(av) + '" alt="โปรไฟล์">';
+      var nm = String(s.name || "").trim();
+      var letter = nm ? nm.charAt(0).toUpperCase() : "👤";
+      return '<span class="me-avatar-ph">' + esc(letter) + "</span>";
     }
     return '<div class="me-profile" data-profile>' +
       '<button class="me-avatar" data-profile-btn aria-label="โปรไฟล์ของฉัน">' + avInner() + "</button>" +
@@ -563,32 +564,47 @@
     if (!on) {
       if (el) el.remove();
       document.body.classList.remove("testmode-on");
-      var oldPad = document.body.getAttribute("data-testpad");
-      if (oldPad) { document.body.style.paddingTop = ""; document.body.removeAttribute("data-testpad"); }
+      document.body.style.paddingTop = "";
+      document.body.style.removeProperty("--testbar-h");
+      document.body.removeAttribute("data-testpad");
       return;
     }
     document.body.classList.add("testmode-on");
-    if (el) return;
-    var isAdmin = /\/admin\//.test(location.pathname);
-    var bar = document.createElement("div");
-    bar.setAttribute("data-test-banner", "");
-    bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;" +
-      "background:linear-gradient(90deg,#d97706 0%,#f59e0b 50%,#d97706 100%);" +
-      "color:#1c1000;font-family:var(--font-body),sans-serif;font-weight:800;font-size:13px;" +
-      "display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;" +
-      "padding:6px 16px;box-shadow:0 3px 10px rgba(217,119,6,.45);min-height:32px";
-    bar.innerHTML =
-      '<span style="display:inline-flex;align-items:center;gap:6px">' +
-        '<span style="font-size:16px">🧪</span>' +
-        '<b>โหมดทดลอง</b>' +
-        '<span style="font-weight:400;opacity:.85">— ออเดอร์ทุกรายการที่สั่งตอนนี้เป็นการทดลอง ไม่นับยอดขายจริง</span>' +
-      '</span>' +
-      (isAdmin
-        ? '<a href="../index.html" target="_blank" rel="noopener" style="background:rgba(0,0,0,.18);color:#1c1000;text-decoration:none;padding:3px 12px;border-radius:6px;font-size:12px;font-weight:700;white-space:nowrap">ดูหน้าร้านทดลอง →</a>'
-        : '<span style="background:rgba(0,0,0,.15);padding:3px 10px;border-radius:6px;font-size:12px">🏪 หน้าร้านทดลอง</span>');
-    document.body.setAttribute("data-testpad", "1");
-    document.body.appendChild(bar);
-    document.body.style.paddingTop = "34px";
+    if (!el) {
+      var isAdmin = /\/admin\//.test(location.pathname);
+      var bar = document.createElement("div");
+      bar.setAttribute("data-test-banner", "");
+      bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;" +
+        "background:linear-gradient(90deg,#d97706 0%,#f59e0b 50%,#d97706 100%);" +
+        "color:#1c1000;font-family:var(--font-body),sans-serif;font-weight:800;font-size:13px;" +
+        "display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;" +
+        "padding:6px 16px;box-shadow:0 3px 10px rgba(217,119,6,.45);min-height:32px";
+      bar.innerHTML =
+        '<span style="display:inline-flex;align-items:center;gap:6px">' +
+          '<span style="font-size:16px">🧪</span>' +
+          '<b>โหมดทดลอง</b>' +
+          '<span style="font-weight:400;opacity:.85">— ออเดอร์ทุกรายการที่สั่งตอนนี้เป็นการทดลอง ไม่นับยอดขายจริง</span>' +
+        '</span>' +
+        (isAdmin
+          ? '<a href="../index.html" target="_blank" rel="noopener" style="background:rgba(0,0,0,.18);color:#1c1000;text-decoration:none;padding:3px 12px;border-radius:6px;font-size:12px;font-weight:700;white-space:nowrap">ดูหน้าร้านทดลอง →</a>'
+          : '<span style="background:rgba(0,0,0,.15);padding:3px 10px;border-radius:6px;font-size:12px">🏪 หน้าร้านทดลอง</span>');
+      document.body.setAttribute("data-testpad", "1");
+      document.body.appendChild(bar);
+      // วัดความสูงจริงของแถบ (บนมือถือมันตัดบรรทัด → สูงกว่าปกติ) แล้วดันเนื้อหา + หัวเว็บลงพอดี ไม่ทับกัน
+      if (!renderTestBanner._bound) {
+        renderTestBanner._bound = true;
+        window.addEventListener("resize", syncTestbarHeight);
+      }
+    }
+    syncTestbarHeight();
+  }
+  // ดันเนื้อหาทั้งหน้า (และล็อกหัวเว็บ sticky ให้อยู่ใต้แถบ) ตามความสูงจริงของแถบทดลอง
+  function syncTestbarHeight() {
+    var bar = document.querySelector("[data-test-banner]");
+    if (!bar) return;
+    var h = bar.offsetHeight || 34;
+    document.body.style.paddingTop = h + "px";
+    document.body.style.setProperty("--testbar-h", h + "px");
   }
 
   /* ---------- chat widget (rule-based "AI", owner-configurable) ---------- */
