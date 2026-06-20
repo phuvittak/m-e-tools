@@ -28,6 +28,7 @@
     myQuotes: "me_my_quotes",           // เลขอ้างอิงใบขอเสนอราคาที่ส่งจากเครื่องนี้
     stockApplied: "me_stock_applied",   // order ids ที่ตัดสต๊อกแล้ว (กันตัดซ้ำตอนรับออเดอร์จาก cloud)
     ratings: "me_ratings",              // ดาวที่เบราว์เซอร์นี้ให้ไว้ { productId: stars }
+    avatar: "me_avatar",                // รูปโปรไฟล์ลูกค้า (cache เล็กๆ ให้หัวเว็บโชว์ได้ทันที ไม่ต้องโหลด cloud ก่อน)
   };
 
   // ===== Firebase web config for REAL online chat (shared by ALL visitors) =====
@@ -1992,7 +1993,10 @@
     if (s.perms && Object.prototype.hasOwnProperty.call(s.perms, key)) return !!s.perms[key];
     return !!SOFT_PERMS[key]; // หน้าใหม่: ค่าเดิม = เปิด จนแอดมินตั้งค่าเอง
   }
-  function logout() { localStorage.removeItem(KEY.session); dispatch(); }
+  function logout() { localStorage.removeItem(KEY.session); try { localStorage.removeItem(KEY.avatar); } catch (e) {} dispatch(); }
+
+  // รูปโปรไฟล์ที่ cache ไว้ในเครื่อง (โชว์บนหัวเว็บได้ทันทีโดยไม่ต้องรอ cloud)
+  function cachedAvatar() { try { return localStorage.getItem(KEY.avatar) || ""; } catch (e) { return ""; } }
 
   function registerUser(u) {
     var email = (u.email || "").trim().toLowerCase();
@@ -2147,7 +2151,22 @@
       var fs = m.fsMod;
       return fs.getDoc(fs.doc(m.db, "customer_profiles", uid)).then(function (snap) {
         var data = (snap && snap.exists && snap.exists()) ? (snap.data() || {}) : {};
+        // cache รูปโปรไฟล์ลงเครื่อง (เขียน localStorage ตรงๆ ไม่ dispatch → ไม่รีเฟรชหัวเว็บจนเมนูเด้งปิด)
+        try { if (data.avatarImage) localStorage.setItem(KEY.avatar, data.avatarImage); } catch (e) {}
         return { uid: uid, code: customerCode(uid), profile: data };
+      });
+    });
+  }
+  // บันทึกเฉพาะรูปโปรไฟล์ — ไม่แตะข้อมูลอื่น (merge) + อัปเดต cache ในเครื่อง
+  function saveMyAvatar(dataUrl) {
+    return loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var uid = m.auth && m.auth.currentUser && m.auth.currentUser.uid;
+      if (!uid) return Promise.reject(new Error("ยังไม่ได้เข้าสู่ระบบ"));
+      var fs = m.fsMod;
+      var img = String(dataUrl || "").slice(0, 200000); // รูปเล็ก (~256px) — เก็บใน profile ได้สบาย
+      return fs.setDoc(fs.doc(m.db, "customer_profiles", uid), { avatarImage: img, updatedAt: fs.serverTimestamp() }, { merge: true }).then(function () {
+        try { localStorage.setItem(KEY.avatar, img); } catch (e) {}
+        return { ok: true };
       });
     });
   }
@@ -2274,6 +2293,7 @@
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
     registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loginGoogleCloud: loginGoogleCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
     customerCode: customerCode, loadMyProfile: loadMyProfile, saveMyProfile: saveMyProfile,
+    saveMyAvatar: saveMyAvatar, cachedAvatar: cachedAvatar,
     cloudLoadAdminData: cloudLoadAdminData, cloudPushAdminData: cloudPushAdminData,
     cloudLoadPublicSettings: cloudLoadPublicSettings,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,

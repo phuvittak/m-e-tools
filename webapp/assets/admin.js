@@ -113,6 +113,20 @@
     shell.insertAdjacentHTML("afterbegin", side);
     document.querySelector("[data-logout]").addEventListener("click", function () { S.logout(); window.location.href = "../login.html"; });
 
+    // ปุ่มเมนู 3 ขีด (มุมขวาบน) — เปิด/ปิดเมนูข้างบนจอเล็ก
+    shell.insertAdjacentHTML("beforeend", '<div class="admin-scrim" data-scrim></div>');
+    var burger = document.createElement("button");
+    burger.className = "admin-burger";
+    burger.type = "button";
+    burger.setAttribute("aria-label", "เมนู");
+    burger.innerHTML = "<span></span><span></span><span></span>";
+    shell.appendChild(burger);
+    function closeNav() { shell.classList.remove("nav-open"); }
+    burger.addEventListener("click", function (e) { e.stopPropagation(); shell.classList.toggle("nav-open"); });
+    var scrim = shell.querySelector("[data-scrim]");
+    if (scrim) scrim.addEventListener("click", closeNav);
+    shell.querySelectorAll(".side-nav a").forEach(function (a) { a.addEventListener("click", closeNav); });
+
     mountBackToTop();
   }
 

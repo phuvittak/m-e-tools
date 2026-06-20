@@ -228,24 +228,23 @@ img { max-width: 100%; display: block; }
 .faq-a { max-height: 0; overflow: hidden; padding: 0 20px; font-family: var(--font-body); font-size: 15px; line-height: 1.6; color: var(--fg-1); transition: max-height 240ms ease, padding 240ms ease; }
 .faq-item.open .faq-a { max-height: 360px; padding: 0 20px 18px; }
 
-/* ---------- hamburger button + nav drawer ---------- */
-.me-hamburger { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: none; border: none; cursor: pointer; padding: 8px 6px; color: var(--paper); margin-left: 4px; flex: 0 0 auto; }
-.me-hamburger-bar { display: block; width: 22px; height: 2px; background: currentColor; border-radius: 1px; transition: all 180ms; }
-@media (max-width: 860px) {
-  .me-header-nav { display: none; }
-  .me-hamburger { display: flex; }
-}
-.me-nav-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 500; }
-.me-nav-overlay.open { display: block; }
-.me-nav-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(85vw, 320px); background: var(--ink); z-index: 501; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 280ms cubic-bezier(.2,.8,.2,1); }
-.me-nav-overlay.open .me-nav-drawer { transform: translateX(0); }
-.me-nav-drawer-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 3px solid var(--dw-yellow); flex: 0 0 auto; }
-.me-nav-drawer-wm { font-family: var(--font-wordmark, inherit); font-weight: 900; font-size: 20px; color: var(--paper); letter-spacing: -.01em; }
-.me-nav-drawer-close { background: none; border: none; color: var(--paper); font-size: 28px; cursor: pointer; padding: 0 6px; line-height: 1; }
-.me-nav-drawer-links { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 8px; flex: 1; align-content: start; overflow-y: auto; }
-.me-nav-drawer-links a { padding: 14px 10px; color: var(--paper); text-decoration: none; font-family: var(--font-body); font-weight: 600; font-size: 14px; background: var(--ink-soft); border: 1px solid var(--concrete-700); text-align: center; transition: background 120ms, color 120ms; }
-.me-nav-drawer-links a:hover, .me-nav-drawer-links a.on { background: var(--dw-yellow); color: var(--ink); border-color: var(--dw-yellow); }
-.me-nav-drawer-links a:first-child { grid-column: 1 / -1; }
+/* ---------- header profile avatar + dropdown ---------- */
+.me-profile { position: relative; flex: 0 0 auto; }
+.me-avatar { width: 38px; height: 38px; border-radius: 999px; overflow: hidden; background: var(--ink-soft); border: 2px solid var(--dw-yellow); padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--paper); }
+.me-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.me-avatar-ph { font-size: 18px; line-height: 1; }
+.me-avatar.lg { width: 64px; height: 64px; border-width: 3px; }
+.me-profile-menu { position: absolute; top: calc(100% + 10px); right: 0; width: 280px; background: var(--paper); color: var(--ink); border: 3px solid var(--ink); box-shadow: 8px 8px 0 0 rgba(0,0,0,.35); z-index: 300; }
+.me-profile-head { display: flex; gap: 14px; align-items: center; padding: 16px; background: var(--ink); color: var(--paper); }
+.me-avatar-edit { position: relative; cursor: pointer; flex: 0 0 auto; }
+.me-avatar-cam { position: absolute; bottom: -2px; right: -2px; width: 22px; height: 22px; background: var(--dw-yellow); border: 2px solid var(--ink); border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+.me-profile-id { min-width: 0; flex: 1; }
+.me-profile-name { font-family: var(--font-body); font-weight: 800; font-size: 16px; color: var(--paper); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me-profile-row { font-family: var(--font-body); font-size: 12.5px; color: var(--concrete-300); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me-profile-links { display: flex; flex-direction: column; padding: 6px; }
+.me-profile-links a, .me-profile-links button { font-family: var(--font-body); font-weight: 600; font-size: 14px; text-align: left; color: var(--ink); text-decoration: none; background: none; border: none; padding: 11px 12px; cursor: pointer; border-radius: 4px; }
+.me-profile-links a:hover, .me-profile-links button:hover { background: var(--dw-yellow-pale, #fff1c4); }
+.me-profile-links button { color: var(--price-red); border-top: 1px solid var(--concrete-200, #e7e5e0); margin-top: 4px; }
 
 /* ---------- header login button visible on dark ---------- */
 .me-header .me-acct .me-btn-ghost { color: var(--paper); border-color: var(--paper); box-shadow: 3px 3px 0 0 rgba(255,255,255,.18); }
@@ -825,7 +824,10 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 /* ---------- ACCOUNT (โปรไฟล์ลูกค้า — แก้เอง) ---------- */
 .acct-page { max-width: 640px; }
 .acct-hero { display: flex; align-items: center; gap: 16px; background: linear-gradient(135deg, #1d4ed8, #2563eb); color: #fff; border: 3px solid var(--ink); box-shadow: 5px 5px 0 0 var(--dw-yellow); padding: 20px 22px; margin-bottom: 18px; }
-.acct-hero-ava { width: 58px; height: 58px; border-radius: 50%; background: rgba(255,255,255,.22); display: flex; align-items: center; justify-content: center; font-size: 30px; flex: 0 0 auto; }
+.acct-hero-ava { position: relative; width: 58px; height: 58px; border-radius: 50%; background: rgba(255,255,255,.22); display: flex; align-items: center; justify-content: center; font-size: 30px; flex: 0 0 auto; cursor: pointer; overflow: visible; }
+.acct-hero-ava [data-acct-ava-inner] { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.acct-hero-ava img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.acct-ava-cam { position: absolute; bottom: -2px; right: -2px; width: 22px; height: 22px; background: var(--dw-yellow); border: 2px solid var(--ink); border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
 .acct-hero-info { min-width: 0; }
 .acct-hero-name { font-family: var(--font-display-th); font-weight: 800; font-size: 22px; line-height: 1.1; }
 .acct-hero-code { font-family: var(--font-body); font-size: 13px; opacity: .92; margin-top: 2px; }

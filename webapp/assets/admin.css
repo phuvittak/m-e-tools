@@ -230,11 +230,30 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
 .me-toast.show { transform: translateX(0); }
 .me-toast.ok { border-left-color: var(--tape-green); } .me-toast.err { border-left-color: var(--price-red); }
 
+/* ปุ่มเมนู 3 ขีด (เฉพาะหลังร้าน) — มุมขวาบน เปิด/ปิดเมนูข้างบนจอเล็ก */
+.admin-burger { display: none; }
+.admin-scrim { display: none; }
 @media (max-width: 900px) {
   .admin { grid-template-columns: 1fr; }
-  .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
-  .side-nav { flex-direction: row; flex-wrap: wrap; overflow-y: visible; min-height: 0; }
-  .side-foot { border-top: none; padding-top: 0; flex-direction: row; align-items: center; }
+  .admin-burger {
+    display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center;
+    position: fixed; top: 10px; right: 12px; z-index: 80; width: 44px; height: 44px;
+    background: var(--ink); border: 2px solid var(--dw-yellow); border-radius: 9px; cursor: pointer;
+  }
+  .admin-burger span { display: block; width: 20px; height: 2px; background: var(--dw-yellow); border-radius: 1px; transition: all .2s; }
+  .admin.nav-open .admin-burger span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+  .admin.nav-open .admin-burger span:nth-child(2) { opacity: 0; }
+  .admin.nav-open .admin-burger span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+  /* เมนูข้างกลายเป็นลิ้นชักเลื่อนจากซ้าย */
+  .side {
+    position: fixed; top: 0; left: 0; bottom: 0; height: 100vh; width: min(82vw, 290px);
+    flex-direction: column; flex-wrap: nowrap; align-items: stretch; z-index: 90;
+    transform: translateX(-100%); transition: transform .26s cubic-bezier(.2,.8,.2,1); overflow-y: auto;
+  }
+  .admin.nav-open .side { transform: translateX(0); }
+  .side-nav { flex-direction: column; flex-wrap: nowrap; overflow-y: auto; min-height: 0; }
+  .side-foot { border-top: 1px solid var(--concrete-700); padding-top: 12px; flex-direction: column; align-items: stretch; }
+  .admin.nav-open .admin-scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 85; }
   .kpis { grid-template-columns: repeat(2,1fr); }
   .grid-2 { grid-template-columns: 1fr; }
   .main { padding: 20px 18px 50px; }

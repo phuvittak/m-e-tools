@@ -115,27 +115,52 @@
       navLink("warranty.html", "ลงทะเบียนประกัน", active === "warranty") +
       navLink("orders.html", "ติดตามคำสั่งซื้อ", active === "orders") +
       "</nav>" +
-      '<div class="me-header-right">' + accountArea() +
+      '<div class="me-header-right">' +
       '<a href="cart.html" class="me-cart-link" aria-label="ตะกร้า">' +
       '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>' +
       '<span class="me-cart-badge" data-cart-badge ' + (count ? "" : "hidden") + ">" + count + "</span></a>" +
-      '<button class="me-hamburger" data-hamburger aria-label="เมนู">' +
-      '<span class="me-hamburger-bar"></span><span class="me-hamburger-bar"></span><span class="me-hamburger-bar"></span></button>' +
+      accountArea() +
       "</div></div></header>"
     );
   }
   function accountArea() {
     var s = S.session();
-    if (s) {
-      var staff = s.role === "employee" || s.role === "owner";
-      return '<div class="me-acct"><a class="me-acct-name" href="' + (staff ? "admin/dashboard.html" : "account.html") + '">' +
-        (s.role === "owner" ? "⭐ " : staff ? "👷 " : "👤 ") + esc(s.name) + "</a>" +
-        (staff ? '<a class="me-acct-link" href="admin/dashboard.html">ระบบหลังร้าน</a>' : '<a class="me-acct-link" href="account.html">บัญชีของฉัน</a>') +
-        '<button class="me-acct-link" data-logout type="button">ออกจากระบบ</button></div>';
+    if (!s) {
+      return '<div class="me-acct">' +
+        '<a class="me-btn me-btn-ghost me-btn-sm" href="login.html">เข้าสู่ระบบ</a>' +
+        '<a class="me-btn me-btn-sm" href="register.html">สมัครสมาชิก</a></div>';
     }
-    return '<div class="me-acct">' +
-      '<a class="me-btn me-btn-ghost me-btn-sm" href="login.html">เข้าสู่ระบบ</a>' +
-      '<a class="me-btn me-btn-sm" href="register.html">สมัครสมาชิก</a></div>';
+    var staff = s.role === "employee" || s.role === "owner";
+    var av = (S.cachedAvatar && S.cachedAvatar()) || "";
+    function avInner(cls) {
+      return av
+        ? '<img src="' + esc(av) + '" alt="โปรไฟล์">'
+        : '<span class="me-avatar-ph">' + (s.role === "owner" ? "⭐" : staff ? "👷" : "👤") + "</span>";
+    }
+    return '<div class="me-profile" data-profile>' +
+      '<button class="me-avatar" data-profile-btn aria-label="โปรไฟล์ของฉัน">' + avInner() + "</button>" +
+      '<div class="me-profile-menu" data-profile-menu hidden>' +
+        '<div class="me-profile-head">' +
+          '<label class="me-avatar-edit" title="เปลี่ยนรูปโปรไฟล์">' +
+            '<span class="me-avatar lg" data-profile-av>' + avInner() + "</span>" +
+            '<span class="me-avatar-cam">📷</span>' +
+            '<input type="file" accept="image/*" data-profile-file hidden>' +
+          "</label>" +
+          '<div class="me-profile-id">' +
+            '<div class="me-profile-name" data-profile-name>' + esc(s.name || "ลูกค้า") + "</div>" +
+            '<div class="me-profile-row" data-profile-email>' + (s.email ? esc(s.email) : "—") + "</div>" +
+            '<div class="me-profile-row" data-profile-phone>—</div>' +
+          "</div>" +
+        "</div>" +
+        '<div class="me-profile-links">' +
+          (staff
+            ? '<a href="admin/dashboard.html">🛠️ ระบบหลังร้าน</a>'
+            : '<a href="account.html">👤 บัญชีของฉัน · แก้ไขข้อมูล</a>') +
+          '<a href="orders.html">📦 ติดตามคำสั่งซื้อ</a>' +
+          '<button data-logout type="button">⎋ ออกจากระบบ</button>' +
+        "</div>" +
+      "</div>" +
+    "</div>";
   }
   function navLink(href, label, on) {
     return '<a href="' + href + '"' + (on ? ' class="on"' : "") + ">" + label + "</a>";
@@ -467,10 +492,69 @@
         if (wc) wc.scrollIntoView({ behavior: "smooth", block: "end" });
       });
     });
-    document.querySelectorAll("[data-hamburger]").forEach(function (btn) {
-      btn.addEventListener("click", openNavDrawer);
-    });
+    wireProfileMenu();
     renderTestBanner();
+  }
+
+  /* ---------- โปรไฟล์ลูกค้าบนหัวเว็บ (รูป + ชื่อ + Gmail + เบอร์ · เปลี่ยนรูปได้) ---------- */
+  function wireProfileMenu() {
+    var box = document.querySelector("[data-profile]");
+    if (!box) return;
+    var btn = box.querySelector("[data-profile-btn]");
+    var menu = box.querySelector("[data-profile-menu]");
+    if (!btn || !menu) return;
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (menu.hidden) { menu.hidden = false; loadProfileInfo(box); } else { menu.hidden = true; }
+    });
+    menu.addEventListener("click", function (e) { e.stopPropagation(); });
+    document.addEventListener("click", function () { if (!menu.hidden) menu.hidden = true; });
+    var file = box.querySelector("[data-profile-file]");
+    if (file) file.addEventListener("change", function () {
+      var f = file.files && file.files[0]; if (!f) return;
+      file.value = "";
+      avatarCompress(f, function (dataUrl) { saveAvatar(dataUrl, box); });
+    });
+  }
+  function setProfileField(box, sel, val) { var el = box.querySelector(sel); if (el && val) el.textContent = val; }
+  function setProfileAvatar(box, dataUrl) {
+    var html = '<img src="' + esc(dataUrl) + '" alt="โปรไฟล์">';
+    box.querySelectorAll("[data-profile-btn], [data-profile-av]").forEach(function (el) { el.innerHTML = html; });
+  }
+  function loadProfileInfo(box) {
+    if (!S.loadMyProfile) return;
+    S.loadMyProfile().then(function (r) {
+      var p = (r && r.profile) || {};
+      var nm = ((p.firstName || "") + " " + (p.lastName || "")).trim();
+      setProfileField(box, "[data-profile-name]", nm);
+      setProfileField(box, "[data-profile-email]", p.email);
+      setProfileField(box, "[data-profile-phone]", p.phone ? "📞 " + p.phone : "");
+      if (p.avatarImage) setProfileAvatar(box, p.avatarImage);
+    }).catch(function () {});
+  }
+  function saveAvatar(dataUrl, box) {
+    setProfileAvatar(box, dataUrl); // โชว์ทันที
+    if (!S.saveMyAvatar) { toast("ยังเชื่อมระบบไม่สำเร็จ — เข้าสู่ระบบก่อน", "err"); return; }
+    S.saveMyAvatar(dataUrl).then(function () { toast("เปลี่ยนรูปโปรไฟล์แล้ว", "ok"); })
+      .catch(function (err) { toast("บันทึกรูปไม่สำเร็จ: " + (err && err.message ? err.message : "ลองใหม่"), "err"); });
+  }
+  // ย่อรูปโปรไฟล์ให้เล็ก (สี่เหลี่ยมจัตุรัส ~256px) ก่อนเก็บ
+  function avatarCompress(file, cb) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var SZ = 256;
+        var side = Math.min(img.width, img.height);
+        var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+        var c = document.createElement("canvas"); c.width = SZ; c.height = SZ;
+        try { c.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, SZ, SZ); cb(c.toDataURL("image/jpeg", 0.8)); }
+        catch (e) { cb(fr.result); }
+      };
+      img.onerror = function () { cb(fr.result); };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
   }
   // แถบเตือน "โหมดทดลอง" — โชว์ทั่วเว็บ (หน้าร้าน + หลังร้าน) เมื่อเจ้าของเปิดโหมดทดลองสั่งซื้อ
   function renderTestBanner() {
@@ -683,47 +767,6 @@
   /* ---------- query param helper -------------------------------- */
   function qp(name) {
     return new URLSearchParams(window.location.search).get(name);
-  }
-
-  /* ---------- hamburger nav drawer ------------------------------ */
-  function openNavDrawer() {
-    var ov = document.getElementById("me-nav-overlay");
-    if (!ov) {
-      ov = document.createElement("div");
-      ov.className = "me-nav-overlay";
-      ov.id = "me-nav-overlay";
-      ov.innerHTML =
-        '<div class="me-nav-drawer">' +
-          '<div class="me-nav-drawer-head">' +
-            '<span class="me-nav-drawer-wm">M.E.<span style="color:var(--price-red)">T</span>ools</span>' +
-            '<button class="me-nav-drawer-close" data-nav-close aria-label="ปิด">×</button>' +
-          '</div>' +
-          '<div class="me-nav-drawer-links" id="me-nav-links"></div>' +
-        '</div>';
-      document.body.appendChild(ov);
-      ov.addEventListener("click", function (e) { if (e.target === ov) closeNavDrawer(); });
-      ov.querySelector("[data-nav-close]").addEventListener("click", closeNavDrawer);
-    }
-    var active = chromeActive;
-    var links = [
-      ["index.html", "หน้าแรก", active === "home"],
-      ["shop.html", "สินค้า / หมวดหมู่", active === "shop" || active === "categories"],
-      ["catalog.html", "แคตตาล็อก", active === "catalog"],
-      ["warranty.html", "ลงทะเบียนประกัน", active === "warranty"],
-      ["orders.html", "ติดตามคำสั่งซื้อ", active === "orders"],
-      ["account.html", "บัญชีของฉัน", false],
-      ["cart.html", "ตะกร้า 🛒", false],
-      ["login.html", "เข้าสู่ระบบ", false],
-    ];
-    var linksEl = document.getElementById("me-nav-links");
-    if (linksEl) linksEl.innerHTML = links.map(function (lk) {
-      return '<a href="' + lk[0] + '"' + (lk[2] ? ' class="on"' : "") + ">" + lk[1] + "</a>";
-    }).join("");
-    requestAnimationFrame(function () { ov.classList.add("open"); });
-  }
-  function closeNavDrawer() {
-    var ov = document.getElementById("me-nav-overlay");
-    if (ov) ov.classList.remove("open");
   }
 
   global.MEUI = {

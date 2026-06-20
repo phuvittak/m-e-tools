@@ -74,6 +74,24 @@
     });
   }
 
+  // ย่อรูปโปรไฟล์ให้เป็นสี่เหลี่ยมจัตุรัสเล็ก (~256px) — ครอปกึ่งกลาง
+  function compressAvatar(file, cb) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var SZ = 256, side = Math.min(img.width, img.height);
+        var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+        var c = document.createElement("canvas"); c.width = SZ; c.height = SZ;
+        try { c.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, SZ, SZ); cb(c.toDataURL("image/jpeg", 0.8)); }
+        catch (e) { cb(fr.result); }
+      };
+      img.onerror = function () { cb(fr.result); };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  }
+
   /* ---------- รีวิว (ดาว + ความเห็น + รูป) ---------- */
   function compressImage(file, cb) {
     var max = 1000, fr = new FileReader();
@@ -1260,6 +1278,21 @@
     var verifyEl = root.querySelector("[data-acct-verify]");
     var pending = { idCardImage: "", licenseImage: "" };
 
+    // ---- รูปโปรไฟล์ (เปลี่ยนรูปได้เหมือนเว็บทั่วไป) ----
+    var avaInner = root.querySelector("[data-acct-ava-inner]");
+    var avaFile = root.querySelector("[data-acct-ava-file]");
+    function showAvatar(dataUrl) { if (avaInner && dataUrl) avaInner.innerHTML = '<img src="' + dataUrl + '" alt="โปรไฟล์">'; }
+    var cachedAva = (S.cachedAvatar && S.cachedAvatar()) || "";
+    if (cachedAva) showAvatar(cachedAva);
+    if (avaFile) avaFile.addEventListener("change", function () {
+      var f = avaFile.files && avaFile.files[0]; if (!f) return; avaFile.value = "";
+      compressAvatar(f, function (dataUrl) {
+        showAvatar(dataUrl);
+        if (S.saveMyAvatar) S.saveMyAvatar(dataUrl).then(function () { U.toast("เปลี่ยนรูปโปรไฟล์แล้ว", "ok"); })
+          .catch(function (err) { U.toast("บันทึกรูปไม่สำเร็จ: " + (err && err.message ? err.message : "ลองใหม่"), "err"); });
+      });
+    });
+
     function f(name) { return form.querySelector('[data-f="' + name + '"]'); }
     function setMsg(t, kind) { if (!msgEl) return; msgEl.textContent = t || ""; msgEl.className = "acct-msg" + (kind ? " " + kind : ""); }
     function verifyBadge(status) {
@@ -1295,6 +1328,7 @@
       // ถ้าเคยอัปโหลดเอกสารแล้ว — โชว์ว่ามีไฟล์
       if (p.idCardImage) { var il = root.querySelector("[data-acct-id-label]"); if (il) il.textContent = "✓ บัตรประชาชน (อัปโหลดแล้ว)"; }
       if (p.licenseImage) { var ll = root.querySelector("[data-acct-lic-label]"); if (ll) ll.textContent = "✓ ใบขับขี่/ใบรับรอง (อัปโหลดแล้ว)"; }
+      if (p.avatarImage) showAvatar(p.avatarImage);
     }).catch(function (err) {
       // ยังไม่ได้ตั้ง Firebase / ออฟไลน์ — แก้แบบ local ได้ แต่เตือนว่าซิงค์ไม่ได้
       setMsg("โหมดออฟไลน์: บันทึกได้แต่จะยังไม่ซิงค์ขึ้นระบบหลังร้าน (" + (err && err.message ? err.message : "ไม่ได้เชื่อมต่อ") + ")", "warn");
