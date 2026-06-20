@@ -247,7 +247,7 @@
     if (bsBox) {
       var sold = {};
       S.getOrders().forEach(function (o) {
-        if (o.status === "cancelled") return;
+        if (o.status === "cancelled" || o.test) return;
         (o.items || []).forEach(function (it) {
           if (!it.productId) return;
           var s = sold[it.productId] || (sold[it.productId] = { qty: 0, rev: 0 });
@@ -1645,7 +1645,7 @@
       fs.onSnapshot(fs.collection(m.db, "orders"), function (snap) {
         state.orders = snap.docs
           .map(function (d) { return d.data() || {}; })
-          .filter(function (o) { return o.status !== "cancelled"; }); // ตามที่ user สั่ง — ยกเลิกแล้วลบออกอัตโนมัติจากสรุป
+          .filter(function (o) { return o.status !== "cancelled" && !o.test; }); // ตัดออเดอร์ที่ยกเลิก + ออเดอร์ทดลอง ออกจากสรุป
         renderAll();
       }, function (err) { setAlert("โหลดออเดอร์ไม่สำเร็จ: " + err.message, "err"); });
 
@@ -2264,6 +2264,46 @@
     ts.addEventListener("change", function () { state.type = ts.value; render(); });
     cs.addEventListener("input", function () { state.q = cs.value.trim().toLowerCase(); render(); });
     document.querySelector("[data-shipcfg]").addEventListener("click", openShipEditor);
+
+    // ── โหมดทดลองสั่งซื้อ + ล้างออเดอร์ ──
+    var testChk = document.querySelector("[data-testmode]");
+    var testBar = document.querySelector("[data-testbar]");
+    function paintTestBar() {
+      if (testChk) testChk.checked = !!S.getSettings().testMode;
+      if (testBar) testBar.style.borderLeftColor = (S.getSettings().testMode ? "#16a34a" : "#f0a500");
+    }
+    paintTestBar();
+    if (testChk) testChk.addEventListener("change", function () {
+      S.saveSettings({ testMode: testChk.checked });
+      paintTestBar();
+      U.toast(testChk.checked ? "เปิดโหมดทดลอง — ออเดอร์ที่สั่งจากนี้จะติดป้ายทดลอง" : "ปิดโหมดทดลองแล้ว", "ok");
+    });
+    var clearTestBtn = document.querySelector("[data-clear-test]");
+    if (clearTestBtn) clearTestBtn.addEventListener("click", function () {
+      if (!S.hasPerm("orders_delete")) { U.toast("ไม่มีสิทธิ์ลบออเดอร์", "err"); return; }
+      var n = S.getOrders().filter(function (o) { return o.test; }).length;
+      if (!n) { U.toast("ไม่มีออเดอร์ทดลอง", "err"); return; }
+      askPin("ล้างออเดอร์ทดลองทั้งหมด " + n + " รายการ", function () {
+        clearTestBtn.disabled = true;
+        S.clearOrders({ testOnly: true }).then(function (r) {
+          clearTestBtn.disabled = false;
+          U.toast("ล้างออเดอร์ทดลองแล้ว (" + (r.local || 0) + " รายการ)", "ok"); render();
+        });
+      });
+    });
+    var clearAllBtn = document.querySelector("[data-clear-all]");
+    if (clearAllBtn) clearAllBtn.addEventListener("click", function () {
+      if (!S.hasPerm("orders_delete")) { U.toast("ไม่มีสิทธิ์ลบออเดอร์", "err"); return; }
+      var n = S.getOrders().length;
+      if (!n) { U.toast("ไม่มีออเดอร์", "err"); return; }
+      askPin("⚠️ ล้างออเดอร์ทั้งหมด " + n + " รายการ (ลบถาวรทั้งในเครื่องและบนคลาวด์)", function () {
+        clearAllBtn.disabled = true;
+        S.clearOrders({ testOnly: false }).then(function (r) {
+          clearAllBtn.disabled = false;
+          U.toast("ล้างออเดอร์ทั้งหมดแล้ว (" + (r.local || 0) + " รายการ)", "ok"); render();
+        });
+      });
+    });
     var ordExp = document.querySelector("[data-export-orders]");
     if (ordExp) ordExp.addEventListener("click", function () {
       if (!window.XLSX) { U.toast("ตัวสร้างไฟล์ Excel ยังโหลดไม่เสร็จ ลองอีกครั้ง", "err"); return; }
@@ -2305,10 +2345,14 @@
         }
         return true;
       });
-      var rev = 0, prof = 0;
-      orders.forEach(function (o) { if (o.status !== "cancelled") { rev += o.revenue || 0; prof += (o.revenue || 0) - (o.cost || 0); } });
+      var rev = 0, prof = 0, testCount = 0;
+      orders.forEach(function (o) {
+        if (o.test) { testCount++; return; } // ออเดอร์ทดลองไม่นับเป็นยอดขายจริง
+        if (o.status !== "cancelled") { rev += o.revenue || 0; prof += (o.revenue || 0) - (o.cost || 0); }
+      });
       document.querySelector("[data-osum]").innerHTML =
-        "แสดง <b>" + orders.length + "</b> คำสั่งซื้อ · รายได้รวม <b>" + S.money(rev) + "</b> · กำไรรวม <b>" + S.money(prof) + "</b>";
+        "แสดง <b>" + orders.length + "</b> คำสั่งซื้อ · รายได้รวม <b>" + S.money(rev) + "</b> · กำไรรวม <b>" + S.money(prof) + "</b>" +
+        (testCount ? ' · <span style="color:#b45309">🧪 ทดลอง ' + testCount + " รายการ (ไม่นับยอด)</span>" : "");
 
       var tb = document.querySelector("[data-ordtable]");
       if (!orders.length) { tb.innerHTML = '<tbody><tr><td colspan="7" style="text-align:center;padding:32px;color:var(--fg-2)">ไม่มีคำสั่งซื้อที่ตรงกับเงื่อนไข</td></tr></tbody>'; return; }
@@ -2318,7 +2362,9 @@
           var opts = statusOptions(o);
           var addr = o.fulfillment === "delivery" && o.address ? "<br><span class=prod-sku>" + o.address.text + "</span>" : "";
           var taxLine = o.taxInvoice ? '<br><span class="chip" style="background:#fff3cd;border-color:#ffe08a;color:#8a6d00">🧾 ใบกำกับภาษี</span><br><span class=prod-sku>' + esc(o.taxInvoice.name) + " · เลขผู้เสียภาษี " + esc(o.taxInvoice.taxId) + "<br>" + esc(o.taxInvoice.address) + "</span>" : "";
-          return "<tr><td><b>" + o.id + '</b> <span class="chip ' + o.type + '">' + S.typeLabel(o.type) + "</span> " +
+          return "<tr" + (o.test ? ' style="background:#fffbeb"' : "") + "><td><b>" + o.id + '</b> ' +
+            (o.test ? '<span class="chip" style="background:#fde68a;border-color:#f0a500;color:#92400e">🧪 ทดลอง</span> ' : "") +
+            '<span class="chip ' + o.type + '">' + S.typeLabel(o.type) + "</span> " +
             '<span class="chip ' + (o.fulfillment === "delivery" ? "rent" : "new") + '">' + S.fulfillmentLabel(o.fulfillment) + "</span>" +
             "<br><span class=prod-sku>" + S.fmtDate(o.createdAt) + (o.type === "rent" ? " · " + o.days + " วัน" : "") + "</span></td>" +
             "<td>" + o.customer.name + "<br><span class=prod-sku>" + o.customer.phone + "</span>" + addr + taxLine + "</td>" +

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>คำสั่งซื้อ / เช่า — M.E.Tools หลังร้าน</title>
-  <link rel="stylesheet" href="../assets/admin.css?v=20260620b">
+  <link rel="stylesheet" href="../assets/admin.css?v=20260620c">
 </head>
 <body data-admin="orders">
   <div class="admin" data-shell>
@@ -14,6 +14,17 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-ghost" data-export-orders title="ดาวน์โหลดคำสั่งซื้อทั้งหมดเป็นไฟล์ Excel (.xlsx) — แยกไฟล์ลูกค้า/ออเดอร์ ออกจากสต๊อก">📥 ดาวน์โหลดคำสั่งซื้อ (Excel)</button>
           <a class="btn btn-ghost" href="dashboard.html">← แดชบอร์ด</a>
+        </div>
+      </div>
+
+      <div class="panel" data-testbar style="margin-bottom:14px;border-left:6px solid #f0a500">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700">
+            <input type="checkbox" data-testmode style="width:18px;height:18px"> 🧪 โหมดทดลองสั่งซื้อ
+          </label>
+          <span class="sub" style="flex:1;min-width:200px">เปิดไว้ตอน "ลองสั่งซื้อ" — ออเดอร์ที่สั่งจะติดป้าย <b>ทดลอง</b> ไม่นับเป็นยอดขายจริง แล้วกดล้างทิ้งทีหลังได้</span>
+          <button class="btn btn-sm btn-ghost" data-clear-test>🧪 ล้างออเดอร์ทดลองทั้งหมด</button>
+          <button class="btn btn-sm btn-danger" data-clear-all>🗑️ ล้างออเดอร์ทั้งหมด</button>
         </div>
       </div>
 
@@ -39,10 +50,10 @@
     </main>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="../assets/thai-geo.js?v=20260620b"></script>
-  <script src="../assets/store.js?v=20260620b"></script>
-  <script src="../assets/bigseller-sync.js?v=20260620b"></script>
-  <script src="../assets/ui.js?v=20260620b"></script>
-  <script src="../assets/admin.js?v=20260620b"></script>
+  <script src="../assets/thai-geo.js?v=20260620c"></script>
+  <script src="../assets/store.js?v=20260620c"></script>
+  <script src="../assets/bigseller-sync.js?v=20260620c"></script>
+  <script src="../assets/ui.js?v=20260620c"></script>
+  <script src="../assets/admin.js?v=20260620c"></script>
 </body>
 </html>

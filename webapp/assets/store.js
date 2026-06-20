@@ -1215,6 +1215,7 @@
     var lines = cartLines();
     if (!lines.length) return null;
     var sess = session();
+    var testMode = !!getSettings().testMode; // โหมดทดลอง — ออเดอร์จะติดป้าย test
     var userEmail = (sess && sess.email) || checkout.email || "";
     var customer = { name: checkout.name, phone: checkout.phone, email: userEmail };
     var fulfillment = checkout.fulfillment === "delivery" ? "delivery" : "pickup";
@@ -1262,6 +1263,7 @@
         // stockApplied=true เฉพาะตอนผู้สั่งมีสิทธิ์คลัง (ตัดสต๊อก cloud แล้วผ่าน saveProduct)
         // ลูกค้าหน้าร้านไม่มีสิทธิ์ → false → ฝั่งหลังร้านจะตัดสต๊อกให้ตอนรับออเดอร์เข้า
         stockApplied: hasPerm("inventory"),
+        test: testMode, // ออเดอร์ทดลอง — กดล้างทิ้งได้ ไม่นับยอดขายจริง
       };
       if (mode === "rent") {
         order.rentStart = dateStr(Date.now());
@@ -1509,6 +1511,35 @@
       return m.fsMod.deleteDoc(m.fsMod.doc(m.db, "orders", String(id)));
     }).catch(function (err) { console.warn("[order delete]", id, err && err.message); });
   }
+  // ล้างออเดอร์เป็นชุด — testOnly:true = เฉพาะออเดอร์ทดลอง, false = ทั้งหมด
+  // ลบทั้ง local + cloud (query orders collection ลบทุก doc ที่เข้าเงื่อนไข)
+  function clearOrders(opts) {
+    opts = opts || {};
+    var testOnly = !!opts.testOnly;
+    if (!hasPerm("orders_delete")) return Promise.resolve({ ok: false, error: "no-perm" });
+    // local
+    var all = read(KEY.orders, []);
+    var keep = testOnly ? all.filter(function (o) { return !o.test; }) : [];
+    var removed = testOnly ? all.filter(function (o) { return !!o.test; }) : all.slice();
+    var tomb = read(KEY.deletedOrders, []);
+    removed.forEach(function (o) { if (o && o.id && tomb.indexOf(o.id) < 0) tomb.push(o.id); });
+    write(KEY.deletedOrders, tomb, { skipCloud: true });
+    write(KEY.orders, keep);
+    dispatch();
+    // cloud — ลบทุก doc ที่เข้าเงื่อนไข
+    return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      return fs.getDocs(fs.collection(m.db, "orders")).then(function (snap) {
+        var jobs = [];
+        snap.docs.forEach(function (d) {
+          var data = d.data() || {};
+          if (testOnly && !data.test) return;
+          jobs.push(fs.deleteDoc(fs.doc(m.db, "orders", d.id)).catch(function () {}));
+        });
+        return Promise.all(jobs).then(function () { return { ok: true, count: jobs.length, local: removed.length }; });
+      });
+    }).catch(function (err) { return { ok: true, count: 0, local: removed.length, cloudError: err && err.message }; });
+  }
   function deletePurchase(id) { write(KEY.purchases, read(KEY.purchases, []).filter(function (p) { return p.id !== id; })); dispatch(); }
   function checkPin(pin) { return String(pin) === String(getSettings().deletePin || "1234"); }
 
@@ -1716,7 +1747,7 @@
 
   /* ---------- Metrics (for the employee dashboard) ---------------- */
   function getMetrics() {
-    var orders = getOrders().filter(function (o) { return o.status !== "cancelled"; });
+    var orders = getOrders().filter(function (o) { return o.status !== "cancelled" && !o.test; });
     var revenue = 0, cost = 0;
     orders.forEach(function (o) { revenue += o.revenue || 0; cost += o.cost || 0; });
     var products = getProducts();
@@ -1741,7 +1772,7 @@
   function revenueByDay(n) {
     n = n || 7;
     var out = [];
-    var orders = getOrders().filter(function (o) { return o.status !== "cancelled"; });
+    var orders = getOrders().filter(function (o) { return o.status !== "cancelled" && !o.test; });
     for (var i = n - 1; i >= 0; i--) {
       var dayStart = new Date();
       dayStart.setHours(0, 0, 0, 0);
@@ -2246,7 +2277,7 @@
     session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, canReduceInventory: canReduceInventory, PERM_KEYS: PERM_KEYS, PERM_DEFS: PERM_DEFS,
     logout: logout, requirePerm: requirePerm, checkPin: checkPin,
     ensureAdminRegistered: ensureAdminRegistered, adminIdToken: adminIdToken, absorbCloudOrders: absorbCloudOrders,
-    deleteOrder: deleteOrder, deletePurchase: deletePurchase,
+    deleteOrder: deleteOrder, clearOrders: clearOrders, deletePurchase: deletePurchase,
     getLedger: getLedger, saveLedgerEntry: saveLedgerEntry, deleteLedgerEntry: deleteLedgerEntry,
     getSuppliers: getSuppliers, saveSupplier: saveSupplier, deleteSupplier: deleteSupplier,
     getPurchases: getPurchases, receivePurchase: receivePurchase, getPnL: getPnL,

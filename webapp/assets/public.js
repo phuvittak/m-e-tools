@@ -1146,7 +1146,7 @@
         return;
       }
       // แต้มสะสมช่าง — คำนวณจากยอดซื้อสะสม (1 แต้ม / 100 บาท) + ระดับสมาชิก
-      var spend = orders.filter(function (o) { return o.status !== "cancelled"; }).reduce(function (s, o) { return s + (o.total || 0); }, 0);
+      var spend = orders.filter(function (o) { return o.status !== "cancelled" && !o.test; }).reduce(function (s, o) { return s + (o.total || 0); }, 0);
       var points = Math.floor(spend / 100);
       var tier = spend >= 100000 ? { n: "ช่างทอง 🥇", c: "#caa12a" } : spend >= 30000 ? { n: "ช่างเงิน 🥈", c: "#8a8a8a" } : { n: "ช่างทั่วไป 🔧", c: "var(--ink)" };
       var loyalty = '<div class="loyalty-card"><div><div class="loyalty-tier" style="color:' + tier.c + '">' + tier.n + "</div>" +

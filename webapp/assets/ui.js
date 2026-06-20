@@ -460,6 +460,20 @@
     document.querySelectorAll("[data-open-chat]").forEach(function (b) {
       b.addEventListener("click", function (e) { e.preventDefault(); openLineChat(); });
     });
+    renderTestBanner();
+  }
+  // แถบเตือน "โหมดทดลอง" — โชว์ทั่วเว็บเมื่อเจ้าของเปิดโหมดทดลองสั่งซื้อ
+  function renderTestBanner() {
+    var on = !!(S.getSettings && S.getSettings().testMode);
+    var el = document.querySelector("[data-test-banner]");
+    if (!on) { if (el) el.remove(); return; }
+    if (el) return;
+    var bar = document.createElement("div");
+    bar.setAttribute("data-test-banner", "");
+    bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#f0a500;color:#3a2a00;font-family:var(--font-body),sans-serif;font-weight:700;font-size:13px;text-align:center;padding:5px 12px;box-shadow:0 2px 6px rgba(0,0,0,.2)";
+    bar.textContent = "🧪 โหมดทดลองสั่งซื้อเปิดอยู่ — ออเดอร์ที่สั่งตอนนี้เป็นการทดลอง ลบทิ้งได้ทีหลัง";
+    document.body.appendChild(bar);
+    document.body.style.paddingTop = "26px";
   }
 
   /* ---------- chat widget (rule-based "AI", owner-configurable) ---------- */
