@@ -126,9 +126,9 @@
     var s = S.session();
     if (s) {
       var staff = s.role === "employee" || s.role === "owner";
-      return '<div class="me-acct"><span class="me-acct-name">' +
-        (s.role === "owner" ? "⭐ " : staff ? "👷 " : "👤 ") + esc(s.name) + "</span>" +
-        (staff ? '<a class="me-acct-link" href="admin/dashboard.html">ระบบหลังร้าน</a>' : "") +
+      return '<div class="me-acct"><a class="me-acct-name" href="' + (staff ? "admin/dashboard.html" : "account.html") + '">' +
+        (s.role === "owner" ? "⭐ " : staff ? "👷 " : "👤 ") + esc(s.name) + "</a>" +
+        (staff ? '<a class="me-acct-link" href="admin/dashboard.html">ระบบหลังร้าน</a>' : '<a class="me-acct-link" href="account.html">บัญชีของฉัน</a>') +
         '<button class="me-acct-link" data-logout type="button">ออกจากระบบ</button></div>';
     }
     return '<div class="me-acct">' +
@@ -171,7 +171,7 @@
           '<a href="catalog.html">แคตตาล็อก</a><a href="warranty.html">ลงทะเบียนประกัน</a><a href="cart.html">ตะกร้า</a><a href="orders.html">ติดตามคำสั่งซื้อ</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">ช่วยเหลือ</div>' +
           '<a href="guide.html">ความรู้ช่าง · ตารางช่วยช่าง</a><a href="index.html#faq">คำถามที่พบบ่อย</a><a href="#" data-open-chat>ติดต่อร้าน (แชท)</a>' +
-          '<a href="login.html">เข้าสู่ระบบ</a><a href="register.html">สมัครสมาชิก</a></div>' +
+          '<a href="account.html">บัญชีของฉัน</a><a href="login.html">เข้าสู่ระบบ</a><a href="register.html">สมัครสมาชิก</a></div>' +
         '<div class="me-footer-col"><div class="me-footer-h">เวลาทำการ</div>' +
           "<div>" + esc(st.hoursWeek) + "</div><div>" + esc(st.hoursSun) + "</div>" +
           (function () { var op = S.isOpenNow(); return '<div class="me-footer-pill ' + (op.open ? "open" : "closed") + '"><span class="dot' + (op.open ? "" : " dot-closed") + '"></span> ' + (op.open ? "เปิดอยู่" : "ปิดอยู่" + (op.reason ? " · " + esc(op.reason) : "")) + "</div>"; })() + "</div>" +
@@ -460,6 +460,20 @@
     document.querySelectorAll("[data-open-chat]").forEach(function (b) {
       b.addEventListener("click", function (e) { e.preventDefault(); openLineChat(); });
     });
+    renderTestBanner();
+  }
+  // แถบเตือน "โหมดทดลอง" — โชว์ทั่วเว็บเมื่อเจ้าของเปิดโหมดทดลองสั่งซื้อ
+  function renderTestBanner() {
+    var on = !!(S.getSettings && S.getSettings().testMode);
+    var el = document.querySelector("[data-test-banner]");
+    if (!on) { if (el) el.remove(); return; }
+    if (el) return;
+    var bar = document.createElement("div");
+    bar.setAttribute("data-test-banner", "");
+    bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#f0a500;color:#3a2a00;font-family:var(--font-body),sans-serif;font-weight:700;font-size:13px;text-align:center;padding:5px 12px;box-shadow:0 2px 6px rgba(0,0,0,.2)";
+    bar.textContent = "🧪 โหมดทดลองสั่งซื้อเปิดอยู่ — ออเดอร์ที่สั่งตอนนี้เป็นการทดลอง ลบทิ้งได้ทีหลัง";
+    document.body.appendChild(bar);
+    document.body.style.paddingTop = "26px";
   }
 
   /* ---------- chat widget (rule-based "AI", owner-configurable) ---------- */

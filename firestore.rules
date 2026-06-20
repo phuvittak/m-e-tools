@@ -79,13 +79,46 @@ service cloud.firestore {
       allow delete: if isAdmin(); // ลบข้อความเก่าเกิน 7 วันจากหน้า "แชทบอท LINE"
     }
 
-    // โปรไฟล์ลูกค้า (ชื่อเล่นที่แอดมินตั้ง) — แยกจาก ID ใน bot_messages
+    // BigSeller webhook ขาเข้า — เก็บเหตุการณ์ออเดอร์/ยกเลิก/คืน/พัสดุ ไว้ให้หลังร้านดึงไป apply
+    //   อ่าน/อัปเดต(ติด processed): แอดมินเท่านั้น
+    //   create: shape-gated (มาจาก /api/bigseller-webhook ที่ตรวจลายเซ็น HMAC แล้ว — ชั้นนี้กันรูปแบบ)
+    match /bigseller_events/{eventId} {
+      allow read, list: if isAdmin();
+      allow create: if request.resource.data.type is string
+                 && request.resource.data.type.size() < 40
+                 && request.resource.data.processed == false;
+      allow update: if isAdmin();   // ติดธง processed หลัง apply เสร็จ
+      allow delete: if isAdmin();
+    }
+
+    // AI เรียนรู้เอง — คำถามที่บอทตอบไม่ได้ (LINE webhook upsert + นับยอด)
+    //   อ่าน/ลบ: แอดมิน · เขียน: shape-gated (text) หรือแอดมิน (ติดธง processed)
+    match /unanswered_questions/{qId} {
+      allow read, list, delete: if isAdmin();
+      allow create, update: if (request.resource.data.text is string && request.resource.data.text.size() < 600)
+                          || isAdmin();
+    }
+
+    // โปรไฟล์ลูกค้า — 2 ส่วนในเอกสารเดียว:
+    //   • nickname        = ชื่อที่ "แอดมิน" ตั้งให้หลังร้าน (ลูกค้าแตะไม่ได้)
+    //   • firstName/...   = ข้อมูลที่ "ลูกค้า" แก้เองจากหน้า account.html (ซิงค์เข้าหลังร้าน)
     // อ่าน: แอดมินอ่านทั้งหมด, ลูกค้าอ่านของตัวเอง
-    // เขียน: แอดมินเท่านั้น (ตั้งชื่อเล่นเป็นเรื่องหลังร้าน)
+    // เขียน: แอดมินทำได้ทุกอย่าง · ลูกค้าแก้ได้เฉพาะฟิลด์ของตัวเอง (ห้ามแตะ nickname,
+    //        ห้ามตั้ง verifyStatus เป็น "verified" เอง — ต้องให้แอดมินอนุมัติ)
     match /customer_profiles/{userId} {
       allow read: if isAdmin()
                 || (request.auth != null && request.auth.uid == userId);
       allow write: if isAdmin();
+      allow create: if request.auth != null && request.auth.uid == userId
+                 && !('nickname' in request.resource.data)
+                 && (!('verifyStatus' in request.resource.data)
+                     || request.resource.data.verifyStatus in ['none', 'pending']);
+      allow update: if request.auth != null && request.auth.uid == userId
+                 && request.resource.data.diff(resource.data).affectedKeys()
+                      .hasOnly(['firstName', 'lastName', 'phone', 'email', 'address',
+                                'verifyStatus', 'idCardImage', 'licenseImage', 'updatedAt'])
+                 && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['verifyStatus'])
+                     || request.resource.data.verifyStatus in ['none', 'pending']);
     }
 
     // ตั้งค่าคำตอบของบอท (Phase B) — เจ้าของแก้จากหน้า bot-replies.html

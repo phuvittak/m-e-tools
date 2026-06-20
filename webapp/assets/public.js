@@ -141,14 +141,14 @@
     });
   }
 
-  U.mountChrome(page === "home" ? "home" : page === "categories" ? "categories" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : "");
+  U.mountChrome(page === "home" ? "home" : page === "categories" ? "categories" : page === "shop" || page === "product" ? "shop" : page === "orders" ? "orders" : page === "catalog" ? "catalog" : page === "account" ? "account" : "");
 
   // เมื่อแคตตาล็อกจาก cloud มาถึง (ลูกค้า) → วาดส่วนที่ขึ้นกับสินค้าใหม่
   // ต้องประกาศ + ผูก listener "ก่อน" เรียก route เพราะ route จะตั้งค่า pageRefresh เอง
   var pageRefresh = null;
   window.addEventListener("me-products-loaded", function () { if (pageRefresh) try { pageRefresh(); } catch (e) {} });
 
-  var routes = { home: initHome, categories: initCategories, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog, warranty: initWarranty, "warranty-status": initWarrantyStatus };
+  var routes = { home: initHome, categories: initCategories, shop: initShop, product: initProduct, cart: initCart, orders: initOrders, login: initLogin, register: initRegister, catalog: initCatalog, warranty: initWarranty, "warranty-status": initWarrantyStatus, account: initAccount };
 
   // หน้า "หมวดหมู่" — กริดช่องหมวดแบบซ้อนหลายชั้น (เหมือน iToolmart)
   //   ?cat=<key> = ดูหมวดย่อยภายใต้หมวดนั้น. กดหมวดที่มีลูก → ลงลึกต่อ, กดหมวดที่ไม่มีลูก → ดูสินค้า
@@ -187,7 +187,7 @@
       }).join("");
 
       // สินค้าในหมวดนี้ (รวมหมวดย่อยทุกชั้น) — ทุกหมวดมีสินค้าโชว์ แค่แคบลงเมื่อลงลึก
-      var prods = S.getProducts().filter(function (p) { return !p.hidden; });
+      var prods = S.getVisibleProducts();
       if (curKey) { var set = S.catDescendants(curKey); prods = prods.filter(function (p) { return set[p.category]; }); }
       var prodBox = document.querySelector("[data-cat-products]");
       var prodHead = document.querySelector("[data-cat-prodhead]");
@@ -396,13 +396,13 @@
       }
       var feat = document.querySelector("[data-featured]");
       if (feat) {
-        feat.innerHTML = S.getProducts().filter(function (p) { return !p.hidden; }).slice(0, 6).map(cardHtml).join("");
+        feat.innerHTML = S.getVisibleProducts().slice(0, 6).map(cardHtml).join("");
         wireCards(feat);
       }
       // สินค้าใหม่ล่าสุด — เรียงตามวันที่เพิ่ม (createdAt) โชว์เฉพาะที่มี createdAt
       var na = document.querySelector("[data-newarrivals]");
       if (na) {
-        var newest = S.getProducts().filter(function (p) { return !p.hidden && p.createdAt; })
+        var newest = S.getVisibleProducts().filter(function (p) { return p.createdAt; })
           .sort(function (a, b) { return b.createdAt - a.createdAt; }).slice(0, 6);
         var sec = document.querySelector("[data-newarrivals-sec]");
         if (newest.length >= 3) { na.innerHTML = newest.map(cardHtml).join(""); wireCards(na); if (sec) sec.hidden = false; }
@@ -486,7 +486,7 @@
 
     // สร้าง/วาดแถบตัวกรองใหม่จากสินค้าปัจจุบัน (เรียกซ้ำได้เมื่อ cloud มาถึง)
     function buildSidebar() {
-      var products = S.getProducts().filter(function (p) { return !p.hidden; });
+      var products = S.getVisibleProducts();
       var productBrands = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
       var settingBrands = S.getSettings().brands || [];
       var hiddenBrands = settingBrands.filter(function (b) { return b.hidden; }).map(function (b) { return b.name; });
@@ -568,7 +568,7 @@
         return hay + add;
       }
       var list = S.getProducts().filter(function (p) {
-        if (p.hidden) return false;
+        if (!S.isVisible(p)) return false;
         if (state.q) { var hay = expandSlang((p.name + " " + p.brand + " " + p.sku + " " + S.categoryLabel(p.category)).toLowerCase()); if (hay.indexOf(state.q.toLowerCase()) < 0) return false; }
         if (acceptCats && !acceptCats[p.category]) return false;
         if (state.brands.length && state.brands.indexOf(p.brand) < 0) return false;
@@ -603,12 +603,32 @@
     var id = U.qp("id");
     var p = S.getProduct(id);
     var root = document.querySelector("[data-product]");
-    if (!p || p.hidden) { root.innerHTML = '<div class="empty"><h3>ไม่พบสินค้านี้</h3><a class="me-btn" href="shop.html">กลับไปหน้าสินค้า</a></div>'; return; }
+    if (!p || !S.isVisible(p)) { root.innerHTML = '<div class="empty"><h3>ไม่พบสินค้านี้</h3><a class="me-btn" href="shop.html">กลับไปหน้าสินค้า</a></div>'; return; }
 
     document.title = p.name + " — M.E.Tools";
     var avail = S.available(p);
     var mode = p.forSale ? "buy" : "rent";
     var qty = 1, days = 1;
+
+    // ---- badges ข้างชื่อสินค้า (ประกัน / ของแท้ / พร้อมส่ง) ----
+    var badgesHtml = '<div class="pd-badges">' +
+      (p.warrantyYears ? '<span class="pd-badge warranty">🛡️ ประกันศูนย์ ' + p.warrantyYears + ' ปี</span>' : "") +
+      '<span class="pd-badge genuine">✓ ของแท้ 100%</span>' +
+      (avail > 0 ? '<span class="pd-badge ready">⚡ พร้อมส่ง</span>' : "") +
+      "</div>";
+
+    // ---- ตารางสเปกด่วน (quick attributes grid) ----
+    var quickAttrs = [];
+    if (p.warrantyYears) quickAttrs.push(["🛡️", "การรับประกัน", "ศูนย์ " + p.warrantyYears + " ปี"]);
+    if (p.motorType && p.motorType !== "—") quickAttrs.push(["⚙️", "ระบบมอเตอร์", p.motorType]);
+    if (p.voltage) quickAttrs.push(["🔌", "แรงดันไฟฟ้า", p.voltage]);
+    if (p.batteryPlatform) quickAttrs.push(["🔋", "แพลตฟอร์มแบต", p.batteryPlatform]);
+    (p.specs || []).forEach(function (s) { var kv = specKV(s); if (kv && kv[0] && kv[1] && quickAttrs.length < 6) quickAttrs.push(["▪️", kv[0], kv[1]]); });
+    var quickGridHtml = quickAttrs.length
+      ? '<div class="pd-quickgrid">' + quickAttrs.map(function (a) {
+          return '<div class="pd-qcell"><span class="pd-qicon">' + a[0] + '</span><span class="pd-qk">' + esc(a[1]) + '</span><span class="pd-qv">' + esc(a[2]) + "</span></div>";
+        }).join("") + "</div>"
+      : "";
 
     root.innerHTML =
       '<div class="crumbs"><a href="index.html">หน้าแรก</a> / <a href="shop.html">สินค้า</a> / ' +
@@ -616,6 +636,7 @@
       '<div class="pd-grid"><div>' + productViewer(p) + "</div>" +
         '<div class="pd-info"><span class="pd-brand">' + p.brand + "</span>" +
           '<h1 class="pd-name">' + p.name + "</h1>" +
+          badgesHtml +
           '<div class="pd-rate">' + starsDisplay(p) + "</div>" +
           '<span class="' + (avail > 0 ? "stockpill in" : "stockpill out") + '">' +
             (avail > 0 ? "มีของพร้อมส่ง · เหลือ " + avail + " ชิ้น" : "สินค้าหมดชั่วคราว") + " · " + S.categoryLabel(p.category) + "</span>" +
@@ -625,6 +646,7 @@
             (p.forSale ? '<div class="pd-price-box"><div class="k">ราคาขาย</div><div class="v">' + S.money(p.price) + "</div></div>" : "") +
             (p.forRent ? '<div class="pd-price-box" data-rent-only><div class="k">ค่าเช่า / วัน</div><div class="v rent">' + S.money(p.rentPerDay) + "</div></div>" : "") +
           "</div><div class=\"buybox\" data-buybox></div>" +
+          quickGridHtml +
           '<div class="pd-rate-give"><span class="pd-rate-give-label">⭐ ให้คะแนนสินค้านี้</span>' + ratingWidget(p.id) + "</div>" +
           "<table class=specs><tbody><tr><th>รหัสสินค้า (SKU)</th><td>" + p.sku + "</td></tr>" +
             "<tr><th>การรับประกัน</th><td>" + (p.warrantyYears ? "ศูนย์ " + p.warrantyYears + " ปี" : "ตามเงื่อนไขร้าน") + "</td></tr>" +
@@ -651,12 +673,12 @@
       var sec = root.querySelector("[data-cross]"); var box = root.querySelector("[data-cross-list]"); if (!sec || !box) return;
       var byId = {}; S.getProducts().forEach(function (x) { byId[x.id] = x; });
       var picked = [], seen = {};
-      function add(id) { var x = byId[id]; if (x && !x.hidden && x.id !== p.id && !seen[id] && picked.length < 4) { seen[id] = 1; picked.push(x); } }
+      function add(id) { var x = byId[id]; if (x && S.isVisible(x) && x.id !== p.id && !seen[id] && picked.length < 4) { seen[id] = 1; picked.push(x); } }
       (p.relatedIds || []).forEach(add);                                  // 1) แอดมินตั้งเอง
       var cob = p.coBought || {};                                          // 2) เรียนรู้จากออเดอร์จริง (เรียงตามความถี่)
       Object.keys(cob).sort(function (x, y) { return (cob[y] || 0) - (cob[x] || 0); }).forEach(add);
       if (picked.length < 4) {                                            // 3) สำรอง: หมวด/แบรนด์เดียวกัน
-        var all = S.getProducts().filter(function (x) { return !x.hidden && x.id !== p.id; });
+        var all = S.getProducts().filter(function (x) { return S.isVisible(x) && x.id !== p.id; });
         all.filter(function (x) { return x.category === p.category; }).forEach(function (x) { add(x.id); });
         all.filter(function (x) { return x.brand === p.brand; }).forEach(function (x) { add(x.id); });
       }
@@ -668,7 +690,7 @@
     (function renderBattMates() {
       if (!p.batteryPlatform) return;
       var sec = root.querySelector("[data-battmates]"); var box = root.querySelector("[data-battmates-list]"); if (!sec || !box) return;
-      var mates = S.getProducts().filter(function (x) { return !x.hidden && x.id !== p.id && (x.batteryPlatform || "").toLowerCase() === p.batteryPlatform.toLowerCase(); }).slice(0, 4);
+      var mates = S.getProducts().filter(function (x) { return S.isVisible(x) && x.id !== p.id && (x.batteryPlatform || "").toLowerCase() === p.batteryPlatform.toLowerCase(); }).slice(0, 4);
       if (!mates.length) return;
       box.innerHTML = mates.map(cardHtml).join("");
       wireCards(box); sec.hidden = false;
@@ -715,10 +737,41 @@
         bb.querySelector("[data-d='1']").addEventListener("click", function () { days = days + 1; drawBuybox(); });
         bb.querySelector("[data-days]").addEventListener("change", function (e) { days = clampInt(e.target.value, 1, 365); drawBuybox(); });
       }
-      bb.querySelector("[data-add]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); U.toast("เพิ่ม <b>" + p.name + "</b> ลงตะกร้าแล้ว", "ok"); });
+      bb.querySelector("[data-add]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); U.toast("เพิ่ม <b>" + p.name + "</b> ลงตะกร้าแล้ว", "ok"); syncStickyPrice(); });
       bb.querySelector("[data-buynow]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); window.location.href = "cart.html"; });
     }
     drawBuybox();
+    mountStickyBar();
+
+    // ---- แถบปุ่มตรึงด้านล่าง (มือถือ) : แชท · ใส่ตะกร้า · ซื้อทันที(ราคา) ----
+    function syncStickyPrice() {
+      var el = document.querySelector(".pd-stickybar [data-sb-price]");
+      if (!el) return;
+      var unit = mode === "rent" ? p.rentPerDay : p.price;
+      var total = mode === "rent" ? unit * qty * days : unit * qty;
+      el.textContent = S.money(total);
+    }
+    function mountStickyBar() {
+      var old = document.querySelector(".pd-stickybar"); if (old) old.remove();
+      if (avail <= 0) return;
+      var bar = document.createElement("div");
+      bar.className = "pd-stickybar";
+      bar.innerHTML =
+        '<button class="sb-chat" data-sb-chat aria-label="แชทกับร้าน">' +
+          '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
+          "<span>แชท</span></button>" +
+        '<button class="sb-cart" data-sb-cart>🛒 ใส่ตะกร้า</button>' +
+        '<button class="sb-buy" data-sb-buy>ซื้อทันที · <b data-sb-price></b></button>';
+      document.body.appendChild(bar);
+      bar.querySelector("[data-sb-chat]").addEventListener("click", function () {
+        var fab = document.querySelector("[data-line-fab]");
+        if (fab) fab.click();
+        else { var oc = document.querySelector("[data-open-chat]"); if (oc) oc.click(); }
+      });
+      bar.querySelector("[data-sb-cart]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); U.toast("เพิ่ม <b>" + p.name + "</b> ลงตะกร้าแล้ว", "ok"); });
+      bar.querySelector("[data-sb-buy]").addEventListener("click", function () { S.addToCart(p.id, qty, mode, days); window.location.href = "cart.html"; });
+      syncStickyPrice();
+    }
   }
 
   /* ===================== CART + CHECKOUT ===================== */
@@ -1006,12 +1059,32 @@
       paidBtn.onclick = function () {
         if (!payStatus) { U.toast("กรุณาอัปโหลดสลิปให้ตรวจผ่านก่อน", "err"); return; }
         var co = Object.assign({}, checkout, { slip: slip, slipRef: slipRef, payStatus: payStatus, payAmount: payAmount, payMethod: "promptpay" });
-        var created = S.placeOrder(co);
-        close();
-        if (created && created.length) {
-          var ids = created.map(function (o) { return o.id; }).join(",");
-          window.location.href = "orders.html?new=" + encodeURIComponent(ids);
+
+        function finalize() {
+          var created = S.placeOrder(co);
+          close();
+          if (created && created.length) {
+            var ids = created.map(function (o) { return o.id; }).join(",");
+            window.location.href = "orders.html?new=" + encodeURIComponent(ids);
+          }
         }
+
+        // BigSeller: ตรวจสต็อกจริงที่คลังกลางอีกครั้งก่อนตัดเงิน (ถ้าเปิดฟีเจอร์ไว้)
+        // ปิด/ดึงไม่ได้ → ปล่อยผ่าน ใช้สต็อก local เดิม (ไม่ขวางการขาย)
+        var BS = window.BigSellerSync;
+        if (BS && BS.featureOn && BS.featureOn("stockPull")) {
+          var lines = (S.cartLines() || []).filter(function (l) { return l.mode === "buy"; })
+            .map(function (l) { return { sku: BS.merchantSku(l.product), qty: l.qty }; });
+          paidBtn.setAttribute("disabled", "disabled");
+          BS.finalStockCheck(lines).then(function (res) {
+            paidBtn.removeAttribute("disabled");
+            if (res.ok) { finalize(); return; }
+            var msg = (res.shortages || []).map(function (s) { return s.sku + " เหลือ " + s.have + " (สั่ง " + s.want + ")"; }).join(", ");
+            U.toast("สินค้าบางรายการเหลือไม่พอแล้ว: " + msg + " — กรุณาปรับจำนวนในตะกร้า", "err");
+          }).catch(function () { paidBtn.removeAttribute("disabled"); finalize(); });
+          return;
+        }
+        finalize();
       };
     }
 
@@ -1073,7 +1146,7 @@
         return;
       }
       // แต้มสะสมช่าง — คำนวณจากยอดซื้อสะสม (1 แต้ม / 100 บาท) + ระดับสมาชิก
-      var spend = orders.filter(function (o) { return o.status !== "cancelled"; }).reduce(function (s, o) { return s + (o.total || 0); }, 0);
+      var spend = orders.filter(function (o) { return o.status !== "cancelled" && !o.test; }).reduce(function (s, o) { return s + (o.total || 0); }, 0);
       var points = Math.floor(spend / 100);
       var tier = spend >= 100000 ? { n: "ช่างทอง 🥇", c: "#caa12a" } : spend >= 30000 ? { n: "ช่างเงิน 🥈", c: "#8a8a8a" } : { n: "ช่างทั่วไป 🔧", c: "var(--ink)" };
       var loyalty = '<div class="loyalty-card"><div><div class="loyalty-tier" style="color:' + tier.c + '">' + tier.n + "</div>" +
@@ -1119,6 +1192,119 @@
       wireRating(root);
     }
     render();
+  }
+
+  /* ===================== ACCOUNT (โปรไฟล์ลูกค้า — แก้เอง ซิงค์หลังร้าน) ===================== */
+  function initAccount() {
+    var guard = document.querySelector("[data-acct-guard]");
+    var root = document.querySelector("[data-acct-root]");
+    if (!root) return;
+
+    var sess = S.session();
+    if (!sess) { if (guard) guard.hidden = false; root.hidden = true; return; }
+    // พนักงาน/เจ้าของใช้หลังร้านอยู่แล้ว — ส่งไป dashboard
+    if (sess.role === "owner" || sess.role === "employee") { location.href = "admin/dashboard.html"; return; }
+
+    var form = root.querySelector("[data-acct-form]");
+    var msgEl = root.querySelector("[data-acct-msg]");
+    var nameEl = root.querySelector("[data-acct-name]");
+    var codeEl = root.querySelector("[data-acct-code]");
+    var verifyEl = root.querySelector("[data-acct-verify]");
+    var pending = { idCardImage: "", licenseImage: "" };
+
+    function f(name) { return form.querySelector('[data-f="' + name + '"]'); }
+    function setMsg(t, kind) { if (!msgEl) return; msgEl.textContent = t || ""; msgEl.className = "acct-msg" + (kind ? " " + kind : ""); }
+    function verifyBadge(status) {
+      if (status === "verified") return { cls: "ok", txt: "● ยืนยันตัวตนแล้ว" };
+      if (status === "pending") return { cls: "pending", txt: "● รอตรวจสอบ" };
+      return { cls: "none", txt: "● ยังไม่ยืนยันตัวตน" };
+    }
+
+    // เติมค่าเริ่มต้นจาก session ทันที (ก่อน cloud มาถึง) — ลื่นไหล
+    root.hidden = false;
+    if (guard) guard.hidden = true;
+    nameEl.textContent = sess.name || "ลูกค้า";
+    if (f("email")) f("email").value = sess.email || "";
+
+    setMsg("กำลังโหลดข้อมูล…");
+    S.loadMyProfile().then(function (r) {
+      setMsg("");
+      codeEl.textContent = r.code;
+      var p = r.profile || {};
+      // ชื่อ-นามสกุล: ใช้ค่าที่เคยกรอก ถ้าไม่มีลองแยกจากชื่อ session
+      var fn = p.firstName, ln = p.lastName;
+      if (!fn && !ln && sess.name) { var parts = String(sess.name).trim().split(/\s+/); fn = parts.shift() || ""; ln = parts.join(" "); }
+      if (f("firstName")) f("firstName").value = fn || "";
+      if (f("lastName")) f("lastName").value = ln || "";
+      if (f("phone")) f("phone").value = p.phone || "";
+      if (f("email")) f("email").value = p.email || sess.email || "";
+      if (f("address")) f("address").value = p.address || "";
+      var disp = ((fn || "") + " " + (ln || "")).trim() || sess.name || "ลูกค้า";
+      nameEl.textContent = disp;
+      var vb = verifyBadge(p.verifyStatus);
+      verifyEl.className = "acct-badge " + vb.cls;
+      verifyEl.textContent = vb.txt;
+      // ถ้าเคยอัปโหลดเอกสารแล้ว — โชว์ว่ามีไฟล์
+      if (p.idCardImage) { var il = root.querySelector("[data-acct-id-label]"); if (il) il.textContent = "✓ บัตรประชาชน (อัปโหลดแล้ว)"; }
+      if (p.licenseImage) { var ll = root.querySelector("[data-acct-lic-label]"); if (ll) ll.textContent = "✓ ใบขับขี่/ใบรับรอง (อัปโหลดแล้ว)"; }
+    }).catch(function (err) {
+      // ยังไม่ได้ตั้ง Firebase / ออฟไลน์ — แก้แบบ local ได้ แต่เตือนว่าซิงค์ไม่ได้
+      setMsg("โหมดออฟไลน์: บันทึกได้แต่จะยังไม่ซิงค์ขึ้นระบบหลังร้าน (" + (err && err.message ? err.message : "ไม่ได้เชื่อมต่อ") + ")", "warn");
+      codeEl.textContent = S.customerCode((sess && sess.uid) || (sess && sess.email) || "");
+    });
+
+    // อัปโหลดเอกสารยืนยันตัวตน → อ่านเป็น base64 เก็บไว้ส่งตอนบันทึก
+    function wireUpload(inputSel, labelSel, key, label) {
+      var input = root.querySelector(inputSel);
+      var lab = root.querySelector(labelSel);
+      if (!input) return;
+      input.addEventListener("change", function () {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        // ย่อรูป (≤1000px, JPEG) ก่อน — กันเอกสารเกินลิมิต Firestore 1MiB
+        compressImage(file, function (dataUrl) {
+          pending[key] = dataUrl;
+          if (lab) lab.textContent = "✓ " + label + " (พร้อมอัปโหลด)";
+        });
+      });
+    }
+    wireUpload("[data-acct-id]", "[data-acct-id-label]", "idCardImage", "บัตรประชาชน");
+    wireUpload("[data-acct-lic]", "[data-acct-lic-label]", "licenseImage", "ใบขับขี่/ใบรับรอง");
+
+    var vToggle = root.querySelector("[data-acct-verify-toggle]");
+    var vBody = root.querySelector("[data-acct-verify-body]");
+    if (vToggle && vBody) vToggle.addEventListener("click", function () { vBody.hidden = !vBody.hidden; });
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var data = {
+        firstName: (f("firstName") && f("firstName").value || "").trim(),
+        lastName: (f("lastName") && f("lastName").value || "").trim(),
+        phone: (f("phone") && f("phone").value || "").trim(),
+        email: (f("email") && f("email").value || "").trim(),
+        address: (f("address") && f("address").value || "").trim(),
+        idCardImage: pending.idCardImage,
+        licenseImage: pending.licenseImage,
+      };
+      if (!data.firstName) { U.toast("กรุณากรอกชื่อ", "err"); return; }
+      var btn = form.querySelector(".acct-save-btn");
+      if (btn) { btn.disabled = true; btn.textContent = "กำลังบันทึก…"; }
+      setMsg("");
+      S.saveMyProfile(data).then(function (r) {
+        if (btn) { btn.disabled = false; btn.textContent = "💾 บันทึก"; }
+        U.toast("บันทึกข้อมูลแล้ว", "ok");
+        var disp = (data.firstName + " " + data.lastName).trim();
+        nameEl.textContent = disp || (sess.name || "ลูกค้า");
+        if (r && r.code) codeEl.textContent = r.code;
+        if (data.idCardImage || data.licenseImage) {
+          verifyEl.className = "acct-badge pending"; verifyEl.textContent = "● รอตรวจสอบ";
+          pending.idCardImage = ""; pending.licenseImage = "";
+        }
+      }).catch(function (err) {
+        if (btn) { btn.disabled = false; btn.textContent = "💾 บันทึก"; }
+        U.toast("บันทึกไม่สำเร็จ: " + (err && err.message ? err.message : "ลองใหม่อีกครั้ง"), "err");
+      });
+    });
   }
 
   // ขอใบเสนอราคา — จากตะกร้า (B2B/ซื้อจำนวนมาก)
@@ -1309,7 +1495,7 @@
     if (!box) return;
     pageRefresh = initCatalog; // re-วาดเมื่อแคตตาล็อกจาก cloud มาถึง
     var st = S.getSettings();
-    var products = S.getProducts().filter(function (p) { return !p.hidden; });
+    var products = S.getVisibleProducts();
 
     var brandOrder = (st.brands || []).filter(function (b) { return !b.hidden; }).map(function (b) { return b.name; });
     var present = uniq(products.map(function (p) { return p.brand; }).filter(Boolean));
@@ -1938,9 +2124,16 @@
         (b.primary ? '<div class="me-brand-stamp">ศูนย์แท้</div>' : "") + "</a>";
     }
     var one = list.map(card).join("");
-    // 3 ชุดต่อกัน เริ่มที่ชุดกลาง → เลื่อนเองด้วย rAF (ลื่น) และผู้ใช้เลื่อนมือเองก็ได้ (native scroll)
-    box.innerHTML = list.length ? ('<div class="me-brands-track">' + one + one + one + "</div>") : "";
-    setupBrandsAuto(box, list.length);
+    if (!list.length) { box.innerHTML = ""; setupBrandsAuto(box, 0); return; }
+    // ถ้ามีแบรนด์น้อย (≤2) แสดงแบบ static ไม่ต้อง loop ซ้ำ 3 รอบ
+    if (list.length <= 2) {
+      box.innerHTML = '<div class="me-brands-track me-brands-static">' + one + "</div>";
+      setupBrandsAuto(box, 0);
+    } else {
+      // 3 ชุดต่อกัน เริ่มที่ชุดกลาง → เลื่อนเองด้วย rAF (ลื่น) และผู้ใช้เลื่อนมือเองก็ได้ (native scroll)
+      box.innerHTML = '<div class="me-brands-track">' + one + one + one + "</div>";
+      setupBrandsAuto(box, list.length);
+    }
   }
   // เลื่อนแบรนด์อัตโนมัติแบบลื่น (requestAnimationFrame) + รองรับเลื่อนมือ + หยุดเมื่อแตะ/ชี้
   function setupBrandsAuto(box, n) {

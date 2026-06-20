@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BigSeller Sync — M.E.Tools หลังร้าน</title>
+  <link rel="stylesheet" href="../assets/admin.css?v=20260620c">
+  <style>
+    .bs-card { background:var(--bg-1); border:1px solid var(--border-3); border-radius:10px; padding:20px; margin-bottom:16px }
+    .bs-card h2 { margin:0 0 6px; font-size:16px }
+    .bs-card .sub { font-size:13px; color:var(--fg-2); margin-bottom:14px; line-height:1.55 }
+    .bs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px }
+    .bs-field { display:flex; flex-direction:column; gap:5px }
+    .bs-field label { font-size:11px; font-weight:700; color:var(--fg-2); text-transform:uppercase; letter-spacing:.05em }
+    .bs-field input[type=text], .bs-field input[type=number], .bs-field select { padding:9px 11px; border:1px solid var(--border-3); border-radius:7px; font-family:var(--font-body); font-size:14px; background:#fff }
+    .bs-field input:focus, .bs-field select:focus { outline:none; border-color:var(--accent,#FFB81C); box-shadow:0 0 0 3px rgba(255,184,28,.18) }
+    .bs-checks { display:flex; gap:16px; flex-wrap:wrap; margin:4px 0 6px }
+    .bs-check { display:flex; align-items:center; gap:7px; font-size:14px; font-weight:600 }
+    .bs-btn { padding:10px 20px; font-family:var(--font-body); font-weight:700; font-size:14px; border-radius:8px; border:1px solid var(--ink,#0b0b0b); cursor:pointer; background:var(--accent,#FFB81C); color:var(--ink,#0b0b0b) }
+    .bs-btn:disabled { opacity:.5; cursor:not-allowed }
+    .bs-btn-ghost { background:#fff }
+    .bs-foot { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; padding-top:12px; border-top:1px solid var(--border-3) }
+    .bs-status { font-size:13px; color:var(--fg-2) }
+    .bs-file { padding:9px 12px; border:1px dashed var(--border-3); border-radius:8px; background:#fff; width:100%; box-sizing:border-box; font-size:13px }
+    .bs-meta { display:flex; gap:18px; flex-wrap:wrap; font-size:12px; color:var(--fg-2); margin-top:10px }
+    .bs-meta b { color:var(--fg) }
+    .bs-table-wrap { overflow:auto; max-height:420px; border:1px solid var(--border-3); border-radius:8px; margin-top:10px }
+    .bs-table { border-collapse:collapse; width:100%; font-size:12.5px }
+    .bs-table th, .bs-table td { border:1px solid var(--border-3); padding:6px 9px; text-align:left; white-space:nowrap }
+    .bs-table th { background:var(--bg-2); position:sticky; top:0; z-index:1 }
+    .bs-table td.num { text-align:right; font-variant-numeric:tabular-nums }
+    .bs-row-bad { background:#fff3f3 }
+    .bs-tag { display:inline-block; font-size:11px; font-weight:700; padding:2px 9px; border-radius:999px }
+    .bs-tag.ok { background:#e8f8ee; color:#1a7a3c; border:1px solid #b6e6c6 }
+    .bs-tag.bad { background:#fdecec; color:#c0392b; border:1px solid #f3c2c2 }
+    .bs-note { background:#fff8e8; border:1px solid #ffe2a8; border-radius:8px; padding:12px 14px; font-size:13px; line-height:1.55; margin-bottom:14px }
+    .bs-map-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:6px }
+    .bs-map-row .bs-field { flex:1; min-width:160px }
+    .divider { border:none; border-top:1px solid var(--border-3); margin:18px 0 }
+  </style>
+</head>
+<body data-admin="bigseller">
+  <div class="admin" data-shell>
+    <main class="main">
+      <div class="topbar">
+        <div><h1>BigSeller Sync</h1><div class="sub">เชื่อมแคตตาล็อก/สต็อก/ออเดอร์ของร้านเข้ากับ BigSeller (Shopee · Lazada · TikTok Shop) ผ่านไฟล์นำเข้า–ส่งออก</div></div>
+      </div>
+
+      <div class="alert" data-alert style="display:none"></div>
+
+      <div class="bs-note">
+        ℹ️ <b>วิธีทำงาน:</b> BigSeller รับ–ส่งข้อมูลด้วยไฟล์ Excel/CSV เป็นหลัก โมดูลนี้จึง (1) สร้างไฟล์สินค้า/สต็อกในรูปแบบที่อัปโหลดเข้า BigSeller ได้ และ (2) อ่านไฟล์ออเดอร์ที่ส่งออกจาก BigSeller มาตัดสต็อกในคลังของร้านอัตโนมัติ — ไม่ต้องคีย์ซ้ำสองที่
+      </div>
+
+      <!-- ========== 1) Connection settings ========== -->
+      <div class="bs-card">
+        <h2>⚙️ ตั้งค่าการเชื่อมต่อ</h2>
+        <div class="sub">ตั้งค่าครั้งเดียว ใช้กับทุกไฟล์ที่สร้าง — ค่าเหล่านี้ถูกบันทึกไว้ในระบบหลังร้าน</div>
+        <div class="bs-grid">
+          <div class="bs-field"><label>ชื่อร้านบน BigSeller</label><input type="text" id="bsShop" placeholder="เช่น M.E.Tools ท่ารั้ว"></div>
+          <div class="bs-field"><label>บวกราคาขายบนมาร์เก็ตเพลส (%)</label><input type="number" id="bsMarkup" min="0" step="1" placeholder="0"></div>
+          <div class="bs-field"><label>น้ำหนักพัสดุเริ่มต้น (กก.)</label><input type="number" id="bsWeight" min="0" step="0.1" placeholder="1"></div>
+          <div class="bs-field"><label>คำนำหน้า SKU (ไม่บังคับ)</label><input type="text" id="bsPrefix" placeholder="เช่น MET-"></div>
+        </div>
+        <div style="margin-top:12px">
+          <label style="font-size:11px;font-weight:700;color:var(--fg-2);text-transform:uppercase;letter-spacing:.05em">ช่องทางการขายที่เชื่อม</label>
+          <div class="bs-checks" id="bsChannels">
+            <label class="bs-check"><input type="checkbox" value="Shopee"> Shopee</label>
+            <label class="bs-check"><input type="checkbox" value="Lazada"> Lazada</label>
+            <label class="bs-check"><input type="checkbox" value="TikTok Shop"> TikTok Shop</label>
+          </div>
+        </div>
+        <div class="bs-foot">
+          <button class="bs-btn" id="bsSaveCfg">บันทึกการตั้งค่า</button>
+          <span class="bs-status" id="bsCfgStatus"></span>
+        </div>
+        <div class="bs-meta" id="bsMeta"></div>
+      </div>
+
+      <!-- ========== 1b) Live API sync settings ========== -->
+      <div class="bs-card">
+        <h2>🔌 ซิงค์ผ่าน API (ออนไลน์) — เปิดทีละขาเมื่อพร้อม</h2>
+        <div class="sub">
+          การซิงค์อัตโนมัติผ่าน BigSeller Open API วิ่งผ่านเซิร์ฟเวอร์ของเรา (<code>/api/bigseller-sync</code>)
+          ที่ถือ API key ไว้ฝั่ง server เพื่อความปลอดภัย — ตั้งค่า <b>BIGSELLER_API_KEY</b> ใน Vercel ก่อน
+          ถ้ายังไม่ตั้ง ระบบจะทำงานแบบ <b>ทดลอง (dry-run)</b> ไม่ส่งจริง เพื่อไม่ให้เว็บรวน
+        </div>
+        <label class="bs-check" style="margin-bottom:10px"><input type="checkbox" id="bsEnabled"> <b>เปิดการซิงค์ผ่าน API</b> (สวิตช์หลัก — ปิดไว้ = ปลอดภัย ใช้แต่ไฟล์)</label>
+        <div class="sub" style="margin:2px 0 6px"><b>เปิดทีละฟีเจอร์</b> (แนะนำเริ่มจาก “ดึงสต็อก” อ่านอย่างเดียวก่อน):</div>
+        <div class="bs-checks">
+          <label class="bs-check"><input type="checkbox" id="bsFeatStock"> ① ดึงสต็อกจาก BigSeller (อ่านอย่างเดียว)</label>
+          <label class="bs-check"><input type="checkbox" id="bsFeatProduct"> ② ส่งสินค้าขึ้น BigSeller ตอนบันทึก</label>
+          <label class="bs-check"><input type="checkbox" id="bsFeatOrder"> ③ ส่งออเดอร์ไป BigSeller ตอนลูกค้าสั่ง</label>
+        </div>
+        <div class="sub" style="margin:10px 0 4px"><b>ขนาดกล่องพัสดุเริ่มต้น</b> (ซม. — ส่งไปกับสินค้า ใช้คำนวณค่าส่งฝั่งมาร์เก็ตเพลส)</div>
+        <div class="bs-grid">
+          <div class="bs-field"><label>กว้าง (W)</label><input type="number" id="bsDimW" min="0" step="0.1" placeholder="0"></div>
+          <div class="bs-field"><label>ยาว (L)</label><input type="number" id="bsDimL" min="0" step="0.1" placeholder="0"></div>
+          <div class="bs-field"><label>สูง (H)</label><input type="number" id="bsDimH" min="0" step="0.1" placeholder="0"></div>
+        </div>
+        <div class="bs-foot">
+          <button class="bs-btn" id="bsSaveApi">บันทึกการตั้งค่า API</button>
+          <span class="bs-status" id="bsApiStatus"></span>
+        </div>
+      </div>
+
+      <!-- ========== Phase 1: read-only stock pull ========== -->
+      <div class="bs-card">
+        <h2>① ทดสอบดึงสต็อกจาก BigSeller (read-only)</h2>
+        <div class="sub">ขั้นปลอดภัยที่สุด — อ่านจำนวนสต็อกจริงจากคลังกลาง BigSeller มาเทียบกับเว็บ โดยไม่แก้ไขข้อมูลใด ๆ (ต้องเปิดฟีเจอร์ ① และตั้ง API key ก่อน)</div>
+        <div class="bs-foot" style="border:none;padding-top:0;margin-top:0">
+          <button class="bs-btn bs-btn-ghost" id="bsTestStock">📡 ดึงสต็อกมาเทียบ</button>
+          <span class="bs-status" id="bsTestStatus"></span>
+        </div>
+        <div class="bs-table-wrap" id="bsStockCmpWrap" style="display:none"><table class="bs-table" id="bsStockCmp"></table></div>
+      </div>
+
+      <!-- ========== Webhook events (inbound) ========== -->
+      <div class="bs-card">
+        <h2>📨 เหตุการณ์จาก BigSeller (Webhook ขาเข้า)</h2>
+        <div class="sub">
+          เมื่อมีออเดอร์/ยกเลิก/คืนสินค้า/ออกเลขพัสดุจาก Shopee·Lazada·TikTok ผ่าน BigSeller จะถูกส่งมาที่
+          <code>/api/bigseller-webhook</code> และบันทึกไว้ที่นี่ กด “ใช้เหตุการณ์” เพื่อให้ระบบ
+          <b>ตัด/บวกสต็อก + ลงบัญชี</b> ผ่านโค้ดเดิมที่ปลอดภัย (ไม่แตะ catalog โดยตรง)
+        </div>
+        <div class="bs-foot" style="border:none;padding-top:0;margin-top:0">
+          <button class="bs-btn bs-btn-ghost" id="bsLoadEvents">🔄 โหลดเหตุการณ์ใหม่</button>
+          <label class="bs-check"><input type="checkbox" id="bsAutoApply"> ใช้อัตโนมัติเมื่อเปิดหน้านี้</label>
+          <span class="bs-status" id="bsEventsStatus"></span>
+        </div>
+        <div class="bs-table-wrap" id="bsEventsWrap" style="display:none"><table class="bs-table" id="bsEventsTable"></table></div>
+      </div>
+
+      <!-- ========== Sync log ========== -->
+      <div class="bs-card">
+        <h2>🧾 บันทึกการซิงค์ (Sync Log)</h2>
+        <div class="sub">ประวัติการส่งข้อมูลขาออกล่าสุด (สำเร็จ/เข้าคิว/ลองใหม่/ผิดพลาด/ทดลอง) — ช่วยตรวจสอบเวลาเชื่อมต่อจริง</div>
+        <div class="bs-foot" style="border:none;padding-top:0;margin-top:0">
+          <button class="bs-btn bs-btn-ghost" id="bsRefreshLog">🔄 รีเฟรช</button>
+          <button class="bs-btn bs-btn-ghost" id="bsClearLog">ล้าง log</button>
+          <span class="bs-status" id="bsQueueStatus"></span>
+        </div>
+        <div class="bs-table-wrap" id="bsLogWrap" style="display:none"><table class="bs-table" id="bsLogTable"></table></div>
+      </div>
+
+      <!-- ========== 2) Export catalog ========== -->
+      <div class="bs-card">
+        <h2>⤴ ส่งออกแคตตาล็อกสินค้า → BigSeller</h2>
+        <div class="sub">สร้างไฟล์ Excel รายการสินค้าสำหรับอัปโหลดเข้า BigSeller (Mass Import) → BigSeller จะกระจายไปลงร้าน Shopee/Lazada/TikTok ให้</div>
+        <div class="bs-checks">
+          <label class="bs-check"><input type="checkbox" id="bsOnlySale" checked> เฉพาะสินค้าที่ตั้ง “ขาย”</label>
+          <label class="bs-check"><input type="checkbox" id="bsInStock"> เฉพาะที่มีของพร้อมขาย (คงเหลือ &gt; 0)</label>
+          <label class="bs-check"><input type="checkbox" id="bsApplyMarkup" checked> ใช้ราคาบวก % ตามการตั้งค่า</label>
+        </div>
+        <div class="bs-foot">
+          <button class="bs-btn" id="bsExportProducts">📦 ดาวน์โหลดไฟล์สินค้า</button>
+          <span class="bs-status" id="bsExportStatus"></span>
+        </div>
+        <div class="sub" style="margin:10px 0 0;color:#a07000">⚠️ คอลัมน์รูปภาพจะมีลิงก์เฉพาะสินค้าที่ย้ายรูปขึ้น Storage แล้ว (ลิงก์ http) — รูปแบบฝังในเครื่อง (data:) อัปโหลดเข้า BigSeller ไม่ได้ แนะนำกดปุ่ม “ย้ายรูปขึ้น Storage” ในหน้าคลังก่อน</div>
+      </div>
+
+      <!-- ========== 3) Stock update file ========== -->
+      <div class="bs-card">
+        <h2>🔄 อัปเดตสต็อกขึ้น BigSeller</h2>
+        <div class="sub">สร้างไฟล์ SKU + จำนวนคงเหลือ สำหรับเครื่องมือ “Stock Update / แก้ไขจำนวนสินค้าจำนวนมาก” ของ BigSeller — ใช้ดันยอดสต็อกล่าสุดของร้านขึ้นทุกแพลตฟอร์มพร้อมกัน</div>
+        <div class="bs-foot">
+          <button class="bs-btn bs-btn-ghost" id="bsExportStock">🔢 ดาวน์โหลดไฟล์สต็อก</button>
+          <span class="bs-status" id="bsStockStatus"></span>
+        </div>
+      </div>
+
+      <!-- ========== 4) Import orders ========== -->
+      <div class="bs-card">
+        <h2>📥 นำเข้าออเดอร์จาก BigSeller</h2>
+        <div class="sub">อัปโหลดไฟล์ออเดอร์ที่ส่งออกจาก BigSeller (.xlsx / .csv) → ระบบจับคู่ SKU กับคลัง แสดงตัวอย่าง แล้วตัดสต็อก + ลงบัญชีรายรับให้ในคลิกเดียว</div>
+        <input type="file" id="bsOrderFile" class="bs-file" accept=".xlsx,.xls,.csv">
+
+        <div id="bsMapWrap" style="display:none">
+          <hr class="divider">
+          <div class="sub" style="margin-bottom:2px"><b>จับคู่คอลัมน์</b> — ระบบเดาให้แล้ว ปรับได้ถ้าไฟล์ใช้ชื่อหัวตารางต่างออกไป</div>
+          <div class="bs-map-row">
+            <div class="bs-field"><label>เลขที่คำสั่งซื้อ</label><select id="bsColOrder"></select></div>
+            <div class="bs-field"><label>SKU สินค้า</label><select id="bsColSku"></select></div>
+            <div class="bs-field"><label>จำนวน</label><select id="bsColQty"></select></div>
+            <div class="bs-field"><label>ยอดเงิน (ไม่บังคับ)</label><select id="bsColAmt"></select></div>
+          </div>
+          <div class="bs-foot" style="border:none;padding-top:6px">
+            <button class="bs-btn bs-btn-ghost" id="bsPreviewOrders">👁️ ดูตัวอย่าง / จับคู่</button>
+          </div>
+        </div>
+
+        <div id="bsOrderPreview" style="display:none">
+          <div class="bs-meta" id="bsOrderSummary" style="margin-top:14px"></div>
+          <div class="bs-table-wrap"><table class="bs-table" id="bsOrderTable"></table></div>
+          <div class="bs-checks" style="margin-top:14px">
+            <label class="bs-check"><input type="checkbox" id="bsDoStock" checked> ตัดสต็อกตาม SKU ที่จับคู่ได้</label>
+            <label class="bs-check"><input type="checkbox" id="bsDoLedger" checked> ลงบัญชีรายรับใน ERP</label>
+          </div>
+          <div class="bs-foot" style="border:none">
+            <button class="bs-btn" id="bsApplyOrders">✅ ยืนยันตัดสต็อก + ลงบัญชี</button>
+            <span class="bs-status" id="bsApplyStatus"></span>
+          </div>
+          <div class="sub" style="margin-top:8px">กันยอดซ้ำ: ระบบจำเลขออเดอร์ที่เคยนำเข้าแล้ว และจะข้ามให้อัตโนมัติถ้าอัปโหลดไฟล์เดิมซ้ำ</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="../assets/thai-geo.js?v=20260620c"></script>
+  <script src="../assets/store.js?v=20260620c"></script>
+  <script src="../assets/bigseller-sync.js?v=20260620c"></script>
+  <script src="../assets/ui.js?v=20260620c"></script>
+  <script src="../assets/admin.js?v=20260620c"></script>
+  <script>
+  (function () {
+    "use strict";
+    var S = window.MEStore, U = window.MEUI;
+    if (!S) return;
+
+    var $ = function (id) { return document.getElementById(id); };
+    function setAlert(msg, kind) {
+      var a = document.querySelector("[data-alert]");
+      if (!a) return;
+      if (!msg) { a.style.display = "none"; return; }
+      a.style.display = "block"; a.textContent = msg;
+      a.style.background = kind === "err" ? "#fee" : kind === "ok" ? "#efe" : "";
+    }
+    function toast(msg, kind) { if (U && U.toast) U.toast(msg, kind); else setAlert(msg, kind); }
+    function num(v) { var n = parseFloat(String(v == null ? "" : v).replace(/[, ]/g, "")); return isFinite(n) ? n : 0; }
+    function dstamp() { var d = new Date(), z = function (n) { return (n < 10 ? "0" : "") + n; }; return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()); }
+    function fmtTime(ts) { if (!ts) return "—"; try { return new Date(ts).toLocaleString("th-TH"); } catch (e) { return "—"; } }
+
+    /* ---------- config (persisted under settings.bigseller) ---------- */
+    function cfg() { return (S.getSettings() || {}).bigseller || {}; }
+    function saveCfg(patch) {
+      var next = Object.assign({}, cfg(), patch);
+      S.saveSettings({ bigseller: next });
+      return next;
+    }
+
+    function loadCfg() {
+      var c = cfg();
+      $("bsShop").value = c.shop || "";
+      $("bsMarkup").value = c.markup != null ? c.markup : "";
+      $("bsWeight").value = c.weight != null ? c.weight : "";
+      $("bsPrefix").value = c.skuPrefix || "";
+      var chans = c.channels || [];
+      Array.prototype.forEach.call($("bsChannels").querySelectorAll("input"), function (cb) {
+        cb.checked = chans.indexOf(cb.value) >= 0;
+      });
+      // API live-sync settings
+      var sync = c.sync || {}, dims = c.dims || {};
+      $("bsEnabled").checked = !!c.enabled;
+      $("bsFeatStock").checked = !!sync.stockPull;
+      $("bsFeatProduct").checked = !!sync.product;
+      $("bsFeatOrder").checked = !!sync.order;
+      $("bsDimW").value = dims.width != null ? dims.width : "";
+      $("bsDimL").value = dims.length != null ? dims.length : "";
+      $("bsDimH").value = dims.height != null ? dims.height : "";
+      renderMeta();
+    }
+    function renderMeta() {
+      var c = cfg();
+      $("bsMeta").innerHTML =
+        "<span>ส่งออกสินค้าล่าสุด: <b>" + fmtTime(c.lastProductExport) + "</b></span>" +
+        "<span>อัปเดตสต็อกล่าสุด: <b>" + fmtTime(c.lastStockExport) + "</b></span>" +
+        "<span>นำเข้าออเดอร์ล่าสุด: <b>" + fmtTime(c.lastOrderImport) + "</b></span>" +
+        "<span>ออเดอร์ที่นำเข้าแล้ว: <b>" + ((c.importedOrders || []).length) + "</b></span>";
+    }
+
+    $("bsSaveCfg").addEventListener("click", function () {
+      var chans = [];
+      Array.prototype.forEach.call($("bsChannels").querySelectorAll("input"), function (cb) { if (cb.checked) chans.push(cb.value); });
+      saveCfg({
+        shop: $("bsShop").value.trim(),
+        markup: num($("bsMarkup").value),
+        weight: num($("bsWeight").value),
+        skuPrefix: $("bsPrefix").value.trim(),
+        channels: chans,
+      });
+      $("bsCfgStatus").textContent = "บันทึกแล้ว ✓";
+      setTimeout(function () { $("bsCfgStatus").textContent = ""; }, 2500);
+      renderMeta();
+    });
+
+    /* ---------- 1b) API live-sync settings ---------- */
+    $("bsSaveApi").addEventListener("click", function () {
+      saveCfg({
+        enabled: $("bsEnabled").checked,
+        sync: { stockPull: $("bsFeatStock").checked, product: $("bsFeatProduct").checked, order: $("bsFeatOrder").checked },
+        dims: { width: num($("bsDimW").value), length: num($("bsDimL").value), height: num($("bsDimH").value) },
+      });
+      $("bsApiStatus").textContent = "บันทึกแล้ว ✓ " + ($("bsEnabled").checked ? "(ซิงค์ API เปิด)" : "(ปิดอยู่ — ใช้แต่ไฟล์)");
+      setTimeout(function () { $("bsApiStatus").textContent = ""; }, 3500);
+    });
+
+    /* ---------- ① read-only stock test (Phase 1) ---------- */
+    $("bsTestStock").addEventListener("click", function () {
+      var BS = window.BigSellerSync;
+      if (!BS) { $("bsTestStatus").textContent = "โมดูลซิงค์ยังไม่โหลด"; return; }
+      if (!BS.featureOn("stockPull")) { $("bsTestStatus").textContent = "เปิดฟีเจอร์ ① และกดบันทึกการตั้งค่า API ก่อน"; return; }
+      var prods = S.getProducts();
+      var skus = prods.map(function (p) { return BS.merchantSku(p); });
+      $("bsTestStatus").textContent = "กำลังดึง…";
+      BS.pullStock(skus).then(function (res) {
+        if (!res.ok) {
+          $("bsTestStatus").textContent = res.configured === false
+            ? "เซิร์ฟเวอร์ยังไม่ตั้ง BIGSELLER_API_KEY (ยัง dry-run)"
+            : "ดึงไม่สำเร็จ (ตรวจ API key / endpoint)";
+          return;
+        }
+        var have = {};
+        (res.items || []).forEach(function (it) { have[String(it.sku)] = Number(it.stock) || 0; });
+        var rows = prods.map(function (p) {
+          var sku = BS.merchantSku(p), bs = have[sku], local = S.available(p);
+          var diff = bs == null ? null : bs - local;
+          return { sku: sku, name: p.name, local: local, bs: bs, diff: diff };
+        });
+        $("bsStockCmp").innerHTML =
+          "<tr><th>SKU</th><th>สินค้า</th><th>สต็อกเว็บ</th><th>สต็อก BigSeller</th><th>ต่าง</th></tr>" +
+          rows.map(function (r) {
+            var bsTxt = r.bs == null ? "—" : r.bs;
+            var diffTxt = r.diff == null ? "—" : (r.diff === 0 ? "ตรงกัน" : (r.diff > 0 ? "+" + r.diff : r.diff));
+            return "<tr class='" + (r.diff && r.diff !== 0 ? "bs-row-bad" : "") + "'><td>" + r.sku + "</td><td>" + (r.name || "") +
+              "</td><td class='num'>" + r.local + "</td><td class='num'>" + bsTxt + "</td><td class='num'>" + diffTxt + "</td></tr>";
+          }).join("");
+        $("bsStockCmpWrap").style.display = "";
+        $("bsTestStatus").textContent = "ดึงสำเร็จ (เทียบ " + rows.length + " รายการ) — โหมดอ่านอย่างเดียว ไม่แก้ข้อมูล";
+      });
+    });
+
+    /* ---------- webhook events (inbound) → apply ผ่านโค้ดเดิมที่ปลอดภัย ---------- */
+    // อ่าน/อัปเดตผ่าน SDK ที่ล็อกอินแอดมินแล้ว (กฎ Firestore: bigseller_events ต้อง isAdmin())
+    function withAdminDb(cb, onErr) {
+      if (!S.loadFirebaseAuthAndDb) { if (onErr) onErr(); return; }
+      var pre = S.ensureAdminRegistered ? S.ensureAdminRegistered() : Promise.resolve();
+      pre.then(function () { return S.loadFirebaseAuthAndDb("admin"); }).then(cb).catch(function () { if (onErr) onErr(); });
+    }
+    var eventsState = [];
+    function loadEvents() {
+      $("bsEventsStatus").textContent = "กำลังโหลด…";
+      withAdminDb(function (m) {
+        var fs = m.fsMod;
+        fs.getDocs(fs.collection(m.db, "bigseller_events")).then(function (snap) {
+          eventsState = snap.docs.map(function (d) { var o = d.data() || {}; o._id = d.id; return o; })
+            .filter(function (e) { return !e.processed; });
+          renderEvents();
+          $("bsEventsStatus").textContent = eventsState.length ? ("ค้างอยู่ " + eventsState.length + " เหตุการณ์") : "ไม่มีเหตุการณ์ค้าง";
+          if ($("bsAutoApply").checked) eventsState.slice().forEach(applyEvent);
+        }).catch(function () { $("bsEventsStatus").textContent = "โหลดเหตุการณ์ไม่สำเร็จ (ตรวจสิทธิ์/กฎ Firestore)"; });
+      }, function () { $("bsEventsStatus").textContent = "ยังไม่ได้เชื่อม Firebase — webhook ใช้ไม่ได้"; });
+    }
+    function typeLabel(t) { return { sale: "ขายออก", cancel: "ยกเลิก", "return": "คืนสินค้า", shipped: "ออกพัสดุ" }[t] || t; }
+    function renderEvents() {
+      if (!eventsState.length) { $("bsEventsWrap").style.display = "none"; return; }
+      $("bsEventsTable").innerHTML =
+        "<tr><th>ชนิด</th><th>ออเดอร์</th><th>ช่องทาง</th><th>รายการ</th><th>เลขพัสดุ</th><th></th></tr>" +
+        eventsState.map(function (e, i) {
+          var items = (e.items || []).map(function (it) { return it.sku + "×" + it.qty; }).join(", ");
+          return "<tr><td>" + typeLabel(e.type) + "</td><td>" + (e.orderRef || "—") + "</td><td>" + (e.channel || "—") +
+            "</td><td>" + (items || "—") + "</td><td>" + (e.tracking || "—") + "</td>" +
+            "<td><button class='bs-btn bs-btn-ghost' data-applyev='" + i + "' style='padding:4px 10px'>ใช้</button></td></tr>";
+        }).join("");
+      Array.prototype.forEach.call($("bsEventsTable").querySelectorAll("[data-applyev]"), function (b) {
+        b.addEventListener("click", function () { applyEvent(eventsState[+b.getAttribute("data-applyev")]); });
+      });
+      $("bsEventsWrap").style.display = "";
+    }
+    function findProductBySkuExact(sku) {
+      sku = String(sku || "").trim().toLowerCase();
+      var pre = (cfg().skuPrefix || "").toLowerCase();
+      var bare = pre && sku.indexOf(pre) === 0 ? sku.slice(pre.length) : sku;
+      return S.getProducts().filter(function (p) {
+        var ps = String(p.sku || "").toLowerCase(), pid = String(p.id || "").toLowerCase();
+        return ps === sku || ps === bare || pid === sku || pid === bare;
+      })[0];
+    }
+    function markEventProcessed(ev) {
+      withAdminDb(function (m) {
+        var fs = m.fsMod;
+        fs.setDoc(fs.doc(m.db, "bigseller_events", ev._id), { processed: true, processedAt: fs.serverTimestamp() }, { merge: true }).catch(function () {});
+      });
+    }
+    function applyEvent(ev) {
+      if (!ev || ev._applied) return;
+      // sign: ขาย = -1 (ตัดสต็อก), ยกเลิก/คืน = +1 (บวกคืน)
+      var sign = (ev.type === "cancel" || ev.type === "return") ? 1 : (ev.type === "sale" ? -1 : 0);
+      var stockN = 0, cogs = 0;
+      if (sign !== 0) {
+        (ev.items || []).forEach(function (it) {
+          var p = findProductBySkuExact(it.sku);
+          if (p && it.qty > 0) {
+            if (S.adjustStock(p.id, sign * it.qty)) stockN++;
+            cogs += (Number(p.cost) || 0) * it.qty;   // ต้นทุนขาย (ใช้ต้นทุนปัจจุบัน)
+          }
+        });
+        var amt = Number(ev.amount) || 0;
+        var note = "Webhook " + typeLabel(ev.type) + " ออเดอร์ " + (ev.orderRef || "");
+        var chan = ev.channel || "marketplace";
+        if (sign < 0) {
+          // ขายออก: +รายรับ และ +ต้นทุนขาย (COGS) → กำไรสุทธิถูกต้อง
+          if (amt > 0) S.saveLedgerEntry({ type: "income", category: "ขายผ่าน BigSeller (" + chan + ")", note: note, amount: amt });
+          if (cogs > 0) S.saveLedgerEntry({ type: "expense", category: "ต้นทุนขาย BigSeller", note: note, amount: cogs });
+        } else {
+          // ยกเลิก/คืน: กลับรายการ → ลดรายรับ (expense) และกลับ COGS (income)
+          if (amt > 0) S.saveLedgerEntry({ type: "expense", category: "คืน/ยกเลิก BigSeller", note: note, amount: amt });
+          if (cogs > 0) S.saveLedgerEntry({ type: "income", category: "กลับต้นทุนขาย BigSeller", note: note, amount: cogs });
+        }
+      } else if (ev.type === "shipped" && ev.orderRef) {
+        // เลขพัสดุ → หาออเดอร์ในเว็บที่ reference ตรง แล้วเปลี่ยนสถานะ "กำลังจัดส่ง"
+        var ord = S.getOrders().filter(function (o) { return o.id === ev.orderRef; })[0];
+        if (ord) S.setOrderStatus(ord.id, "delivering", { tracking: ev.tracking || "", carrier: ev.carrier || "" });
+      }
+      ev._applied = true;
+      markEventProcessed(ev);
+      eventsState = eventsState.filter(function (x) { return x !== ev; });
+      renderEvents();
+      toast("ใช้เหตุการณ์ " + typeLabel(ev.type) + " แล้ว" + (stockN ? " · ปรับสต็อก " + stockN + " รายการ" : ""), "ok");
+    }
+    $("bsLoadEvents").addEventListener("click", loadEvents);
+
+    /* ---------- sync log ---------- */
+    function renderLog() {
+      var BS = window.BigSellerSync;
+      if (!BS) return;
+      var logs = BS.getLogs(), q = BS.getQueue();
+      $("bsQueueStatus").textContent = "ในคิวรอส่ง: " + q.length + " งาน";
+      if (!logs.length) { $("bsLogWrap").style.display = "none"; return; }
+      var color = { ok: "#1a7a3c", error: "#c0392b", retry: "#a07000", queued: "#1c5a99", "dry-run": "#888" };
+      $("bsLogTable").innerHTML =
+        "<tr><th>เวลา</th><th>งาน</th><th>SKU/ออเดอร์</th><th>สถานะ</th><th>รายละเอียด</th></tr>" +
+        logs.slice(0, 80).map(function (l) {
+          return "<tr><td>" + fmtTime(l.ts) + "</td><td>" + (l.kind || "") + "</td><td>" + (l.sku || l.ref || "—") +
+            "</td><td style='color:" + (color[l.status] || "#333") + ";font-weight:700'>" + (l.status || "") +
+            "</td><td style='white-space:normal'>" + (l.message || "") + "</td></tr>";
+        }).join("");
+      $("bsLogWrap").style.display = "";
+    }
+    $("bsRefreshLog").addEventListener("click", renderLog);
+    $("bsClearLog").addEventListener("click", function () { if (window.BigSellerSync) window.BigSellerSync.clearLogs(); renderLog(); });
+
+    /* ---------- helpers shared by exporters ---------- */
+    function skuOf(p) { var c = cfg(); return (c.skuPrefix || "") + (p.sku || p.id || ""); }
+    function isHttp(u) { return /^https?:\/\//i.test(String(u || "")); }
+    function imageOf(p) {
+      var imgs = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
+      var http = imgs.filter(isHttp);
+      return http;
+    }
+    function priceOf(p, applyMarkup) {
+      var base = num(p.price);
+      if (!applyMarkup) return base;
+      var m = num(cfg().markup);
+      return Math.round(base * (1 + m / 100));
+    }
+    function downloadSheet(rows, sheetName, fileName) {
+      if (!window.XLSX) { toast("ตัวสร้างไฟล์ Excel ยังโหลดไม่เสร็จ ลองอีกครั้ง", "err"); return false; }
+      try {
+        var ws = XLSX.utils.json_to_sheet(rows);
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        XLSX.writeFile(wb, fileName);
+        return true;
+      } catch (e) { toast("สร้างไฟล์ไม่สำเร็จ: " + (e && e.message), "err"); return false; }
+    }
+
+    /* ---------- 2) export products ---------- */
+    $("bsExportProducts").addEventListener("click", function () {
+      var onlySale = $("bsOnlySale").checked, inStock = $("bsInStock").checked, markup = $("bsApplyMarkup").checked;
+      var weight = num(cfg().weight) || 1;
+      var list = S.getProducts().filter(function (p) {
+        if (onlySale && p.forSale === false) return false;
+        if (inStock && S.available(p) <= 0) return false;
+        return true;
+      });
+      if (!list.length) { $("bsExportStatus").textContent = "ไม่มีสินค้าตามเงื่อนไขที่เลือก"; return; }
+      var rows = list.map(function (p) {
+        var imgs = imageOf(p);
+        return {
+          "Product Name": p.name || "",
+          "Category": (S.categoryLabel ? S.categoryLabel(p.category) : p.category) || "",
+          "Brand": p.brand || "",
+          "SKU": skuOf(p),
+          "Description": p.desc || "",
+          "Price": priceOf(p, markup),
+          "Stock": S.available(p),
+          "Weight(kg)": weight,
+          "Image URL 1": imgs[0] || "",
+          "Image URL 2": imgs[1] || "",
+          "Image URL 3": imgs[2] || "",
+        };
+      });
+      if (downloadSheet(rows, "Products", "bigseller-products-" + dstamp() + ".xlsx")) {
+        saveCfg({ lastProductExport: Date.now() });
+        $("bsExportStatus").textContent = "ดาวน์โหลดแล้ว (" + rows.length + " รายการ)";
+        renderMeta();
+      }
+    });
+
+    /* ---------- 3) export stock ---------- */
+    $("bsExportStock").addEventListener("click", function () {
+      var rows = S.getProducts().filter(function (p) { return p.forSale !== false; }).map(function (p) {
+        return { "SKU": skuOf(p), "Product Name": p.name || "", "Available Stock": S.available(p) };
+      });
+      if (!rows.length) { $("bsStockStatus").textContent = "ไม่มีสินค้า"; return; }
+      if (downloadSheet(rows, "Stock", "bigseller-stock-" + dstamp() + ".xlsx")) {
+        saveCfg({ lastStockExport: Date.now() });
+        $("bsStockStatus").textContent = "ดาวน์โหลดแล้ว (" + rows.length + " SKU)";
+        renderMeta();
+      }
+    });
+
+    /* ---------- 4) import orders ---------- */
+    var ord = { headers: [], rows: [], matched: null };
+
+    function guess(headers, keys) {
+      for (var i = 0; i < headers.length; i++) {
+        var h = String(headers[i] || "").toLowerCase();
+        for (var k = 0; k < keys.length; k++) { if (h.indexOf(keys[k]) >= 0) return i; }
+      }
+      return -1;
+    }
+    function fillSelect(sel, headers, chosen) {
+      sel.innerHTML = '<option value="-1">— ไม่ใช้ —</option>' + headers.map(function (h, i) {
+        return '<option value="' + i + '"' + (i === chosen ? " selected" : "") + ">" + String(h || ("คอลัมน์ " + (i + 1))) + "</option>";
+      }).join("");
+    }
+
+    $("bsOrderFile").addEventListener("change", function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (!f) return;
+      if (!window.XLSX) { setAlert("ไลบรารีอ่านไฟล์ยังโหลดไม่เสร็จ ลองรีเฟรชหน้าแล้วลองใหม่", "err"); return; }
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        try {
+          var wb = XLSX.read(new Uint8Array(ev.target.result), { type: "array" });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+          // หาแถวหัวตาราง: แถวแรกที่มีอย่างน้อย 2 ช่องไม่ว่าง
+          var hi = 0;
+          for (var r = 0; r < Math.min(aoa.length, 15); r++) {
+            var filled = aoa[r].filter(function (c) { return String(c).trim() !== ""; }).length;
+            if (filled >= 2) { hi = r; break; }
+          }
+          ord.headers = aoa[hi] || [];
+          ord.rows = aoa.slice(hi + 1).filter(function (row) { return row.some(function (c) { return String(c).trim() !== ""; }); });
+          if (!ord.rows.length) { setAlert("ไม่พบข้อมูลออเดอร์ในไฟล์", "err"); return; }
+          setAlert("");
+          fillSelect($("bsColOrder"), ord.headers, guess(ord.headers, ["order sn", "order id", "เลขที่คำสั่ง", "เลขออเดอร์", "order no", "หมายเลขคำสั่ง"]));
+          fillSelect($("bsColSku"), ord.headers, guess(ord.headers, ["seller sku", "sku", "รหัสสินค้า", "รหัส sku"]));
+          fillSelect($("bsColQty"), ord.headers, guess(ord.headers, ["quantity", "qty", "จำนวน"]));
+          fillSelect($("bsColAmt"), ord.headers, guess(ord.headers, ["paid", "total", "ยอด", "amount", "grand total"]));
+          $("bsMapWrap").style.display = "";
+          $("bsOrderPreview").style.display = "none";
+        } catch (err) { setAlert("อ่านไฟล์ไม่สำเร็จ: " + (err && err.message), "err"); }
+      };
+      reader.readAsArrayBuffer(f);
+    });
+
+    function findProductBySku(sku) {
+      sku = String(sku || "").trim().toLowerCase();
+      if (!sku) return null;
+      var pre = (cfg().skuPrefix || "").toLowerCase();
+      var bare = pre && sku.indexOf(pre) === 0 ? sku.slice(pre.length) : sku;
+      var list = S.getProducts();
+      for (var i = 0; i < list.length; i++) {
+        var ps = String(list[i].sku || "").toLowerCase(), pid = String(list[i].id || "").toLowerCase();
+        if (ps === sku || ps === bare || pid === sku || pid === bare) return list[i];
+      }
+      return null;
+    }
+
+    $("bsPreviewOrders").addEventListener("click", function () {
+      var ci = { order: +$("bsColOrder").value, sku: +$("bsColSku").value, qty: +$("bsColQty").value, amt: +$("bsColAmt").value };
+      if (ci.sku < 0 || ci.qty < 0) { setAlert("กรุณาเลือกคอลัมน์ SKU และจำนวนให้ครบ", "err"); return; }
+      setAlert("");
+      var done = (cfg().importedOrders || []);
+      var lines = ord.rows.map(function (row) {
+        var sku = row[ci.sku], qty = num(row[ci.qty]);
+        var orderNo = ci.order >= 0 ? String(row[ci.order] || "").trim() : "";
+        var p = findProductBySku(sku);
+        return {
+          orderNo: orderNo, sku: String(sku || "").trim(), qty: qty,
+          amt: ci.amt >= 0 ? num(row[ci.amt]) : 0,
+          product: p, name: p ? p.name : "",
+          dup: orderNo && done.indexOf(orderNo) >= 0,
+        };
+      }).filter(function (l) { return l.sku || l.qty; });
+      ord.matched = lines;
+
+      var okCount = lines.filter(function (l) { return l.product && !l.dup; }).length;
+      var badCount = lines.filter(function (l) { return !l.product; }).length;
+      var dupCount = lines.filter(function (l) { return l.dup; }).length;
+      $("bsOrderSummary").innerHTML =
+        "<span>ทั้งหมด <b>" + lines.length + "</b> แถว</span>" +
+        "<span>จับคู่ได้ <b style='color:#1a7a3c'>" + okCount + "</b></span>" +
+        "<span>ไม่พบ SKU <b style='color:#c0392b'>" + badCount + "</b></span>" +
+        "<span>ออเดอร์ซ้ำ (ข้าม) <b>" + dupCount + "</b></span>";
+
+      var head = "<tr><th>เลขออเดอร์</th><th>SKU</th><th>สินค้าในคลัง</th><th>จำนวน</th><th>ยอดเงิน</th><th>สถานะ</th></tr>";
+      var body = lines.slice(0, 200).map(function (l) {
+        var status = l.dup ? '<span class="bs-tag bad">ซ้ำ ข้าม</span>'
+          : l.product ? '<span class="bs-tag ok">จับคู่ได้</span>'
+          : '<span class="bs-tag bad">ไม่พบ SKU</span>';
+        return '<tr class="' + (l.product && !l.dup ? "" : "bs-row-bad") + '">' +
+          "<td>" + (l.orderNo || "—") + "</td><td>" + (l.sku || "—") + "</td>" +
+          "<td>" + (l.name || "—") + "</td><td class='num'>" + l.qty + "</td>" +
+          "<td class='num'>" + (l.amt ? S.money(l.amt) : "—") + "</td><td>" + status + "</td></tr>";
+      }).join("");
+      $("bsOrderTable").innerHTML = head + body;
+      $("bsOrderPreview").style.display = "";
+    });
+
+    $("bsApplyOrders").addEventListener("click", function () {
+      if (!ord.matched) return;
+      var doStock = $("bsDoStock").checked, doLedger = $("bsDoLedger").checked;
+      var apply = ord.matched.filter(function (l) { return l.product && !l.dup; });
+      if (!apply.length) { $("bsApplyStatus").textContent = "ไม่มีรายการที่จับคู่ได้ให้บันทึก"; return; }
+      if (!window.confirm("ยืนยันบันทึก " + apply.length + " รายการ?\n" +
+        (doStock ? "• จะตัดสต็อกตาม SKU\n" : "") + (doLedger ? "• จะลงบัญชีรายรับใน ERP" : ""))) return;
+
+      var stockN = 0, blocked = 0, income = 0, doneOrders = {};
+      apply.forEach(function (l) {
+        if (doStock && l.qty > 0) {
+          if (S.adjustStock(l.product.id, -l.qty)) stockN++; else blocked++;
+        }
+        if (l.orderNo) doneOrders[l.orderNo] = 1;
+        income += l.amt || 0;
+      });
+
+      if (doLedger && income > 0) {
+        S.saveLedgerEntry({
+          type: "income", category: "ขายผ่าน BigSeller",
+          note: "นำเข้าออเดอร์ BigSeller " + apply.length + " รายการ", amount: income,
+        });
+      }
+
+      var prevDone = (cfg().importedOrders || []).slice();
+      Object.keys(doneOrders).forEach(function (o) { if (prevDone.indexOf(o) < 0) prevDone.push(o); });
+      saveCfg({ importedOrders: prevDone.slice(-2000), lastOrderImport: Date.now() });
+      renderMeta();
+
+      var msg = "บันทึกแล้ว: ตัดสต็อก " + stockN + " รายการ" +
+        (blocked ? " (ถูกบล็อก " + blocked + " — บัญชีนี้ไม่มีสิทธิ์ลดสต็อก)" : "") +
+        (doLedger && income > 0 ? " · ลงรายรับ " + S.money(income) : "");
+      $("bsApplyStatus").textContent = msg;
+      toast("นำเข้าออเดอร์ BigSeller สำเร็จ", "ok");
+      $("bsApplyOrders").disabled = true;
+    });
+
+    loadCfg();
+    renderLog();
+    loadEvents();
+  })();
+  </script>
+</body>
+</html>

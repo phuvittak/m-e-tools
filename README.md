@@ -259,15 +259,125 @@ Broadcast ก็ตั้งใน LINE OA Manager เช่นกัน:
 
 > **เร็ว ๆ นี้:** Phase 3 จะแจ้งเตือนแอดมินเมื่อมีออเดอร์ใหม่
 
-## เครื่องมือบรรทัดคำสั่ง (`tools/`)
+### 🛒 BigSeller Sync — เชื่อมร้านกับ Shopee / Lazada / TikTok Shop (`webapp/admin/bigseller.html`)
 
-| Tool | Description |
-|------|-------------|
-| `tools/Get-WordCount.ps1` | Counts the words in a text file. |
+โมดูลซิงค์สินค้า สต็อก และออเดอร์ระหว่างคลังของร้านกับ **BigSeller** (ระบบจัดการร้านหลายแพลตฟอร์ม)
+เข้าที่เมนูซ้ายของหลังร้าน **"BigSeller Sync"** (เฉพาะแอดมิน) — BigSeller รับ-ส่งข้อมูลด้วยไฟล์ Excel/CSV
+โมดูลนี้จึงสร้าง/อ่านไฟล์ให้ตรงรูปแบบ ไม่ต้องคีย์ข้อมูลซ้ำสองที่
 
-```powershell
-.\tools\Get-WordCount.ps1 -Path notes.txt
+**สิ่งที่ทำได้:**
+1. **ตั้งค่าการเชื่อมต่อ** — ชื่อร้านบน BigSeller, ช่องทางที่เชื่อม (Shopee/Lazada/TikTok),
+   บวกราคา %, น้ำหนักพัสดุเริ่มต้น, คำนำหน้า SKU (บันทึกไว้ในระบบหลังร้าน)
+2. **ส่งออกแคตตาล็อกสินค้า** → ไฟล์ Excel สำหรับ Mass Import ของ BigSeller
+   (กรองเฉพาะของขาย/มีสต็อก และบวกราคา % ให้อัตโนมัติ)
+3. **อัปเดตสต็อกขึ้น BigSeller** → ไฟล์ SKU + จำนวนคงเหลือ สำหรับเครื่องมือแก้ไขจำนวนสินค้าจำนวนมาก
+4. **นำเข้าออเดอร์จาก BigSeller** → อัปโหลดไฟล์ออเดอร์ที่ส่งออกมา ระบบจับคู่ SKU กับคลัง แสดงตัวอย่าง
+   แล้ว **ตัดสต็อก + ลงบัญชีรายรับใน ERP** ให้ในคลิกเดียว (จำเลขออเดอร์ที่นำเข้าแล้ว กันยอดซ้ำ)
+
+> 💡 ก่อนส่งออกสินค้าครั้งแรก แนะนำกดปุ่ม **"ย้ายรูปขึ้น Storage"** ในหน้าคลังก่อน
+> เพื่อให้คอลัมน์รูปภาพเป็นลิงก์ http ที่อัปโหลดเข้า BigSeller ได้ (รูปฝังในเครื่องแบบ `data:` ใช้ไม่ได้)
+
+#### 🔌 ซิงค์อัตโนมัติผ่าน BigSeller Open API (เปิดทีละขาเมื่อพร้อม)
+
+นอกจากไฟล์ Excel/CSV ยังมีการซิงค์อัตโนมัติผ่าน API — ออกแบบให้ **ปลอดภัยที่สุด**:
+
+- **ปิดไว้โดยค่าเริ่มต้น (feature-flag)** — เปิดสวิตช์ในหน้า BigSeller Sync ทีละฟีเจอร์
+  ถ้ายังไม่เปิด/ยังไม่ตั้งคีย์ ระบบทำงานแบบ **dry-run** (แค่บันทึก log ไม่ส่งจริง) เว็บไม่รวน
+- **คีย์อยู่ฝั่งเซิร์ฟเวอร์** — เบราว์เซอร์ไม่เคยถือ BigSeller API key ทุกคำสั่งวิ่งผ่าน
+  Vercel proxy `api/bigseller-sync.js` (กันคีย์รั่ว + กัน CORS)
+- **ขาออกเป็นคิวเบื้องหลัง** — มี retry + exponential backoff + Idempotency-Key (กันส่งซ้ำ)
+  และ sync log ให้ตรวจสอบ (เก็บใน `webapp/assets/bigseller-sync.js`)
+
+**แนวทางเปิดใช้ (เรียงตามความปลอดภัย):**
+1. **① ดึงสต็อก (อ่านอย่างเดียว)** — เริ่มจากตรงนี้ก่อน กดปุ่ม “ดึงสต็อกมาเทียบ” ดูว่าตัวเลขตรงไหม
+2. **② ส่งสินค้าขึ้น BigSeller** — เปิดเมื่อ ① นิ่งแล้ว (ยิงตอนกดบันทึกสินค้า)
+3. **③ ส่งออเดอร์ไป BigSeller** — เปิดเป็นลำดับสุดท้าย (ยิงตอนลูกค้าสั่งซื้อสำเร็จ)
+
+**ขาเข้า (Webhook):** ตั้ง Webhook ของ BigSeller ให้ยิงมาที่ `https://<โดเมน>/api/bigseller-webhook`
+เมื่อมีออเดอร์/ยกเลิก/คืนสินค้า/ออกเลขพัสดุจากมาร์เก็ตเพลส ระบบจะบันทึกเหตุการณ์ไว้ (กันซ้ำ +
+ตรวจลายเซ็น) แล้วหน้าหลังร้านจะดึงมา **ตัด/บวกสต็อก + ลงบัญชี + อัปเดตเลขพัสดุ** ผ่านโค้ดเดิมที่
+ปลอดภัย (ไม่เขียนทับเอกสารแคตตาล็อกโดยตรง เพื่อกัน catalog พัง)
+
+**ENV ที่ต้องตั้งใน Vercel (เปิดใช้จริงเมื่อพร้อม):**
+
+| ตัวแปร | ใช้ทำอะไร |
+|--------|-----------|
+| `BIGSELLER_API_KEY` | access token ของ BigSeller Open API (ไม่ตั้ง = dry-run) |
+| `BIGSELLER_API_BASE` | โฮสต์ API (ไม่บังคับ ค่าเริ่ม `https://api.bigseller.com`) |
+| `BIGSELLER_EP_PRODUCT` / `BIGSELLER_EP_ORDER` / `BIGSELLER_EP_STOCK` | path ของแต่ละ endpoint (ไม่บังคับ) |
+| `BIGSELLER_WEBHOOK_SECRET` | ความลับตรวจลายเซ็น HMAC ของ webhook ขาเข้า (แนะนำตั้ง) |
+
+> ⚠️ รูปแบบ payload/endpoint ที่ผูกกับ BigSeller รวมไว้ "จุดเดียว" ที่ `mapForBigSeller()` ใน
+> `api/bigseller-sync.js` — โปรดเทียบกับเอกสาร BigSeller Open API ของบัญชีคุณแล้วปรับให้ตรงก่อนเปิดใช้จริง
+> ส่วนอื่นบนเว็บไม่ต้องแก้
+
+**ข้อกำหนดที่ยึดไว้ (ตามที่ตกลง):**
+- **ที่จัดเก็บในคลัง (Location/Shelf)** เก็บในเว็บเราเท่านั้น — ไม่ส่งไป BigSeller (เร็ว ไม่กินทรัพยากร)
+- **ค่าจัดส่ง** คิดแบบ local เท่านั้น ไม่ส่งออกไปคิดซ้ำที่มาร์เก็ตเพลส
+- **Merchant SKU** เป็น Primary Key เชื่อมทุกระบบ — รูปสินค้าต้องเป็นลิงก์ `https://…` ก่อนถึงจะส่งได้
+- **ข้อมูลจำเพาะ** (ประกัน/มอเตอร์/แรงดัน/specs) แปลงเป็น bullet ต่อท้าย “รายละเอียดสินค้า” อัตโนมัติ
+
+## 🧠 AI ตอบ–เรียนรู้เอง (เจ้าของไม่ต้องพิมพ์คำตอบเอง)
+
+เมื่อลูกค้าทักบอท LINE แล้วบอท **ตอบไม่ได้** (ไม่เจอกฎ + AI ตอบไม่ได้) ระบบจะบันทึกคำถามนั้นไว้
+รวมยอดว่าถูกถามกี่ครั้ง ที่ Firestore `unanswered_questions`
+
+ในหน้าหลังร้าน **คำตอบของบอท** → ส่วน **🧠 คำถามที่บอทตอบไม่ได้**:
+1. กด **“✨ ให้ AI ร่างคำตอบ”** — เรียก `api/ai-suggest-reply.js` ให้ Claude ร่างคำตอบภาษาไทยจาก
+   ข้อมูลสินค้าจริง + โทนคำตอบเดิมของร้าน
+2. ตรวจ/แก้คำตอบ แล้วกด **“➕ เพิ่มเป็นคำตอบบอท”** → กลายเป็นกฎคีย์เวิร์ดทันที
+3. กด **บันทึก** — ครั้งหน้าบอทตอบคำถามนั้นเองอัตโนมัติ
+
+ต้องตั้ง `ANTHROPIC_API_KEY` ใน Vercel (ตัวเดียวกับบอท LINE) — ถ้ายังไม่ตั้ง ปุ่มจะแจ้งเตือน ระบบส่วนอื่นไม่กระทบ
+
+## 💬 AI ตอบ Facebook Messenger + Instagram (`api/messenger-webhook.js`)
+
+ให้บอทตอบลูกค้าบน **Messenger/IG** ด้วยสมองตัวเดียวกับ LINE (กฎคีย์เวิร์ดของเจ้าของ → AI → fallback)
+
+**ตั้งค่า (ทำครั้งเดียว):**
+1. สร้าง Facebook App ที่ https://developers.facebook.com → เพิ่มผลิตภัณฑ์ **Messenger** (และ Instagram ถ้าใช้)
+2. ผูก Facebook Page → กด **Generate Token** ได้ **Page Access Token**
+3. Vercel → Environment Variables ตั้ง:
+   - `META_VERIFY_TOKEN` = ข้อความลับอะไรก็ได้ (ตั้งเอง)
+   - `META_PAGE_TOKEN` = Page Access Token จากข้อ 2
+   - `ANTHROPIC_API_KEY` = (มีอยู่แล้ว) เปิดให้ AI ตอบคำถามธรรมชาติ
+4. Meta → Webhooks → Callback URL: `https://<โดเมน>/api/messenger-webhook` · Verify Token: ใส่ให้ตรง `META_VERIFY_TOKEN`
+   → Subscribe ฟิลด์ `messages`
+> ไม่ตั้ง token ก็ deploy ได้ (verify ผ่าน แต่ยังไม่ส่งตอบ) — ไม่กระทบส่วนอื่น
+
+## 📊 ซิงค์ออเดอร์เข้า Google Sheets เรียลไทม์ (`api/sheets-sync.js`)
+
+ทุกออเดอร์ใหม่ต่อท้ายแถวใน Google Sheets อัตโนมัติ — สำรองข้อมูล/เปิดดูจากมือถือได้ทันที
+ใช้ **Google Apps Script Web App** (ไม่ต้องตั้ง service account ให้ยุ่งยาก)
+
+**ตั้งค่า (ทำครั้งเดียว):**
+1. เปิด Google Sheet ใหม่ → เมนู **ส่วนขยาย → Apps Script** → วางโค้ดนี้แล้ว Deploy เป็น **Web App**
+   (Execute as: *Me* · Who has access: *Anyone*) → คัดลอก URL ที่ได้
+
+```javascript
+function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(data.type || 'orders')
+        || SpreadsheetApp.getActiveSpreadsheet().insertSheet(data.type || 'orders');
+  var row = data.row || {};
+  if (sh.getLastRow() === 0) sh.appendRow(Object.keys(row).concat(['ซิงค์เมื่อ']));
+  sh.appendRow(Object.keys(row).map(function (k) { return row[k]; }).concat([data.at || new Date()]));
+  return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
+}
 ```
+
+2. Vercel → Environment Variables → `SHEETS_WEBHOOK_URL` = URL จากข้อ 1
+> ไม่ตั้ง URL → ระบบข้ามเงียบ ๆ (no-op) ไม่กระทบความเร็วหน้าเว็บ
+> **สองทิศทาง:** ถ้าต้องการให้แก้ในชีตแล้วเด้งกลับเว็บ ให้เพิ่ม trigger `onEdit` ในสคริปต์เดียวกัน
+> ยิง POST กลับมาที่ `https://<โดเมน>/api/bigseller-webhook` (รูปแบบ event เดียวกับมาร์เก็ตเพลส)
+
+## พิมพ์ใบปะหน้าซอง + ใบเสร็จ (หลังร้าน → คำสั่งซื้อ)
+
+ในหน้า **คำสั่งซื้อ** แต่ละออเดอร์มีปุ่ม:
+- **🏷️ ใบปะหน้าซอง** — พิมพ์ชื่อ-ที่อยู่-เบอร์ผู้รับ + รายการ สำหรับแปะหน้าซอง/กล่อง (รองรับสติกเกอร์ 100×150 มม. หรือ A4)
+- **🧾 ใบเสร็จ** — ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ พิมพ์ให้ลูกค้าที่มารับหน้าร้าน หรือแนบไปกับพัสดุ
+
+ทั้งสองสั่งพิมพ์ผ่านกล่องพิมพ์ของระบบ (เลือกเครื่องพิมพ์/ขนาดกระดาษได้) เจ้าของร้านแค่กดปุ่ม → ปริ้น → แปะ/แนบ
 
 ## Status
 

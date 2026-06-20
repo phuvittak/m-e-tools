@@ -305,6 +305,7 @@
   ];
   function write(key, val, opts) {
     localStorage.setItem(key, JSON.stringify(val));
+    if (key === KEY.settings) _hiddenBrandSet = null; // settings เปลี่ยน → ล้างแคชแบรนด์ซ่อน
     if (!opts || !opts.skipCloud) {
       if (ADMIN_CLOUD_KEYS.indexOf(key) >= 0) cloudPushAdminData(key, val);
     }
@@ -903,8 +904,27 @@
   // นับสินค้าในหมวด (รวมหมวดย่อยทุกชั้น)
   function productCountInCat(key) {
     var set = catDescendants(key);
-    return getProducts().filter(function (p) { return !p.hidden && set[p.category]; }).length;
+    return getProducts().filter(function (p) { return isVisible(p) && set[p.category]; }).length;
   }
+
+  // ----- การมองเห็นสินค้าฝั่งลูกค้า (ซ่อนสินค้า + ซ่อนทั้งแบรนด์) -----
+  // ซ่อนแบรนด์ในหน้า "แบรนด์ในร้าน" → สินค้าทุกตัวของแบรนด์นั้นหายจากหน้าเว็บลูกค้า
+  // (เป็นการกรองตอนแสดงผล — ไม่แตะข้อมูลสินค้า ปลดซ่อนแล้วกลับมาทันที)
+  // แคชชุดแบรนด์ที่ซ่อน — สร้างใหม่เฉพาะเมื่อ settings เปลี่ยน (write() ล้างแคชให้)
+  // กัน getSettings()/JSON.parse ทำงานต่อสินค้าทุกชิ้นในทุก ๆ การกรอง/พิมพ์ค้นหา
+  var _hiddenBrandSet = null;
+  function hiddenBrandSet() {
+    if (_hiddenBrandSet) return _hiddenBrandSet;
+    var out = {};
+    ((getSettings() || {}).brands || []).forEach(function (b) {
+      if (b && b.hidden && b.name) out[String(b.name).trim().toLowerCase()] = 1;
+    });
+    _hiddenBrandSet = out;
+    return out;
+  }
+  function brandHidden(name) { return !!hiddenBrandSet()[String(name || "").trim().toLowerCase()]; }
+  function isVisible(p) { return !!p && !p.hidden && !brandHidden(p.brand); }
+  function getVisibleProducts() { return getProducts().filter(isVisible); }
   function categoryLabel(key) {
     var cats = getCategories();
     for (var i = 0; i < cats.length; i++) if (cats[i].key === key) return cats[i].label;
@@ -913,7 +933,7 @@
   function typeLabel(type) { return type === "rent" ? "เช่าสินค้า" : "ซื้อสินค้า"; }
   function statusLabel(s) {
     return { paid: "ชำระแล้ว", waiting: "รอรับสินค้า", pickup: "รับสินค้าหน้าร้าน",
-      received: "ได้รับสินค้าแล้ว", returned: "คืนแล้ว", cancelled: "ยกเลิก" }[s] || s;
+      delivering: "กำลังจัดส่ง", received: "ได้รับสินค้าแล้ว", returned: "คืนแล้ว", cancelled: "ยกเลิก" }[s] || s;
   }
   function fulfillmentLabel(f) { return f === "delivery" ? "บริการจัดส่ง" : "รับสินค้าหน้าร้าน"; }
 
@@ -1086,6 +1106,9 @@
     // auto-sync ขึ้น cloud — ใครก็ตามที่มีสิทธิ์ "คลัง/สต็อก" (เจ้าของ + พนักงานที่ได้รับสิทธิ์)
     // ลูกค้า/คนไม่มีสิทธิ์ไม่เข้าเงื่อนไขนี้ จึงไม่เขียนทับแคตตาล็อกบน cloud
     if (hasPerm("inventory")) { cloudPushProduct(saved); scheduleCatalogSync(); }
+    // BigSeller: ซิงค์สินค้าขาออก (async, ไม่บล็อก, ปลอดภัยถ้าโมดูลปิด/ไม่มี)
+    // หมายเหตุ: ตั้งใจ "ไม่ส่ง" ฟิลด์ location/ที่จัดเก็บ — เก็บในเว็บเราเท่านั้น
+    try { if (global.BigSellerSync) global.BigSellerSync.syncProduct(saved); } catch (e) {}
     return saved;
   }
   function deleteProduct(id) {
@@ -1192,6 +1215,7 @@
     var lines = cartLines();
     if (!lines.length) return null;
     var sess = session();
+    var testMode = !!getSettings().testMode; // โหมดทดลอง — ออเดอร์จะติดป้าย test
     var userEmail = (sess && sess.email) || checkout.email || "";
     var customer = { name: checkout.name, phone: checkout.phone, email: userEmail };
     var fulfillment = checkout.fulfillment === "delivery" ? "delivery" : "pickup";
@@ -1239,6 +1263,7 @@
         // stockApplied=true เฉพาะตอนผู้สั่งมีสิทธิ์คลัง (ตัดสต๊อก cloud แล้วผ่าน saveProduct)
         // ลูกค้าหน้าร้านไม่มีสิทธิ์ → false → ฝั่งหลังร้านจะตัดสต๊อกให้ตอนรับออเดอร์เข้า
         stockApplied: hasPerm("inventory"),
+        test: testMode, // ออเดอร์ทดลอง — กดล้างทิ้งได้ ไม่นับยอดขายจริง
       };
       if (mode === "rent") {
         order.rentStart = dateStr(Date.now());
@@ -1266,6 +1291,21 @@
     // ซิงค์ "ทุก" ออเดอร์ (รวมลูกค้าที่ไม่ได้ล็อกอิน — ใช้ anonymous auth) เพื่อให้
     // เจ้าของเห็นออเดอร์ครบทุกเครื่อง ไม่ใช่แค่เครื่องที่กดสั่ง
     syncOrdersToCloud(created, sess || {});
+    // BigSeller: สร้างออเดอร์ขาออก (async, ไม่บล็อก, ทำงานเฉพาะเมื่อเปิด feature order)
+    try { if (global.BigSellerSync) created.forEach(function (o) { global.BigSellerSync.syncOrder(o); }); } catch (e) {}
+    // Google Sheets: ต่อท้ายแถวออเดอร์แบบเรียลไทม์ (no-op ถ้ายังไม่ตั้ง SHEETS_WEBHOOK_URL)
+    try {
+      created.forEach(function (o) {
+        var c = o.customer || {};
+        var row = {
+          order: o.id, date: new Date(o.createdAt).toLocaleString("th-TH"), channel: "เว็บ M.E.Tools",
+          name: c.name || "", phone: c.phone || "",
+          items: (o.items || []).map(function (it) { return it.name + " x" + it.qty; }).join(", "),
+          total: o.total || 0, fulfillment: o.fulfillment || "",
+        };
+        fetch("/api/sheets-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "order", row: row }) }).catch(function () {});
+      });
+    } catch (e) {}
     return created;
   }
 
@@ -1303,6 +1343,9 @@
       var o = orders[i];
       var prev = o.status;
       if (extra.reason) o.cancelReason = extra.reason;
+      // เลขพัสดุ/ขนส่ง (จาก BigSeller webhook → "กำลังจัดส่ง")
+      if (extra.tracking) o.tracking = extra.tracking;
+      if (extra.carrier) o.carrier = extra.carrier;
       if (status === "cancelled") o.refunded = true;
       // returning a rental puts units back as available
       if (o.type === "rent" && status === "returned" && prev !== "returned") {
@@ -1467,6 +1510,35 @@
     loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
       return m.fsMod.deleteDoc(m.fsMod.doc(m.db, "orders", String(id)));
     }).catch(function (err) { console.warn("[order delete]", id, err && err.message); });
+  }
+  // ล้างออเดอร์เป็นชุด — testOnly:true = เฉพาะออเดอร์ทดลอง, false = ทั้งหมด
+  // ลบทั้ง local + cloud (query orders collection ลบทุก doc ที่เข้าเงื่อนไข)
+  function clearOrders(opts) {
+    opts = opts || {};
+    var testOnly = !!opts.testOnly;
+    if (!hasPerm("orders_delete")) return Promise.resolve({ ok: false, error: "no-perm" });
+    // local
+    var all = read(KEY.orders, []);
+    var keep = testOnly ? all.filter(function (o) { return !o.test; }) : [];
+    var removed = testOnly ? all.filter(function (o) { return !!o.test; }) : all.slice();
+    var tomb = read(KEY.deletedOrders, []);
+    removed.forEach(function (o) { if (o && o.id && tomb.indexOf(o.id) < 0) tomb.push(o.id); });
+    write(KEY.deletedOrders, tomb, { skipCloud: true });
+    write(KEY.orders, keep);
+    dispatch();
+    // cloud — ลบทุก doc ที่เข้าเงื่อนไข
+    return loadFirebaseAuthAndDb("admin").then(ensureCloudAuth).then(function (m) {
+      var fs = m.fsMod;
+      return fs.getDocs(fs.collection(m.db, "orders")).then(function (snap) {
+        var jobs = [];
+        snap.docs.forEach(function (d) {
+          var data = d.data() || {};
+          if (testOnly && !data.test) return;
+          jobs.push(fs.deleteDoc(fs.doc(m.db, "orders", d.id)).catch(function () {}));
+        });
+        return Promise.all(jobs).then(function () { return { ok: true, count: jobs.length, local: removed.length }; });
+      });
+    }).catch(function (err) { return { ok: true, count: 0, local: removed.length, cloudError: err && err.message }; });
   }
   function deletePurchase(id) { write(KEY.purchases, read(KEY.purchases, []).filter(function (p) { return p.id !== id; })); dispatch(); }
   function checkPin(pin) { return String(pin) === String(getSettings().deletePin || "1234"); }
@@ -1675,7 +1747,7 @@
 
   /* ---------- Metrics (for the employee dashboard) ---------------- */
   function getMetrics() {
-    var orders = getOrders().filter(function (o) { return o.status !== "cancelled"; });
+    var orders = getOrders().filter(function (o) { return o.status !== "cancelled" && !o.test; });
     var revenue = 0, cost = 0;
     orders.forEach(function (o) { revenue += o.revenue || 0; cost += o.cost || 0; });
     var products = getProducts();
@@ -1700,7 +1772,7 @@
   function revenueByDay(n) {
     n = n || 7;
     var out = [];
-    var orders = getOrders().filter(function (o) { return o.status !== "cancelled"; });
+    var orders = getOrders().filter(function (o) { return o.status !== "cancelled" && !o.test; });
     for (var i = n - 1; i >= 0; i--) {
       var dayStart = new Date();
       dayStart.setHours(0, 0, 0, 0);
@@ -2053,6 +2125,59 @@
       });
     });
   }
+
+  /* ---------- โปรไฟล์ลูกค้า (ลูกค้าแก้เอง → ซิงค์หลังร้าน) ---------- */
+  // รหัสลูกค้าแบบคงที่ — ได้จาก uid (deterministic) เพื่อให้เจ้าของอ้างอิงตัวลูกค้าได้
+  // แม้ลูกค้าจะเปลี่ยนชื่อเอง รหัสนี้ก็ไม่เปลี่ยน ("เจ้าของรู้ว่าใคร แต่ไม่ต้องรู้ว่าเปลี่ยนชื่อ")
+  function customerCode(uid) {
+    uid = String(uid || "");
+    if (!uid) return "CUST—";
+    var h = 0; for (var i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0;
+    return "CUST" + (h % 9000 + 1000); // 4 หลัก คงที่ 1000–9999
+  }
+  // โหลดโปรไฟล์ของ uid ตัวเอง — ใช้ uid เดียวกับที่ออเดอร์/แชทใช้ (หลังร้าน join ได้ตรง)
+  // คืน { uid, code, profile } — profile = { firstName, lastName, phone, email, address, verifyStatus, ... }
+  function loadMyProfile() {
+    return loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var uid = m.auth && m.auth.currentUser && m.auth.currentUser.uid;
+      if (!uid) return Promise.reject(new Error("ยังไม่ได้เข้าสู่ระบบ"));
+      var fs = m.fsMod;
+      return fs.getDoc(fs.doc(m.db, "customer_profiles", uid)).then(function (snap) {
+        var data = (snap && snap.exists && snap.exists()) ? (snap.data() || {}) : {};
+        return { uid: uid, code: customerCode(uid), profile: data };
+      });
+    });
+  }
+  // บันทึกโปรไฟล์ตัวเอง — merge เพื่อไม่ทับ "ชื่อเล่น" (nickname) ที่แอดมินตั้งไว้หลังร้าน
+  // ถ้ามีอัปโหลดเอกสารยืนยันตัวตน → ตั้งสถานะ "pending" (รอแอดมินตรวจ)
+  function saveMyProfile(data) {
+    data = data || {};
+    return loadFirebaseAuthAndDb().then(ensureCloudAuth).then(function (m) {
+      var uid = m.auth && m.auth.currentUser && m.auth.currentUser.uid;
+      if (!uid) return Promise.reject(new Error("ยังไม่ได้เข้าสู่ระบบ"));
+      var fs = m.fsMod;
+      var payload = {
+        firstName: String(data.firstName || "").slice(0, 80),
+        lastName: String(data.lastName || "").slice(0, 80),
+        phone: String(data.phone || "").slice(0, 40),
+        email: String(data.email || "").slice(0, 120),
+        address: String(data.address || "").slice(0, 400),
+        updatedAt: fs.serverTimestamp(),
+      };
+      // จำกัดความยาว base64 ต่อรูป — กันเอกสารเกินลิมิต Firestore 1MiB (รวม 2 รูป)
+      if (data.idCardImage) payload.idCardImage = String(data.idCardImage).slice(0, 700000);
+      if (data.licenseImage) payload.licenseImage = String(data.licenseImage).slice(0, 700000);
+      if (data.idCardImage || data.licenseImage) payload.verifyStatus = "pending";
+      return fs.setDoc(fs.doc(m.db, "customer_profiles", uid), payload, { merge: true }).then(function () {
+        // อัปเดตชื่อใน session ให้หัวเว็บ/หน้าอื่นเห็นทันที (ไม่กระทบรหัสลูกค้า)
+        var full = (payload.firstName + " " + payload.lastName).trim();
+        var s = session();
+        if (s && full) { s.name = full; setSession(s); }
+        return { ok: true, uid: uid, code: customerCode(uid) };
+      });
+    });
+  }
+
   // gate an admin page by a permission key (employees) — owner always allowed
   function requirePerm(key, redirect) {
     if (!isStaff()) { window.location.href = redirect || "../login.html"; return false; }
@@ -2127,6 +2252,7 @@
     typeLabel: typeLabel, statusLabel: statusLabel, fulfillmentLabel: fulfillmentLabel,
     money: money, fmtDate: fmtDate, dateStr: dateStr, genId: genId,
     getProducts: getProducts, getProduct: getProduct, available: available, getLocalProducts: getLocalProducts,
+    isVisible: isVisible, brandHidden: brandHidden, getVisibleProducts: getVisibleProducts,
     saveProduct: saveProduct, deleteProduct: deleteProduct, adjustStock: adjustStock,
     cloudLoadProducts: cloudLoadProducts, cloudSyncAllProducts: cloudSyncAllProducts, autoCatchUpSync: autoCatchUpSync, cloudPushProduct: cloudPushProduct, restoreProductsFromCloud: restoreProductsFromCloud, pushProductToSheet: pushProductToSheet, pushSheetDelete: pushSheetDelete, migrateImagesToStorage: migrateImagesToStorage,
     startAdminRealtime: startAdminRealtime,
@@ -2144,13 +2270,14 @@
     getSettings: getSettings, saveSettings: saveSettings, fillPromoTokens: fillPromoTokens, promoWindow: promoWindow, promoActiveNow: promoActiveNow, promoDateText: promoDateText, isOpenNow: isOpenNow, firebaseCfg: firebaseCfg,
     getUsers: getUsers, registerUser: registerUser, loginUser: loginUser, socialUpsert: socialUpsert,
     registerUserCloud: registerUserCloud, loginUserCloud: loginUserCloud, loginGoogleCloud: loginGoogleCloud, loadFirebaseAuthAndDb: loadFirebaseAuthAndDb,
+    customerCode: customerCode, loadMyProfile: loadMyProfile, saveMyProfile: saveMyProfile,
     cloudLoadAdminData: cloudLoadAdminData, cloudPushAdminData: cloudPushAdminData,
     cloudLoadPublicSettings: cloudLoadPublicSettings,
     getStaff: getStaff, saveStaffMember: saveStaffMember, deleteStaff: deleteStaff,
     session: session, isStaff: isStaff, isOwner: isOwner, hasPerm: hasPerm, canReduceInventory: canReduceInventory, PERM_KEYS: PERM_KEYS, PERM_DEFS: PERM_DEFS,
     logout: logout, requirePerm: requirePerm, checkPin: checkPin,
     ensureAdminRegistered: ensureAdminRegistered, adminIdToken: adminIdToken, absorbCloudOrders: absorbCloudOrders,
-    deleteOrder: deleteOrder, deletePurchase: deletePurchase,
+    deleteOrder: deleteOrder, clearOrders: clearOrders, deletePurchase: deletePurchase,
     getLedger: getLedger, saveLedgerEntry: saveLedgerEntry, deleteLedgerEntry: deleteLedgerEntry,
     getSuppliers: getSuppliers, saveSupplier: saveSupplier, deleteSupplier: deleteSupplier,
     getPurchases: getPurchases, receivePurchase: receivePurchase, getPnL: getPnL,
