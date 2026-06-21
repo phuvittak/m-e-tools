@@ -371,6 +371,8 @@
     var typeEl = document.querySelector("[data-hero-type]");
     if (typeEl) {
       var phrases = (st.heroPhrases && st.heroPhrases.length) ? st.heroPhrases : ["เช่าก็ได้ ซื้อก็ดี"];
+      // จองความสูงบรรทัดตามวลีที่ "ยาวที่สุด" ก่อน เพื่อไม่ให้หน้าจอขยับตอนพิมพ์/ลบตัวอักษร
+      reserveTypeHeight(typeEl, phrases);
       var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (reduce) typeEl.textContent = phrases[0];
       else typewriter(typeEl, phrases);
@@ -2680,6 +2682,30 @@
   function clampInt(v, min, max) { v = parseInt(v, 10); if (isNaN(v)) v = min; return Math.max(min, Math.min(max, v)); }
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
   function setText(sel, txt) { var el = document.querySelector(sel); if (el) el.textContent = txt || ""; }
+  // วัดว่าวลีไหนทำให้บรรทัด "สูงที่สุด" (กี่บรรทัดก็ตามความยาวจริง) แล้วล็อกความสูงไว้เท่านั้น
+  // → เวลา typewriter พิมพ์/ลบตัวอักษร บรรทัดไม่ยุบ/ไม่ยืด หน้าจอจึงนิ่ง ไม่สั่น
+  function reserveTypeHeight(el, phrases) {
+    var line = el.closest ? el.closest(".me-type-line") : null;
+    line = line || el.parentNode;
+    if (!line) return;
+    function measure() {
+      var keep = el.textContent;
+      line.style.minHeight = "0px";           // รีเซ็ตก่อนวัดใหม่ (เผื่อจอเปลี่ยนขนาด)
+      var max = 0;
+      for (var i = 0; i < phrases.length; i++) {
+        el.textContent = phrases[i];
+        var h = line.offsetHeight;
+        if (h > max) max = h;
+      }
+      el.textContent = keep;
+      if (max) line.style.minHeight = max + "px";
+    }
+    measure();
+    // จอเปลี่ยนขนาด → จำนวนบรรทัดที่ตัดคำเปลี่ยน ต้องวัดใหม่ (หน่วงไว้กันถี่เกิน)
+    var rt;
+    window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(measure, 160); });
+  }
+
   function typewriter(el, phrases) {
     var pi = 0, ci = 0, deleting = false;
     function tick() {

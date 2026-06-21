@@ -3373,16 +3373,100 @@
       U.toast("เพิ่มผู้จัดจำหน่ายแล้ว", "ok"); renderSuppliers(); renderPO();
     };
     function renderPO() {
-      var prodSel = document.querySelector("[data-po-product]"), supSel = document.querySelector("[data-po-supplier]");
-      prodSel.innerHTML = S.getProducts().map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + " (" + p.sku + ")</option>"; }).join("");
+      var supSel = document.querySelector("[data-po-supplier]");
+      poProductRefresh(); // เติม/รีเฟรชรายการสินค้าในช่องค้นหาแบบพิมพ์เอง
       supSel.innerHTML = '<option value="">— ไม่ระบุ —</option>' + S.getSuppliers().map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + "</option>"; }).join("");
-      var first = S.getProducts()[0]; document.querySelector("[data-po-cost]").value = first ? first.cost : "";
       var purch = S.getPurchases(), owner = S.isOwner();
       var el = document.querySelector("[data-po-list]");
       el.innerHTML = "<table class=\"data\"><thead><tr><th>เลขที่</th><th>วันที่</th><th>ผู้จัดจำหน่าย</th><th>รายการ</th><th class=num>รวมต้นทุน</th>" + (owner ? "<th></th>" : "") + "</tr></thead><tbody>" +
         (purch.length ? purch.map(function (po) { return "<tr><td>" + po.id + "</td><td>" + S.fmtDate(po.date) + "</td><td>" + esc(po.supplierName || "-") + "</td><td>" + po.items.map(function (it) { return esc(it.name) + " ×" + it.qty; }).join("<br>") + '</td><td class="num">' + S.money(po.total) + "</td>" + (owner ? '<td><button class="btn btn-sm btn-danger" data-delpo="' + po.id + '">ลบ</button></td>' : "") + "</tr>"; }).join("") : '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--fg-2)">ยังไม่มีการรับสินค้าเข้า</td></tr>') + "</tbody></table>";
       el.querySelectorAll("[data-delpo]").forEach(function (b) { b.onclick = function () { askPin("ลบใบรับสินค้าเข้า " + b.dataset.delpo, function () { S.deletePurchase(b.dataset.delpo); U.toast("ลบแล้ว", "ok"); renderPO(); renderPnl(); }); }; });
     }
+    // ----- ช่องค้นหาสินค้าแบบพิมพ์เอง (รับสินค้าเข้าสต็อก) -----
+    // พิมพ์คีย์เวิร์ด/รหัสบางส่วน (เช่น DCD, DC, สว่าน) แล้วเลื่อนเลือกจากรายการที่ตรงกัน
+    var poPickProducts = [];
+    function poProductRefresh() {
+      poPickProducts = S.getProducts();
+      var hid = document.querySelector("[data-po-product]");
+      // ถ้าสินค้าที่เลือกไว้หายไปจากรายการ → ล้างการเลือก
+      if (hid && hid.value && !poPickProducts.some(function (p) { return p.id === hid.value; })) {
+        hid.value = "";
+        var si = document.querySelector("[data-po-product-search]"); if (si) si.value = "";
+        var pk = document.querySelector("[data-po-product-pick]"); if (pk) pk.classList.remove("has-sel");
+        document.querySelector("[data-po-cost]").value = "";
+      }
+    }
+    function setupPoPicker() {
+      var pick = document.querySelector("[data-po-product-pick]");
+      if (!pick || pick._wired) return; pick._wired = true;
+      var input = pick.querySelector("[data-po-product-search]");
+      var hidden = pick.querySelector("[data-po-product]");
+      var list = pick.querySelector("[data-po-product-list]");
+      var matches = [], activeIdx = -1;
+      function norm(s) { return String(s || "").toLowerCase().replace(/[\s\-]/g, ""); }
+      function filter(q) {
+        q = String(q || "").trim().toLowerCase();
+        var toks = q.split(/\s+/).filter(Boolean);
+        if (!toks.length) return poPickProducts.slice(0, 60);
+        return poPickProducts.filter(function (p) {
+          var hay = ((p.name || "") + " " + (p.sku || "")).toLowerCase(), hayN = norm(hay);
+          return toks.every(function (t) { return hay.indexOf(t) >= 0 || hayN.indexOf(norm(t)) >= 0; });
+        }).slice(0, 60);
+      }
+      function render(q) {
+        matches = filter(q); activeIdx = -1;
+        if (!matches.length) {
+          list.innerHTML = '<div class="prodpick-empty">ไม่พบสินค้าที่ตรงกับ “' + esc(q) + '”</div>';
+        } else {
+          list.innerHTML = matches.map(function (p, i) {
+            var stk = (typeof p.stock === "number") ? '<span class="pp-stock">คงเหลือ ' + p.stock + '</span>' : "";
+            return '<div class="prodpick-item" data-pi="' + i + '"><span class="pp-name">' + esc(p.name || "") + '</span>' +
+              (p.sku ? '<span class="pp-sku">' + esc(p.sku) + '</span>' : "") + stk + '</div>';
+          }).join("");
+          list.querySelectorAll("[data-pi]").forEach(function (it) {
+            it.addEventListener("mousedown", function (e) { e.preventDefault(); choose(matches[+it.dataset.pi]); });
+          });
+        }
+        list.hidden = false;
+      }
+      function choose(p) {
+        if (!p) return;
+        hidden.value = p.id;
+        input.value = p.name + (p.sku ? " (" + p.sku + ")" : "");
+        pick.classList.add("has-sel");
+        list.hidden = true;
+        hidden.dispatchEvent(new Event("change")); // เติมช่อง "ต้นทุน/ชิ้น" อัตโนมัติ
+      }
+      function setActive(n) {
+        var items = list.querySelectorAll("[data-pi]");
+        if (!items.length) return;
+        activeIdx = (n + items.length) % items.length;
+        items.forEach(function (it, i) { it.classList.toggle("active", i === activeIdx); });
+        items[activeIdx].scrollIntoView({ block: "nearest" });
+      }
+      input.addEventListener("focus", function () {
+        if (pick.classList.contains("has-sel")) { input.select(); render(""); }
+        else render(input.value);
+      });
+      input.addEventListener("input", function () {
+        pick.classList.remove("has-sel"); hidden.value = "";
+        document.querySelector("[data-po-cost]").value = "";
+        render(input.value);
+      });
+      input.addEventListener("keydown", function (e) {
+        if (list.hidden) { if (e.key === "ArrowDown") render(input.value); return; }
+        if (e.key === "ArrowDown") { e.preventDefault(); setActive(activeIdx + 1); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); setActive(activeIdx - 1); }
+        else if (e.key === "Enter") { if (activeIdx >= 0 && matches[activeIdx]) { e.preventDefault(); choose(matches[activeIdx]); } }
+        else if (e.key === "Escape") { list.hidden = true; }
+      });
+      document.addEventListener("click", function (e) { if (!pick.contains(e.target)) list.hidden = true; });
+      // ฟังก์ชันล้างการเลือก (ใช้หลังบันทึกรับเข้า)
+      pick._clear = function () { hidden.value = ""; input.value = ""; pick.classList.remove("has-sel"); list.hidden = true; };
+    }
+    setupPoPicker();
+    // สินค้าจาก cloud มาถึงทีหลัง → รีเฟรชรายการในช่องค้นหาให้ครบ
+    window.addEventListener("me-products-loaded", function () { try { renderPO(); } catch (e) {} });
     document.querySelector("[data-po-product]").addEventListener("change", function () { var p = S.getProduct(this.value); document.querySelector("[data-po-cost]").value = p ? p.cost : ""; });
     document.querySelector("[data-po-add]").onclick = function () {
       var pid = document.querySelector("[data-po-product]").value, qty = +document.querySelector("[data-po-qty]").value || 0, cost = +document.querySelector("[data-po-cost]").value || 0;
@@ -3390,6 +3474,8 @@
       var prod = S.getProduct(pid), supId = document.querySelector("[data-po-supplier]").value, sup = S.getSuppliers().filter(function (s) { return s.id === supId; })[0];
       S.receivePurchase({ supplierId: supId, supplierName: sup ? sup.name : "", items: [{ productId: pid, name: prod.name, qty: qty, unitCost: cost || prod.cost }] });
       document.querySelector("[data-po-qty]").value = "";
+      var pk = document.querySelector("[data-po-product-pick]"); if (pk && pk._clear) pk._clear();
+      document.querySelector("[data-po-cost]").value = "";
       U.toast("รับสินค้าเข้าสต็อกแล้ว +" + qty + " ชิ้น", "ok"); renderPO(); renderPnl(); renderLedger();
     };
     function renderCustomers() {

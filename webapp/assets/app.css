@@ -100,6 +100,8 @@ img { max-width: 100%; display: block; }
 .me-hero-copy { padding-bottom: 40px; display: flex; flex-direction: column; gap: 16px; }
 .me-hero-h { font-family: var(--font-display-th); font-style: italic; font-weight: 900; font-size: clamp(44px,6.5vw,88px); line-height: .92; letter-spacing: -.01em; color: var(--ink); text-transform: uppercase; margin: 0; }
 .me-hero-h .en { font-family: var(--font-display-en); font-weight: 400; font-style: italic; }
+/* บรรทัดข้อความพิมพ์อัตโนมัติ: กันหน้าจอ "สั่น" — จองความสูงตามวลีที่ยาวที่สุด (คำนวณใน JS) */
+.me-hero-h .me-type-line { display: block; }
 .me-hero-sub { font-family: var(--font-body); font-size: 18px; color: var(--ink); font-weight: 500; max-width: 48ch; line-height: 1.55; margin: 0; }
 .me-hero-sub strong { font-weight: 800; }
 .me-hero-mascot { height: 440px; background-size: contain; background-repeat: no-repeat; background-position: bottom right; }
