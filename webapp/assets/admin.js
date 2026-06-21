@@ -3081,12 +3081,17 @@
           '</div>' +
         '</div>';
       }).join("");
-      // ปุ่ม ⚙️ เปิด/ปิดกล่องรายละเอียดของแต่ละหมวด
+      // ปุ่ม ⚙️ เปิด/ปิดกล่องรายละเอียดของแต่ละหมวด — lock scroll position so reflow doesn't jump
       catList.querySelectorAll("[data-cmore]").forEach(function (b) {
         b.addEventListener("click", function (e) {
           e.preventDefault();
           var box = catList.querySelector('[data-cmorebox="' + b.dataset.cmore + '"]');
-          if (box) box.style.display = (box.style.display === "block") ? "none" : "block";
+          if (!box) return;
+          var savedY = window.scrollY;
+          var opening = box.style.display !== "block";
+          catList.querySelectorAll("[data-cmorebox]").forEach(function (el) { el.style.display = "none"; });
+          if (opening) box.style.display = "block";
+          window.scrollTo({ top: savedY, behavior: "instant" });
         });
       });
       catList.querySelectorAll("[data-cdel]").forEach(function (b) { b.onclick = function () { syncCats(); cats.splice(+b.dataset.cdel, 1); renderCats(); }; });
