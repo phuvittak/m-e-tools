@@ -81,8 +81,19 @@ function detectBrand(text) {
 }
 
 function detectSku(text) {
-  const m = String(text || '').toUpperCase().match(/(?:[A-Z]{2,3}-)?[A-Z]{2,4}\d{3,6}/);
-  return m ? m[0] : null;
+  const up = String(text || '').toUpperCase();
+  // 1) รหัสเต็ม: ตัวอักษร 2-4 + ตัวเลข 3-6 (เช่น DCD805, DWE402, GA9020)
+  const full = up.match(/(?:[A-Z]{2,3}-)?[A-Z]{2,4}\d{3,6}/);
+  if (full) return full[0];
+  // 2) prefix รุ่นล้วนตัวอักษร (เช่น DCD, DCB, DWE, DHP) — ลูกค้าพิมพ์แค่ต้นรหัส
+  //    จับเฉพาะโทเคนสั้น 2-4 ตัวอักษร (+ ตัวเลขท้ายได้ไม่เกิน 2) กันไปชนคำอังกฤษทั่วไป
+  //    ใช้ 3-4 ตัวอักษร (prefix รุ่นจริงล้วน 3-4 ตัว: DCD/DCB/DWE/DHP/DTD/GSR)
+  //    เพื่อกันชนคำอังกฤษสั้น 2 ตัว (OK/NO/HI ฯลฯ)
+  const tokens = up.split(/[^A-Z0-9]+/).filter(Boolean);
+  for (const tk of tokens) {
+    if (/^[A-Z]{3,4}\d{0,3}$/.test(tk)) return tk;
+  }
+  return null;
 }
 
 function isWildcardAny(text) {
@@ -664,14 +675,20 @@ async function smartReply(userId, text) {
     );
   }
 
-  // 8) Fuzzy keyword search — ค้นหาจากชื่อสินค้า
+  // 8) Fuzzy keyword search — ค้นหาจากชื่อ/รหัส/แบรนด์ (พิมพ์บางส่วนก็เจอ)
+  //    ไม่จำกัดเพดานบนแล้ว: ถ้าตรงเยอะ (เช่นพิมพ์ "DCD" เจอสว่านหลายรุ่น) ก็โชว์
+  //    10 รุ่นแรก พร้อมบอกให้พิมพ์เจาะจงขึ้น — ไม่ทิ้งผลจนตกไป fallback อีก
   const fuzzyHits = fuzzySearchProducts(products, text);
-  if (fuzzyHits.length >= 1 && fuzzyHits.length <= 10) {
+  if (fuzzyHits.length >= 1) {
     await clearSession(userId);
     if (fuzzyHits.length === 1) return flexProduct(fuzzyHits[0]);
+    const shown = fuzzyHits.slice(0, 10);
+    const more = fuzzyHits.length > shown.length
+      ? `\n(แสดง ${shown.length} จาก ${fuzzyHits.length} รุ่น — พิมพ์รุ่นให้เจาะจงขึ้นได้ครับ เช่น "DCD805")`
+      : '';
     return [
-      { type: 'text', text: `พบสินค้าที่ตรงกับ "${text}" จำนวน ${fuzzyHits.length} รุ่นครับ` },
-      flexProductCarousel(fuzzyHits.slice(0, 6)),
+      { type: 'text', text: `พบสินค้าที่ตรงกับ "${text}" จำนวน ${fuzzyHits.length} รุ่นครับ${more}` },
+      flexProductCarousel(shown),
     ];
   }
 
