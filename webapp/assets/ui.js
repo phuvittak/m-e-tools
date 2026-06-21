@@ -81,7 +81,7 @@
     else badge = '<span class="tile-badge sale">ขาย</span>';
     var visual = p.image
       ? '<span class="tile-img" style="background-image:url(\'' + String(p.image).replace(/'/g, "%27") + '\')"></span>'
-      : '<span class="tile-icon">' + iconSvg(p.icon, opts.lg ? 120 : 64) + "</span><span class=\"tile-grid\"></span>";
+      : '<span class="tile-img tile-ph" style="background-image:url(\'assets/mascot-on-yellow.png\')"></span><span class="tile-grid"></span>';
     // ป้าย "ใหม่" — สินค้าที่เพิ่มภายใน 30 วัน
     var isNew = p.createdAt && (Date.now() - p.createdAt) < 30 * 86400000;
     var newBadge = isNew ? '<span class="tile-new">ใหม่</span>' : "";

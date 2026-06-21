@@ -307,7 +307,8 @@ img { max-width: 100%; display: block; }
 .tile-grid { position: absolute; inset: 0; background: linear-gradient(var(--ink) 1px,transparent 1px) 0 0/26px 26px, linear-gradient(90deg,var(--ink) 1px,transparent 1px) 0 0/26px 26px; opacity: .07; }
 .tile-icon { color: var(--ink); z-index: 1; }
 .tile-icon svg { stroke: var(--ink); stroke-width: 1.4; }
-.tile-img { position: absolute; inset: 0; z-index: 1; background-size: contain; background-position: center; background-repeat: no-repeat; }
+.tile-img { position: absolute; inset: 0; z-index: 1; background-size: cover; background-position: center; background-repeat: no-repeat; }
+.tile-ph { background-size: contain; background-position: bottom right; }
 .tile.has-img { background: var(--concrete-100); }
 /* product detail gallery */
 .pd-gallery { display: flex; flex-direction: column; gap: 12px; }
