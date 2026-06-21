@@ -1641,13 +1641,107 @@
     });
     if (pages.length % 2 !== 0) pages.push(BLANK);
 
-    // ลองเปิดแบบ "พลิกกระดาษจริง" (St.PageFlip: วางเมาส์ที่มุม = ดึงหน้ากระดาษ, โค้งเงานุ่ม, ลื่น)
-    // ถ้าโหลดไลบรารีไม่ได้ (เน็ต/CDN) → ใช้ตัวพลิกเดิมในเครื่องแทน เพื่อไม่ให้หน้าพัง
+    // เลือกมุมมอง: "เลื่อนแนวนอนในกรอบ" (ค่าเริ่มต้น — ตามที่ลูกค้าขอ) หรือ "พลิกหนังสือ"
+    var view = "scroll";
+    try { view = localStorage.getItem("me_cat_view") || "scroll"; } catch (e) {}
+    if (view === "scroll") { renderScrollStrip(box, pages); return; }
+
+    // โหมดหนังสือ: ลองเปิดแบบ "พลิกกระดาษจริง" (St.PageFlip) ถ้าโหลด CDN ไม่ได้ → ตัวพลิกในเครื่อง
     loadPageFlipLib().then(function (ok) {
       var done = false;
       if (ok) { try { renderFancyBook(box, pages); done = true; } catch (e) { console.warn("[catalog] fancy fail", e && e.message); } }
       if (!done) renderManualBook(box, pages, BLANK);
     });
+  }
+
+  // ===== มุมมอง "เลื่อนแนวนอน" : หน้าทุกหน้าวางเรียงซ้าย→ขวาในกรอบสี่เหลี่ยม =====
+  // เลื่อนด้วยเมาส์ (วีล/ลาก), ปัด, ลูกศร — สุดทางก็สุด ไม่วนกลับ
+  function renderScrollStrip(box, pages) {
+    var real = pages.filter(function (h) { return h.indexOf("cat-blank") < 0; });
+    box.innerHTML =
+      '<div class="cat-scroll-wrap" data-scroll>' +
+        '<div class="cat-scroll-track" data-track>' +
+          real.map(function (h, i) { return '<div class="cat-scroll-page" data-sp="' + i + '">' + h + "</div>"; }).join("") +
+        "</div>" +
+      "</div>" +
+      '<div class="book-nav">' +
+        '<button type="button" data-prev aria-label="ก่อนหน้า">‹</button>' +
+        '<span class="book-pageno" data-pageno></span>' +
+        '<button type="button" data-next aria-label="ถัดไป">›</button>' +
+        '<button type="button" class="book-ctrl" data-view-book title="อ่านแบบหนังสือ (พลิกหน้า)">📖</button>' +
+        '<button type="button" class="book-ctrl" data-print title="พิมพ์แคตตาล็อก">🖨️</button>' +
+      "</div>";
+
+    // div สำหรับพิมพ์ (ซ่อนบนจอ)
+    var printDiv = document.createElement("div");
+    printDiv.className = "cat-print-all";
+    real.forEach(function (h) { var pp = document.createElement("div"); pp.className = "cat-print-page"; pp.innerHTML = h; printDiv.appendChild(pp); });
+    box.appendChild(printDiv);
+
+    var wrap = box.querySelector("[data-scroll]");
+    var pageno = box.querySelector("[data-pageno]");
+    var prevBtn = box.querySelector("[data-prev]");
+    var nextBtn = box.querySelector("[data-next]");
+    var pageEls = Array.prototype.slice.call(box.querySelectorAll("[data-sp]"));
+    var total = pageEls.length;
+
+    function curIndex() {
+      var center = wrap.scrollLeft + wrap.clientWidth / 2, best = 0, bd = Infinity;
+      for (var i = 0; i < pageEls.length; i++) {
+        var mid = pageEls[i].offsetLeft + pageEls[i].offsetWidth / 2;
+        var d = Math.abs(mid - center);
+        if (d < bd) { bd = d; best = i; }
+      }
+      return best;
+    }
+    function upd() {
+      pageno.textContent = "หน้า " + (curIndex() + 1) + " / " + total;
+      prevBtn.disabled = wrap.scrollLeft <= 2;
+      nextBtn.disabled = wrap.scrollLeft >= wrap.scrollWidth - wrap.clientWidth - 2;
+    }
+    function goTo(i) {
+      i = Math.max(0, Math.min(total - 1, i));
+      var el = pageEls[i]; if (!el) return;
+      wrap.scrollTo({ left: el.offsetLeft - (wrap.clientWidth - el.offsetWidth) / 2, behavior: "smooth" });
+    }
+    prevBtn.addEventListener("click", function () { goTo(curIndex() - 1); });
+    nextBtn.addEventListener("click", function () { goTo(curIndex() + 1); });
+    wrap.addEventListener("scroll", upd, { passive: true });
+
+    // วีลเมาส์แนวตั้ง → เลื่อนแนวนอน (trackpad แนวนอนปล่อยทำงานเอง)
+    wrap.addEventListener("wheel", function (e) {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      wrap.scrollLeft += e.deltaY; e.preventDefault();
+    }, { passive: false });
+
+    // ลากด้วยเมาส์ (เดสก์ท็อป)
+    var down = false, sx = 0, sl = 0, moved = false;
+    wrap.addEventListener("pointerdown", function (e) {
+      if (e.pointerType !== "mouse") return;
+      down = true; moved = false; sx = e.clientX; sl = wrap.scrollLeft; wrap.classList.add("grabbing");
+    });
+    window.addEventListener("pointermove", function (e) {
+      if (!down) return;
+      var dx = e.clientX - sx; if (Math.abs(dx) > 3) moved = true;
+      wrap.scrollLeft = sl - dx;
+    });
+    window.addEventListener("pointerup", function () { if (down) { down = false; wrap.classList.remove("grabbing"); } });
+    // กันคลิกลิงก์ในหน้าตอนเพิ่งลาก
+    wrap.addEventListener("click", function (e) { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; } }, true);
+
+    // คีย์บอร์ดลูกศรซ้าย/ขวา
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") goTo(curIndex() + 1);
+      else if (e.key === "ArrowLeft") goTo(curIndex() - 1);
+    });
+
+    box.querySelector("[data-print]").addEventListener("click", function () { window.print(); });
+    box.querySelector("[data-view-book]").addEventListener("click", function () {
+      try { localStorage.setItem("me_cat_view", "book"); } catch (e) {}
+      initCatalog();
+    });
+
+    upd();
   }
 
   // โหลดไลบรารี St.PageFlip จาก CDN ครั้งเดียว (lazy) — คืน true ถ้าพร้อมใช้
@@ -1674,6 +1768,7 @@
         '<input type="number" class="book-goto" data-goto min="1" placeholder="#">' +
         '<span class="book-pageno" data-pageno></span>' +
         '<button type="button" data-next aria-label="ถัดไป">›</button>' +
+        '<button type="button" class="book-ctrl" data-view-scroll title="ดูแบบเลื่อนแนวนอน">↔</button>' +
         '<button type="button" class="book-ctrl" data-thumbs-toggle title="ดูหน้าทั้งหมด" aria-pressed="false">▦</button>' +
         '<button type="button" class="book-ctrl" data-zoom-out title="ซูมออก">−</button>' +
         '<button type="button" class="book-ctrl" data-zoom-in title="ซูมเข้า">+</button>' +
@@ -1822,6 +1917,13 @@
     // print
     box.querySelector("[data-print]").addEventListener("click", function () { window.print(); });
 
+    // สลับไปมุมมองเลื่อนแนวนอน
+    var viewScrollBtn = box.querySelector("[data-view-scroll]");
+    if (viewScrollBtn) viewScrollBtn.addEventListener("click", function () {
+      try { localStorage.setItem("me_cat_view", "scroll"); } catch (e) {}
+      initCatalog();
+    });
+
     // ปุ่มเปิด/ปิดแถบรูปย่อ (ซ่อนเป็นค่าเริ่มต้น — กดแล้วค่อยโผล่ ไม่ทำให้หน้ายาว)
     var thumbToggle = box.querySelector("[data-thumbs-toggle]");
     if (thumbToggle && thumbsEl) {
@@ -1848,6 +1950,7 @@
         '<input type="number" class="book-goto" data-goto min="1" placeholder="#">' +
         '<span class="book-pageno" data-pageno></span>' +
         '<button type="button" data-next aria-label="ถัดไป">›</button>' +
+        '<button type="button" class="book-ctrl" data-view-scroll title="ดูแบบเลื่อนแนวนอน">↔</button>' +
         '<button type="button" class="book-ctrl" data-thumbs-toggle title="ดูหน้าทั้งหมด" aria-pressed="false">▦</button>' +
         '<button type="button" class="book-ctrl" data-zoom-out title="ซูมออก">−</button>' +
         '<button type="button" class="book-ctrl" data-zoom-in title="ซูมเข้า">+</button>' +
@@ -2051,6 +2154,13 @@
 
     // print
     box.querySelector("[data-print]").addEventListener("click", function () { window.print(); });
+
+    // สลับไปมุมมองเลื่อนแนวนอน
+    var viewScrollBtn = box.querySelector("[data-view-scroll]");
+    if (viewScrollBtn) viewScrollBtn.addEventListener("click", function () {
+      try { localStorage.setItem("me_cat_view", "scroll"); } catch (e) {}
+      initCatalog();
+    });
 
     // ปุ่มเปิด/ปิดแถบรูปย่อ (ซ่อนเป็นค่าเริ่มต้น — กดแล้วค่อยโผล่ ไม่ทำให้หน้ายาว)
     var thumbToggle = box.querySelector("[data-thumbs-toggle]");

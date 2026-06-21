@@ -861,7 +861,7 @@ body.no-rent .mode-toggle [data-mode="buy"] { width: 100%; text-align: center; }
 .acct-msg { font-family: var(--font-body); font-size: 13px; text-align: center; margin-top: 8px; min-height: 18px; color: #777; }
 .acct-msg.warn { color: #8a6d00; }
 .acct-msg.err { color: var(--price-red); }
-body.no-rent .acct-verify { display: none; }
+/* ยืนยันตัวตน (KYC) แสดงเสมอ — เป็นฟีเจอร์ของบัญชี ไม่ผูกกับบริการเช่า */
 @media (max-width: 520px) { .acct-page .f2 { grid-template-columns: 1fr; } }
 
 /* ---------- admin customers: code + verify chips ---------- */

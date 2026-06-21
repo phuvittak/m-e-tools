@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>บัญชีของฉัน — M.E.Tools</title>
-  <link rel="stylesheet" href="assets/app.css?v=20260621f">
+  <link rel="stylesheet" href="assets/app.css?v=20260621h">
 </head>
 <body data-page="account">
   <div data-header></div>
@@ -50,20 +50,20 @@
           <div class="field"><label>ที่อยู่</label><textarea data-f="address" rows="3" placeholder="บ้านเลขที่ / ถนน / ตำบล / อำเภอ / จังหวัด / รหัสไปรษณีย์" maxlength="400"></textarea></div>
         </section>
 
-        <!-- ยืนยันตัวตน (เปิดเฉพาะตอนเปิดบริการเช่า) -->
+        <!-- ยืนยันตัวตน (KYC) — แสดงเสมอ เพิ่มความปลอดภัย/ความน่าเชื่อถือให้บัญชี -->
         <section class="acct-card acct-verify" data-acct-verify-card>
           <div class="acct-verify-row">
             <div class="acct-verify-ic">🪪</div>
             <div class="acct-verify-text">
-              <div class="acct-verify-h">ยืนยันตัวตนเพื่อปลดล็อคการเช่า</div>
-              <div class="acct-verify-sub">อัปโหลดบัตรประชาชน + ใบขับขี่/ใบรับรอง (เก็บเป็นความลับ ใช้สำหรับการเช่าเท่านั้น)</div>
+              <div class="acct-verify-h">ยืนยันตัวตน (KYC)</div>
+              <div class="acct-verify-sub">อัปโหลดบัตรประชาชนเพื่อเพิ่มความปลอดภัยและความน่าเชื่อถือให้บัญชี — เก็บเป็นความลับ ใช้ยืนยันตัวตนเท่านั้น</div>
             </div>
             <button type="button" class="me-btn me-btn-sm" data-acct-verify-toggle>ยืนยันตัวตน</button>
           </div>
           <div class="acct-verify-body" data-acct-verify-body hidden>
             <div class="f2">
               <label class="acct-upload"><span data-acct-id-label>📄 บัตรประชาชน</span><input type="file" accept="image/*" data-acct-id hidden></label>
-              <label class="acct-upload"><span data-acct-lic-label>📄 ใบขับขี่/ใบรับรอง</span><input type="file" accept="image/*" data-acct-lic hidden></label>
+              <label class="acct-upload"><span data-acct-lic-label>📄 เอกสารเพิ่มเติม (ไม่บังคับ)</span><input type="file" accept="image/*" data-acct-lic hidden></label>
             </div>
           </div>
         </section>
@@ -78,8 +78,8 @@
   <div data-footer></div>
   <script src="assets/thai-geo.js?v=20260620j"></script>
   <script src="assets/store.js?v=20260620j"></script>
-  <script src="assets/ui.js?v=20260621f"></script>
+  <script src="assets/ui.js?v=20260621h"></script>
   <script src="assets/qr.js?v=20260620j"></script>
-  <script src="assets/public.js?v=20260621g"></script>
+  <script src="assets/public.js?v=20260621h"></script>
 </body>
 </html>

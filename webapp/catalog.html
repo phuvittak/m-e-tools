@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>แคตตาล็อกสินค้า — M.E.Tools ท่ารั้ว เชียงใหม่</title>
   <meta name="description" content="ดูแคตตาล็อกเครื่องมือช่าง M.E.Tools ครบทุกรุ่น DEWALT MAKITA BOSCH ท่ารั้ว เชียงใหม่">
-  <link rel="stylesheet" href="assets/app.css?v=20260621f">
+  <link rel="stylesheet" href="assets/app.css?v=20260621h">
   <style>
     :root { --cat-paper:#ffffff; --cat-red:#d11f26; --cat-ink:#15171c; }
     .catalog-wrap { display:flex; flex-direction:column; min-height:100vh; background:#23262c }
@@ -115,10 +115,20 @@
     .cat-thumb-item:hover:not(.active) { border-color:#666; }
     .cat-thumb-num { position:absolute; bottom:2px; right:4px; font-size:9px; color:#fff; background:rgba(0,0,0,.55); padding:0 3px; border-radius:2px; line-height:1.6; }
 
+    /* ---- horizontal scroll view (เลื่อนแนวนอนในกรอบสี่เหลี่ยม · เมาส์/ลาก/ปัดได้) ---- */
+    .cat-scroll-wrap { width:min(1060px,97vw); height:min(78vh,760px); overflow-x:auto; overflow-y:hidden;
+      background:#1a1d22; border-radius:5px; box-shadow:0 18px 50px rgba(0,0,0,.45);
+      scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; cursor:grab; scrollbar-width:thin; scrollbar-color:#444 #1a1d22; }
+    .cat-scroll-wrap.grabbing { cursor:grabbing; }
+    .cat-scroll-track { display:flex; gap:14px; height:100%; padding:14px; box-sizing:border-box; width:max-content; }
+    .cat-scroll-page { flex:0 0 auto; height:100%; aspect-ratio:.707/1; position:relative; background:var(--cat-paper);
+      border-radius:3px; overflow:hidden; box-shadow:0 8px 22px rgba(0,0,0,.4); scroll-snap-align:center; }
+    .cat-scroll-page .cat-page { position:absolute; inset:0; }
+
     /* ---- print ---- */
     .cat-print-all { display:none; }
     @media print {
-      [data-header],[data-footer],.catalog-hero,.catalog-nav,.book-nav,.cat-thumb-strip { display:none !important; }
+      [data-header],[data-footer],.catalog-hero,.catalog-nav,.book-nav,.cat-thumb-strip,.cat-scroll-wrap { display:none !important; }
       .catalog-wrap { background:#fff !important; min-height:auto !important; }
       .book-stage { padding:0 !important; background:#fff !important; display:block !important; }
       .book,.book-fancy { display:none !important; }
@@ -212,8 +222,8 @@
 
   <script src="assets/thai-geo.js?v=20260621b"></script>
   <script src="assets/store.js?v=20260621b"></script>
-  <script src="assets/ui.js?v=20260621f"></script>
+  <script src="assets/ui.js?v=20260621h"></script>
   <script src="assets/qr.js?v=20260621b"></script>
-  <script src="assets/public.js?v=20260621g"></script>
+  <script src="assets/public.js?v=20260621h"></script>
 </body>
 </html>
