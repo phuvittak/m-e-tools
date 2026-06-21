@@ -106,8 +106,10 @@
     .book-ctrl { background:rgba(255,255,255,.15); color:#fff; border:none; width:36px; height:36px; border-radius:8px; font-size:16px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
     .book-ctrl:hover { background:rgba(255,255,255,.28); }
 
-    /* ---- thumbnail strip ---- */
-    .cat-thumb-strip { display:flex; gap:5px; padding:10px 14px; overflow-x:auto; background:#1a1d22; scrollbar-width:thin; scrollbar-color:#444 #1a1d22; }
+    /* ---- thumbnail strip (ซ่อนเป็นค่าเริ่มต้น เปิดด้วยปุ่ม ▦ บนแถบควบคุม) ---- */
+    .cat-thumb-strip { display:none; gap:5px; padding:10px 14px; overflow-x:auto; background:#1a1d22; scrollbar-width:thin; scrollbar-color:#444 #1a1d22; }
+    .cat-thumb-strip.open { display:flex; }
+    .book-ctrl.on { background:var(--dw-yellow,#FFB81C); color:#111; }
     .cat-thumb-item { flex:0 0 48px; height:64px; background:#2a2d33; border:2px solid #3a3d43; border-radius:4px; cursor:pointer; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; transition:border-color .15s; font-size:11px; color:#aaa; font-family:monospace; background-size:cover; background-position:center; }
     .cat-thumb-item.active { border-color:var(--dw-yellow,#FFB81C); color:var(--dw-yellow,#FFB81C); }
     .cat-thumb-item:hover:not(.active) { border-color:#666; }
@@ -212,6 +214,6 @@
   <script src="assets/store.js?v=20260621b"></script>
   <script src="assets/ui.js?v=20260621f"></script>
   <script src="assets/qr.js?v=20260621b"></script>
-  <script src="assets/public.js?v=20260621d"></script>
+  <script src="assets/public.js?v=20260621g"></script>
 </body>
 </html>

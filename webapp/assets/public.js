@@ -1674,6 +1674,7 @@
         '<input type="number" class="book-goto" data-goto min="1" placeholder="#">' +
         '<span class="book-pageno" data-pageno></span>' +
         '<button type="button" data-next aria-label="ถัดไป">›</button>' +
+        '<button type="button" class="book-ctrl" data-thumbs-toggle title="ดูหน้าทั้งหมด" aria-pressed="false">▦</button>' +
         '<button type="button" class="book-ctrl" data-zoom-out title="ซูมออก">−</button>' +
         '<button type="button" class="book-ctrl" data-zoom-in title="ซูมเข้า">+</button>' +
         '<button type="button" class="book-ctrl" data-print title="พิมพ์แคตตาล็อก">🖨️</button>' +
@@ -1821,6 +1822,17 @@
     // print
     box.querySelector("[data-print]").addEventListener("click", function () { window.print(); });
 
+    // ปุ่มเปิด/ปิดแถบรูปย่อ (ซ่อนเป็นค่าเริ่มต้น — กดแล้วค่อยโผล่ ไม่ทำให้หน้ายาว)
+    var thumbToggle = box.querySelector("[data-thumbs-toggle]");
+    if (thumbToggle && thumbsEl) {
+      thumbToggle.addEventListener("click", function () {
+        var open = thumbsEl.classList.toggle("open");
+        thumbToggle.classList.toggle("on", open);
+        thumbToggle.setAttribute("aria-pressed", open ? "true" : "false");
+        if (open) { var a = thumbsEl.querySelector(".active"); if (a) a.scrollIntoView({ inline: "center" }); }
+      });
+    }
+
     buildThumbs(0);
     upd();
   }
@@ -1836,6 +1848,7 @@
         '<input type="number" class="book-goto" data-goto min="1" placeholder="#">' +
         '<span class="book-pageno" data-pageno></span>' +
         '<button type="button" data-next aria-label="ถัดไป">›</button>' +
+        '<button type="button" class="book-ctrl" data-thumbs-toggle title="ดูหน้าทั้งหมด" aria-pressed="false">▦</button>' +
         '<button type="button" class="book-ctrl" data-zoom-out title="ซูมออก">−</button>' +
         '<button type="button" class="book-ctrl" data-zoom-in title="ซูมเข้า">+</button>' +
         '<button type="button" class="book-ctrl" data-print title="พิมพ์แคตตาล็อก">🖨️</button>' +
@@ -2038,6 +2051,17 @@
 
     // print
     box.querySelector("[data-print]").addEventListener("click", function () { window.print(); });
+
+    // ปุ่มเปิด/ปิดแถบรูปย่อ (ซ่อนเป็นค่าเริ่มต้น — กดแล้วค่อยโผล่ ไม่ทำให้หน้ายาว)
+    var thumbToggle = box.querySelector("[data-thumbs-toggle]");
+    if (thumbToggle && thumbsEl) {
+      thumbToggle.addEventListener("click", function () {
+        var open = thumbsEl.classList.toggle("open");
+        thumbToggle.classList.toggle("on", open);
+        thumbToggle.setAttribute("aria-pressed", open ? "true" : "false");
+        if (open) { var a = thumbsEl.querySelector(".active"); if (a) a.scrollIntoView({ inline: "center" }); }
+      });
+    }
 
     buildThumbs();
     renderStatic(); updateNav();
