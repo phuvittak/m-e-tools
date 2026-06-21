@@ -3061,6 +3061,7 @@
     }
     function renderBrands() {
       if (!brandList) return;
+      var _scrollY = window.scrollY; // ล็อกตำแหน่งหน้าจอ — กดเปิด/ปิดขาย หรือลบแบรนด์ แล้วจอไม่เด้ง
       brandList.innerHTML = brands.map(function (b, i) {
         var pc = brandProducts(b.name).length;
         return '<div class="row-edit' + (b.hidden ? " is-hidden" : "") + '" draggable="true" data-brow="' + i + '" style="cursor:grab">' +
@@ -3124,6 +3125,7 @@
           renderBrands();
         });
       });
+      window.scrollTo(0, _scrollY); // คืนตำแหน่งหน้าจอหลังสร้าง DOM ใหม่
     }
     if (brandList) { renderBrands(); root.querySelector("[data-brand-add]").addEventListener("click", function () { syncBrands(); brands.push({ name: "", tag: "", primary: false, hidden: false }); renderBrands(); }); }
 
@@ -3171,9 +3173,12 @@
     function catDepth(key) { var d = 0, g = 0, c = catByKey(key); while (c && c.parent && g++ < 30) { d++; c = catByKey(c.parent); } return d; }
     function catPathLocal(key) { var labels = [], g = 0, c = catByKey(key); while (c && g++ < 30) { labels.unshift(c.label || c.key); c = c.parent ? catByKey(c.parent) : null; } return labels.join(" › "); }
     var _catDragIdx = null;
+    var catOpen = {}; // จำว่าหมวดไหนกางรายละเอียดอยู่ (key = c.key) — คงสภาพข้ามการ re-render
     function renderCats() {
       if (!catList) return;
+      var _scrollY = window.scrollY; // ล็อกตำแหน่งหน้าจอไว้ก่อนสร้าง DOM ใหม่ — กันจอเด้งกลับบนสุด
       catList.innerHTML = '<datalist id="cat-name-presets">' + CAT_NAME_PRESETS.map(function (n) { return '<option value="' + esc(n) + '">'; }).join("") + "</datalist>" + cats.map(function (c, i) {
+        var isOpen = !!catOpen[c.key];
         var depth = catDepth(c.key);
         var lineage = depth === 0
           ? '⭐ หมวดหลัก (ชั้นบนสุด)'
@@ -3188,16 +3193,17 @@
         })();
         var iconSel = '<select data-ci="' + i + '"' + (c.image ? " disabled" : "") + ' title="ไอคอนของหมวด" style="flex:0 0 130px">' +
           CAT_ICONS.map(function (ic) { return '<option value="' + ic + '"' + ((c.icon || "tool") === ic ? " selected" : "") + ">" + (CAT_ICON_TH[ic] || ic) + "</option>"; }).join("") + "</select>";
-        // แถวเต็มรูปแบบคงที่: รายละเอียดทุกหมวดกางค้างไว้ตลอด — ขนาดไม่ยืด/หดเวลากด เลยไม่มีจอกระโดด
+        // แถวกระชับ: ค่าเริ่มต้นหุบรายละเอียดไว้ (กันข้อมูลยาวเกิน) · กดลูกศรกาง/หุบเฉพาะแถวนั้นโดยจอไม่เด้ง
         return '<div class="row-edit' + (c.hidden ? " is-hidden" : "") + '" draggable="true" data-crow="' + i + '" style="cursor:grab;align-items:center;flex-wrap:wrap;gap:6px;padding-left:' + (8 + depth * 16) + 'px;' + (depth ? "border-left:3px solid var(--dw-yellow-deep,#E8A800);" : "") + '">' +
           '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 2px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
           '<span class="cat-lvl" title="' + esc(lineage) + '" style="flex:0 0 auto;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--ink);min-width:22px">L' + (depth + 1) + '</span>' +
           '<span style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--bg-1,#f5f5f5);border-radius:6px">' + catPreview(c) + "</span>" +
           '<input data-cn="' + i + '" list="cat-name-presets" value="' + esc(c.label) + '" placeholder="ชื่อหมวด" style="flex:1;min-width:90px">' +
           '<label class="f-check" style="white-space:nowrap"><input type="checkbox" data-ch="' + i + '"' + (c.hidden ? " checked" : "") + "> ซ่อน</label>" +
+          '<button type="button" class="btn btn-sm" data-cmore="' + i + '" title="กาง/หุบ ตั้งค่าเพิ่มเติม (หมวดแม่ · ไอคอน · รูป · VAT · BigSeller ID)" style="white-space:nowrap">' + (isOpen ? "▾ ตั้งค่า" : "▸ ตั้งค่า") + "</button>" +
           '<button type="button" class="btn btn-sm btn-danger" data-cdel="' + i + '">ลบ</button>' +
-          // กล่องรายละเอียด — แสดงตลอด (input อยู่ใน DOM ให้ syncCats อ่านได้)
-          '<div data-cmorebox="' + i + '" style="flex-basis:100%;width:100%;margin-top:6px;padding-top:8px;border-top:1px dashed var(--border-3,#ddd)">' +
+          // กล่องรายละเอียด — หุบ/กางตาม catOpen (input อยู่ใน DOM ตลอด ให้ syncCats อ่านได้แม้หุบอยู่)
+          '<div data-cmorebox="' + i + '" style="' + (isOpen ? "" : "display:none;") + 'flex-basis:100%;width:100%;margin-top:6px;padding-top:8px;border-top:1px dashed var(--border-3,#ddd)">' +
             '<div style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2);margin-bottom:6px">' + lineage + '</div>' +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
               '<span style="font-size:11px;color:#888">หมวดแม่</span>' + parentSel +
@@ -3210,6 +3216,22 @@
           '</div>' +
         '</div>';
       }).join("");
+      // ปุ่มลูกศร: กาง/หุบเฉพาะแถวนั้นในที่ — ไม่สร้าง DOM ใหม่ จอจึงนิ่งสนิท แถวที่กดอยู่กับที่
+      catList.querySelectorAll("[data-cmore]").forEach(function (b) {
+        b.addEventListener("click", function (e) {
+          e.preventDefault();
+          var idx = +b.dataset.cmore, c = cats[idx];
+          var box = catList.querySelector('[data-cmorebox="' + idx + '"]');
+          var row = b.closest("[data-crow]");
+          if (!box || !c) return;
+          var beforeTop = row.getBoundingClientRect().top; // ตรึงแถวที่กดให้อยู่ตำแหน่งเดิมบนจอ
+          var nowOpen = box.style.display === "none";
+          box.style.display = nowOpen ? "block" : "none";
+          b.textContent = nowOpen ? "▾ ตั้งค่า" : "▸ ตั้งค่า";
+          catOpen[c.key] = nowOpen;
+          window.scrollBy(0, row.getBoundingClientRect().top - beforeTop);
+        });
+      });
       catList.querySelectorAll("[data-cdel]").forEach(function (b) { b.onclick = function () { syncCats(); cats.splice(+b.dataset.cdel, 1); renderCats(); }; });
       catList.querySelectorAll("[data-cimgclr]").forEach(function (b) { b.onclick = function () { syncCats(); cats[+b.dataset.cimgclr].image = ""; renderCats(); }; });
       catList.querySelectorAll("[data-ci]").forEach(function (sel) { sel.addEventListener("change", function () { syncCats(); renderCats(); }); });
@@ -3237,8 +3259,22 @@
           renderCats();
         });
       });
+      window.scrollTo(0, _scrollY); // คืนตำแหน่งหน้าจอหลังสร้าง DOM ใหม่ — เปลี่ยนไอคอน/หมวดแม่/ซ่อน/ลบ แล้วจอไม่เด้ง
     }
-    if (catList) { renderCats(); var catAddBtn = root.querySelector("[data-cat-add]"); if (catAddBtn) catAddBtn.addEventListener("click", function () { syncCats(); cats.push({ key: "c" + Date.now().toString(36), label: "", icon: "tool", image: "", hidden: false, parent: "" }); renderCats(); }); }
+    if (catList) {
+      renderCats();
+      var catAddBtn = root.querySelector("[data-cat-add]");
+      if (catAddBtn) catAddBtn.addEventListener("click", function () {
+        syncCats();
+        var nc = { key: "c" + Date.now().toString(36), label: "", icon: "tool", image: "", hidden: false, parent: "" };
+        catOpen[nc.key] = true; // หมวดใหม่กางไว้ให้กรอกได้เลย
+        cats.push(nc);
+        renderCats();
+        var rows = catList.querySelectorAll("[data-crow]");
+        var last = rows[rows.length - 1];
+        if (last) { last.scrollIntoView({ block: "center", behavior: "smooth" }); var nm = last.querySelector("[data-cn]"); if (nm) nm.focus(); }
+      });
+    }
 
     // ----- Promo banner -----
     var promo = Object.assign({ enabled: false, title: "", text: "", image: "", startDate: "", endDate: "", autoBroadcast: false, links: [], dateText: "", conditions: "" }, st.promo || {});
