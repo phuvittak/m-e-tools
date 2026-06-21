@@ -3188,17 +3188,16 @@
         })();
         var iconSel = '<select data-ci="' + i + '"' + (c.image ? " disabled" : "") + ' title="ไอคอนของหมวด" style="flex:0 0 130px">' +
           CAT_ICONS.map(function (ic) { return '<option value="' + ic + '"' + ((c.icon || "tool") === ic ? " selected" : "") + ">" + (CAT_ICON_TH[ic] || ic) + "</option>"; }).join("") + "</select>";
-        // แถวกระชับ: บรรทัดเดียว (ลาก · L · ไอคอน · ชื่อ · ซ่อน · ⚙️ · ลบ) — รายละเอียดที่เหลือซ่อนไว้ใน ⚙️
+        // แถวเต็มรูปแบบคงที่: รายละเอียดทุกหมวดกางค้างไว้ตลอด — ขนาดไม่ยืด/หดเวลากด เลยไม่มีจอกระโดด
         return '<div class="row-edit' + (c.hidden ? " is-hidden" : "") + '" draggable="true" data-crow="' + i + '" style="cursor:grab;align-items:center;flex-wrap:wrap;gap:6px;padding-left:' + (8 + depth * 16) + 'px;' + (depth ? "border-left:3px solid var(--dw-yellow-deep,#E8A800);" : "") + '">' +
           '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 2px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
           '<span class="cat-lvl" title="' + esc(lineage) + '" style="flex:0 0 auto;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--ink);min-width:22px">L' + (depth + 1) + '</span>' +
           '<span style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--bg-1,#f5f5f5);border-radius:6px">' + catPreview(c) + "</span>" +
           '<input data-cn="' + i + '" list="cat-name-presets" value="' + esc(c.label) + '" placeholder="ชื่อหมวด" style="flex:1;min-width:90px">' +
           '<label class="f-check" style="white-space:nowrap"><input type="checkbox" data-ch="' + i + '"' + (c.hidden ? " checked" : "") + "> ซ่อน</label>" +
-          '<button type="button" class="btn btn-sm" data-cmore="' + i + '" title="ตั้งค่าเพิ่มเติม (หมวดแม่ · ไอคอน · รูป · VAT · BigSeller ID)">⚙️</button>' +
           '<button type="button" class="btn btn-sm btn-danger" data-cdel="' + i + '">ลบ</button>' +
-          // กล่องรายละเอียด (ซ่อนไว้ — input ยังอยู่ใน DOM ให้ syncCats อ่านได้)
-          '<div data-cmorebox="' + i + '" style="display:none;flex-basis:100%;width:100%;margin-top:6px;padding-top:8px;border-top:1px dashed var(--border-3,#ddd)">' +
+          // กล่องรายละเอียด — แสดงตลอด (input อยู่ใน DOM ให้ syncCats อ่านได้)
+          '<div data-cmorebox="' + i + '" style="flex-basis:100%;width:100%;margin-top:6px;padding-top:8px;border-top:1px dashed var(--border-3,#ddd)">' +
             '<div style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2);margin-bottom:6px">' + lineage + '</div>' +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
               '<span style="font-size:11px;color:#888">หมวดแม่</span>' + parentSel +
@@ -3211,19 +3210,6 @@
           '</div>' +
         '</div>';
       }).join("");
-      // ปุ่ม ⚙️ เปิด/ปิดกล่องรายละเอียดของแต่ละหมวด — lock scroll position so reflow doesn't jump
-      catList.querySelectorAll("[data-cmore]").forEach(function (b) {
-        b.addEventListener("click", function (e) {
-          e.preventDefault();
-          var box = catList.querySelector('[data-cmorebox="' + b.dataset.cmore + '"]');
-          if (!box) return;
-          var savedY = window.scrollY;
-          var opening = box.style.display !== "block";
-          catList.querySelectorAll("[data-cmorebox]").forEach(function (el) { el.style.display = "none"; });
-          if (opening) box.style.display = "block";
-          window.scrollTo({ top: savedY, behavior: "instant" });
-        });
-      });
       catList.querySelectorAll("[data-cdel]").forEach(function (b) { b.onclick = function () { syncCats(); cats.splice(+b.dataset.cdel, 1); renderCats(); }; });
       catList.querySelectorAll("[data-cimgclr]").forEach(function (b) { b.onclick = function () { syncCats(); cats[+b.dataset.cimgclr].image = ""; renderCats(); }; });
       catList.querySelectorAll("[data-ci]").forEach(function (sel) { sel.addEventListener("change", function () { syncCats(); renderCats(); }); });
