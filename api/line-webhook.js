@@ -80,19 +80,50 @@ function detectBrand(text) {
   return null;
 }
 
+// ตาราง "ชื่อตัวอักษรภาษาไทย → ตัวอักษรละติน" — ลูกค้าชอบสะกดรหัสเป็นไทย
+// เช่น "ดีซีดี" = D-C-D, "ดับเบิลยูอี" = W-E ฯลฯ
+const THAI_LETTER = {
+  'เอ': 'A', 'บี': 'B', 'ซี': 'C', 'ดี': 'D', 'อี': 'E', 'เอฟ': 'F', 'จี': 'G',
+  'เอช': 'H', 'ไอ': 'I', 'เจ': 'J', 'เค': 'K', 'แอล': 'L', 'เอ็ม': 'M', 'เอ็ม': 'M',
+  'เอ็น': 'N', 'โอ': 'O', 'พี': 'P', 'คิว': 'Q', 'อาร์': 'R', 'เอส': 'S', 'ที': 'T',
+  'ยู': 'U', 'วี': 'V', 'ดับเบิลยู': 'W', 'ดับบลิว': 'W', 'เอ็กซ์': 'X', 'เอ๊กซ์': 'X',
+  'วาย': 'Y', 'แซด': 'Z', 'เซด': 'Z',
+};
+const THAI_LETTER_KEYS = Object.keys(THAI_LETTER).sort((a, b) => b.length - a.length);
+
+// แปลงรหัสที่ "สะกดเป็นไทย" ให้เป็นละติน — อ่านพยางค์นำหน้าแบบ greedy แล้วหยุด
+// เมื่อเจอพยางค์ที่ไม่ใช่ชื่อตัวอักษร (กันคำไทยทั่วไปกลายเป็นรหัสมั่ว)
+function spellThaiToLatin(text) {
+  const s = String(text || '').replace(/\s+/g, '');
+  let out = '', i = 0, letters = 0, guard = 0;
+  while (i < s.length && guard++ < 200) {
+    let matched = false;
+    for (const k of THAI_LETTER_KEYS) {
+      if (s.startsWith(k, i)) { out += THAI_LETTER[k]; i += k.length; letters++; matched = true; break; }
+    }
+    if (matched) continue;
+    if (/[0-9]/.test(s[i])) { out += s[i]; i++; continue; }
+    break; // พยางค์ที่ไม่ใช่ชื่อตัวอักษร → จบการอ่านรหัส
+  }
+  return letters >= 2 ? out : ''; // ต้องมีอย่างน้อย 2 ตัวอักษร จึงนับเป็นรหัส
+}
+
 function detectSku(text) {
   const up = String(text || '').toUpperCase();
-  // 1) รหัสเต็ม: ตัวอักษร 2-4 + ตัวเลข 3-6 (เช่น DCD805, DWE402, GA9020)
-  const full = up.match(/(?:[A-Z]{2,3}-)?[A-Z]{2,4}\d{3,6}/);
+  // 1) รหัสเต็ม: ตัวอักษร 2-4 + ตัวเลข 3-6 + suffix รุ่นย่อย (เช่น DCD805, DCD709B,
+  //    DCD771B102A, GA9020) — เก็บ suffix ด้วยเพื่อชี้รุ่นเป๊ะเป็นการ์ดเดียว
+  const full = up.match(/(?:[A-Z]{2,3}-)?[A-Z]{2,4}\d{3,6}[A-Z0-9-]{0,6}/);
   if (full) return full[0];
   // 2) prefix รุ่นล้วนตัวอักษร (เช่น DCD, DCB, DWE, DHP) — ลูกค้าพิมพ์แค่ต้นรหัส
-  //    จับเฉพาะโทเคนสั้น 2-4 ตัวอักษร (+ ตัวเลขท้ายได้ไม่เกิน 2) กันไปชนคำอังกฤษทั่วไป
   //    ใช้ 3-4 ตัวอักษร (prefix รุ่นจริงล้วน 3-4 ตัว: DCD/DCB/DWE/DHP/DTD/GSR)
   //    เพื่อกันชนคำอังกฤษสั้น 2 ตัว (OK/NO/HI ฯลฯ)
   const tokens = up.split(/[^A-Z0-9]+/).filter(Boolean);
   for (const tk of tokens) {
     if (/^[A-Z]{3,4}\d{0,3}$/.test(tk)) return tk;
   }
+  // 3) ลูกค้าสะกดรหัสเป็นไทย เช่น "ดีซีดี" → DCD, "ดีซีดี805" → DCD805
+  const thai = spellThaiToLatin(text);
+  if (thai && /^[A-Z]{2,4}\d{0,3}$/.test(thai)) return thai;
   return null;
 }
 
@@ -557,6 +588,102 @@ function wantsBudget(text) {
   return /(งบ|budget|ราคา.*เท่าไร|ราคา.*ถูก|ไม่เกิน|ประมาณ|แถว|ราคาถูก|คุ้มค่า)/i.test(text);
 }
 
+// ============================================================
+// 🔎 Unified catalog search — เหมือนช่องค้นหาในเว็บ
+//    หลักการ: "ในระบบมีรหัส/ชื่อที่เรียงตรงกัน" ก็เจอ — ไม่ว่าตัวใหญ่/เล็ก
+//    ไทย/อังกฤษ/ตัวเลข แล้วค่อยกรองให้แคบด้วยแบรนด์/หมวด/คำในชื่อที่พิมพ์มาด้วย
+// ============================================================
+const REFINE_THRESHOLD = 10; // เกินจำนวนนี้ → ถามลูกค้าให้เลือกประเภทก่อน (ตามที่เจ้าของสั่ง)
+
+// คำทั่วไป/คำเชื่อม ที่ไม่ใช้เป็นคีย์กรองชื่อสินค้า
+const STOPWORDS = new Set([
+  'มี', 'ขอ', 'ดู', 'อยาก', 'ได้', 'ครับ', 'คับ', 'ค่ะ', 'คะ', 'ราคา', 'เท่าไร', 'เท่าไหร่',
+  'ตัว', 'รุ่น', 'สินค้า', 'หน่อย', 'ไหม', 'มั้ย', 'บ้าง', 'ของ', 'แบบ', 'และ', 'กับ', 'เอา',
+  'อัน', 'นี้', 'นั้น', 'หา', 'ที่',
+]);
+
+// ดึง "คำในชื่อ" ที่ลูกค้าพิมพ์เพิ่มจากรหัส/แบรนด์ เพื่อใช้กรองให้แคบ
+// เช่น "DCD สว่านกระแทก" → ['สว่านกระแทก']
+function residualKeywords(text, code, brand) {
+  let t = String(text || '').toLowerCase();
+  if (code) t = t.split(code.toLowerCase()).join(' ');
+  if (brand) t = t.split(brand.toLowerCase()).join(' ');
+  return t.split(/[\s,./]+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 2 && !STOPWORDS.has(w) && !/^[a-z]{1,2}$/.test(w));
+}
+
+// ชนิดสินค้า = คำไทยตัวแรกของชื่อ (เช่น "สว่านไขควง", "สว่านกระแทก", "เครื่องขันน็อต")
+function leadType(name) {
+  const toks = String(name || '').trim().split(/\s+/);
+  for (const tk of toks) { if (/[฀-๿]/.test(tk)) return tk; }
+  return toks[0] || '';
+}
+
+function clip(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+
+// ค้นแคตตาล็อก: คืน { code, brand, category, matches }
+function searchCatalog(products, text) {
+  const code = detectSku(text);
+  const brand = detectBrand(text);
+  const category = detectCategory(text);
+
+  // ฐานผลลัพธ์: รหัส (substring เหมือนเรียงตรงกัน) ก่อน → ถ้าไม่มีใช้ fuzzy ชื่อ
+  let base = [];
+  if (code) {
+    base = products.filter((p) => String(p.sku || '').toUpperCase().includes(code));
+  }
+  if (!base.length) base = fuzzySearchProducts(products, text);
+  if (!base.length) return { code, brand, category, matches: [] };
+
+  // กรองให้แคบด้วยสัญญาณที่พิมพ์มาในข้อความเดียวกัน (กรองเฉพาะเมื่อยังเหลือผล)
+  let pool = base;
+  if (brand) { const f = pool.filter((p) => String(p.brand || '').toUpperCase() === brand); if (f.length) pool = f; }
+  if (category) { const f = pool.filter((p) => p.category === category); if (f.length) pool = f; }
+  const kws = residualKeywords(text, code, brand);
+  if (kws.length) {
+    const f = pool.filter((p) => { const n = String(p.name || '').toLowerCase(); return kws.every((w) => n.includes(w)); });
+    if (f.length) pool = f;
+  }
+  return { code, brand, category, matches: pool };
+}
+
+// เจอเยอะเกินไป → ถามลูกค้าก่อนว่าเอาประเภท/แบรนด์ไหน (ปุ่มสร้างจากผลจริง)
+function refinePrompt(matches, term) {
+  const typeCounts = new Map();
+  for (const p of matches) {
+    const t = leadType(p.name);
+    if (t) typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
+  }
+  const types = [...typeCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 9).map((e) => e[0]);
+  const brands = [...new Set(matches.map((p) => p.brand).filter(Boolean))];
+
+  const buttons = [];
+  for (const t of types) buttons.push({ type: 'message', label: clip(t, 20), text: `${term} ${t}` });
+  if (brands.length > 1) for (const b of brands.slice(0, 3)) buttons.push({ type: 'message', label: clip(b, 20), text: `${term} ${b}` });
+
+  return withQuickReply(
+    `พบ ${matches.length} รุ่นที่มี “${term}” ในระบบครับ 🔎\n` +
+    `มีหลายประเภท — สนใจแบบไหนเป็นพิเศษ? กดเลือกได้เลยครับ`,
+    buttons.slice(0, 13)
+  );
+}
+
+// ตัดสินใจตอบจากชุดผลลัพธ์: 1 → การ์ดเดี่ยว, ≤10 → carousel, >10 → ถามให้เลือก
+async function respondWithMatches(userId, matches, term) {
+  await clearSession(userId);
+  if (matches.length === 1) return flexProduct(matches[0]);
+  if (matches.length <= REFINE_THRESHOLD) {
+    return [
+      { type: 'text', text: `พบสินค้าที่ตรงกับ “${term}” จำนวน ${matches.length} รุ่นครับ` },
+      flexProductCarousel(matches),
+    ];
+  }
+  // เกินเพดาน → จำคำค้นไว้ใน session เผื่อลูกค้าพิมพ์ประเภทตามมาเอง แล้วถามให้เลือก
+  await setSession(userId, { expecting: 'refine', term, mode: 'ai' });
+  return refinePrompt(matches, term);
+}
+
 async function smartReply(userId, text) {
   const products = await getCatalog();
   const session = await getSession(userId);
@@ -565,22 +692,32 @@ async function smartReply(userId, text) {
   const category = detectCategory(text);
   const brand = detectBrand(text);
 
-  // 1) รหัสสินค้าตรง → Flex card
+  // 0.5) Session "refine" — เคยเจอเยอะแล้วถามให้เลือก ลูกค้าพิมพ์ประเภท/แบรนด์ตามมา
+  //      รวมคำค้นเดิม + คำใหม่ แล้วค้นซ้ำให้แคบลง (กดปุ่มก็มีคำค้นติดมาอยู่แล้ว)
+  if (session && session.expecting === 'refine' && session.term) {
+    const combined = String(text || '').includes(session.term) ? text : `${session.term} ${text}`;
+    const r = searchCatalog(products, combined);
+    if (r.matches.length) return respondWithMatches(userId, r.matches, session.term);
+    // เลือกแล้วไม่เจอ → ลองค้นด้วยคำใหม่ล้วน ๆ ก่อนยอมแพ้
+  }
+
+  // 1) รหัส/ชื่อตรงในระบบ → เหมือนช่องค้นหาในเว็บ (รหัส เรียงตรงกัน = เจอ)
   if (sku) {
-    const matches = products.filter((p) => {
-      const ps = String(p.sku || '').toUpperCase();
-      return ps && (ps === sku || ps.includes(sku) || sku.includes(ps));
-    });
-    if (matches.length === 1) { await clearSession(userId); return flexProduct(matches[0]); }
-    if (matches.length > 1) { await clearSession(userId); return flexProductCarousel(matches); }
-    // SKU ไม่เจอตรง → fuzzy search ช่วย
-    const fuzzy = fuzzySearchProducts(products, sku);
-    if (fuzzy.length) {
-      await clearSession(userId);
-      return [
-        { type: 'text', text: `ไม่พบรหัส ${sku} ตรงๆ ครับ — แต่มีสินค้าที่ใกล้เคียง` },
-        flexProductCarousel(fuzzy.slice(0, 6)),
-      ];
+    const r = searchCatalog(products, text);
+    if (r.matches.length) return respondWithMatches(userId, r.matches, sku);
+    // ไม่พบรหัสเป๊ะ → ลองรุ่นตระกูลเดียวกัน (prefix ตัวอักษร เช่น DCD) ก่อนยอมแพ้
+    const fam = (sku.match(/^[A-Z]+/) || [])[0];
+    if (fam && fam.length >= 2 && fam !== sku) {
+      const rf = searchCatalog(products, fam);
+      if (rf.matches.length) {
+        await clearSession(userId);
+        const note = { type: 'text', text: `ไม่พบรหัส ${sku} ตรง ๆ ครับ — แต่มีรุ่นตระกูล ${fam} ให้เลือก 👇` };
+        if (rf.matches.length > REFINE_THRESHOLD) {
+          await setSession(userId, { expecting: 'refine', term: fam, mode: 'ai' });
+          return [note, refinePrompt(rf.matches, fam)];
+        }
+        return [note, flexProductCarousel(rf.matches)];
+      }
     }
     return `ขออภัยครับ ไม่พบรหัสสินค้า ${sku} ในระบบ 🙏 ลองถามชื่อรุ่นหรือประเภทสินค้าได้เลยครับ`;
   }
@@ -675,21 +812,11 @@ async function smartReply(userId, text) {
     );
   }
 
-  // 8) Fuzzy keyword search — ค้นหาจากชื่อ/รหัส/แบรนด์ (พิมพ์บางส่วนก็เจอ)
-  //    ไม่จำกัดเพดานบนแล้ว: ถ้าตรงเยอะ (เช่นพิมพ์ "DCD" เจอสว่านหลายรุ่น) ก็โชว์
-  //    10 รุ่นแรก พร้อมบอกให้พิมพ์เจาะจงขึ้น — ไม่ทิ้งผลจนตกไป fallback อีก
-  const fuzzyHits = fuzzySearchProducts(products, text);
-  if (fuzzyHits.length >= 1) {
-    await clearSession(userId);
-    if (fuzzyHits.length === 1) return flexProduct(fuzzyHits[0]);
-    const shown = fuzzyHits.slice(0, 10);
-    const more = fuzzyHits.length > shown.length
-      ? `\n(แสดง ${shown.length} จาก ${fuzzyHits.length} รุ่น — พิมพ์รุ่นให้เจาะจงขึ้นได้ครับ เช่น "DCD805")`
-      : '';
-    return [
-      { type: 'text', text: `พบสินค้าที่ตรงกับ "${text}" จำนวน ${fuzzyHits.length} รุ่นครับ${more}` },
-      flexProductCarousel(shown),
-    ];
+  // 8) ค้นด้วยชื่อ/คำใด ๆ — เหมือนช่องค้นหาในเว็บ (เจอ ≥1 ก็ตอบ, เจอเยอะ → ถามให้เลือก)
+  const r = searchCatalog(products, text);
+  if (r.matches.length) {
+    const term = String(text || '').trim().slice(0, 30);
+    return respondWithMatches(userId, r.matches, term);
   }
 
   // 9) คำสั่งทั่วไป
