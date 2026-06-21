@@ -169,6 +169,13 @@ select.statussel { font-family: var(--font-body); font-size: 13px; padding: 6px 
 .row-edit:last-child { border-bottom: none; }
 .row-edit input, .row-edit select { font-family: var(--font-body); font-size: 14px; padding: 8px 10px; border: 2px solid var(--ink); }
 .row-edit.is-hidden, .faq-edit.is-hidden { opacity: .55; }
+/* แถวแก้ไขแบบคงที่: หัวแถวบรรทัดเดียวไม่ห่อ (ชื่อยืด/หดแทนการดันปุ่มตกบรรทัด) + รายละเอียดเต็มกว้างด้านล่าง
+   ป้องกันแถวสูงไม่เท่ากัน/เด้งไปมาตอนซูมหรือจอแคบ — ใช้ได้ทุกหน้าที่ใส่ class row-stack */
+.row-edit.row-stack { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 6px; }
+.row-line { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; flex-wrap: nowrap; }
+.row-line .row-grow { flex: 1 1 0; min-width: 0; }
+.row-line > .btn, .row-line > .seg-shelf, .row-line > label, .row-line > select { flex: 0 0 auto; }
+.row-more { width: 100%; box-sizing: border-box; }
 
 /* ตัวสลับ เปิด/ปิด ขายทุกแพลตฟอร์ม (segmented) — รวม "เปิด" กับ "ปิด" ไว้กลุ่มเดียว */
 .seg-shelf { display: inline-flex; align-items: center; gap: 0; border: 2px solid var(--ink); border-radius: 8px; overflow: hidden; white-space: nowrap; }

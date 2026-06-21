@@ -3064,22 +3064,29 @@
       var _scrollY = window.scrollY; // ล็อกตำแหน่งหน้าจอ — กดเปิด/ปิดขาย หรือลบแบรนด์ แล้วจอไม่เด้ง
       brandList.innerHTML = brands.map(function (b, i) {
         var pc = brandProducts(b.name).length;
-        return '<div class="row-edit' + (b.hidden ? " is-hidden" : "") + '" draggable="true" data-brow="' + i + '" style="cursor:grab">' +
-          '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 6px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
-          '<input data-bn="' + i + '" value="' + esc(b.name) + '" placeholder="ชื่อแบรนด์" style="flex:1">' +
-          '<input data-bt="' + i + '" value="' + esc(b.tag || "") + '" placeholder="คำอธิบายสั้น (โชว์บนเว็บเท่านั้น)" style="flex:1.4">' +
-          '<span style="font-size:11px;color:var(--fg-2);white-space:nowrap" title="จำนวนสินค้าในแบรนด์นี้">' + pc + ' สินค้า</span>' +
-          '<label class="f-check" title="แบรนด์เด่น — โชว์เน้นบนหน้าเว็บ"><input type="checkbox" data-bp="' + i + '"' + (b.primary ? " checked" : "") + "> เด่น</label>" +
-          '<label class="f-check" title="ซ่อนแบรนด์นี้ + สินค้าทุกตัวของแบรนด์ออกจากหน้าเว็บลูกค้า — ปลดซ่อนได้ทันที (ไม่กระทบ Shopee/Lazada/TikTok)"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อนทั้งแบรนด์</label>" +
-          (function () {
-            var st = brandShelfState(b.name);
-            return '<div class="seg-shelf' + (st === "part" ? " is-part" : "") + '" title="เปิด/ปิดการขายแบรนด์นี้ทุกแพลตฟอร์ม (เว็บ M.E.Tools + Shopee/Lazada/TikTok)">' +
-              '<span class="seg-shelf-lbl">ขายทุกแพลตฟอร์ม</span>' +
-              '<button type="button" class="seg-on' + (st === "on" ? " active" : "") + '" data-bon="' + i + '">เปิด</button>' +
-              '<button type="button" class="seg-off' + (st === "off" ? " active" : "") + '" data-boff="' + i + '">ปิด</button>' +
-              "</div>";
-          })() +
-          '<button class="btn btn-sm btn-danger" data-bdel="' + i + '">ลบ</button></div>';
+        var segHtml = (function () {
+          var st = brandShelfState(b.name);
+          return '<div class="seg-shelf' + (st === "part" ? " is-part" : "") + '" title="เปิด/ปิดการขายแบรนด์นี้ทุกแพลตฟอร์ม (เว็บ M.E.Tools + Shopee/Lazada/TikTok)">' +
+            '<span class="seg-shelf-lbl">ขายทุกแพลตฟอร์ม</span>' +
+            '<button type="button" class="seg-on' + (st === "on" ? " active" : "") + '" data-bon="' + i + '">เปิด</button>' +
+            '<button type="button" class="seg-off' + (st === "off" ? " active" : "") + '" data-boff="' + i + '">ปิด</button>' +
+            "</div>";
+        })();
+        // หัวแถวคงที่ 2 บรรทัด: (1) ชื่อ+คำอธิบาย+จำนวน  (2) ตัวเลือก/สวิตช์/ลบ — ไม่ห่อมั่ว ไม่เด้ง
+        return '<div class="row-edit row-stack' + (b.hidden ? " is-hidden" : "") + '" draggable="true" data-brow="' + i + '" style="cursor:grab">' +
+          '<div class="row-line">' +
+            '<span style="flex:0 0 auto;color:var(--fg-2);font-size:18px;cursor:grab;padding:0 4px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
+            '<input class="row-grow" data-bn="' + i + '" value="' + esc(b.name) + '" placeholder="ชื่อแบรนด์">' +
+            '<input class="row-grow" data-bt="' + i + '" value="' + esc(b.tag || "") + '" placeholder="คำอธิบายสั้น (โชว์บนเว็บเท่านั้น)" style="flex:1.4 1 0">' +
+            '<span style="flex:0 0 auto;font-size:11px;color:var(--fg-2);white-space:nowrap" title="จำนวนสินค้าในแบรนด์นี้">' + pc + ' สินค้า</span>' +
+          '</div>' +
+          '<div class="row-line" style="flex-wrap:wrap">' +
+            '<label class="f-check" title="แบรนด์เด่น — โชว์เน้นบนหน้าเว็บ"><input type="checkbox" data-bp="' + i + '"' + (b.primary ? " checked" : "") + "> เด่น</label>" +
+            '<label class="f-check" title="ซ่อนแบรนด์นี้ + สินค้าทุกตัวของแบรนด์ออกจากหน้าเว็บลูกค้า — ปลดซ่อนได้ทันที (ไม่กระทบ Shopee/Lazada/TikTok)"><input type="checkbox" data-bh="' + i + '"' + (b.hidden ? " checked" : "") + "> ซ่อนทั้งแบรนด์</label>" +
+            segHtml +
+            '<button class="btn btn-sm btn-danger" data-bdel="' + i + '" style="margin-left:auto">ลบ</button>' +
+          '</div>' +
+        '</div>';
       }).join("");
       brandList.querySelectorAll("[data-bdel]").forEach(function (b) {
         b.onclick = function () {
@@ -3193,17 +3200,20 @@
         })();
         var iconSel = '<select data-ci="' + i + '"' + (c.image ? " disabled" : "") + ' title="ไอคอนของหมวด" style="flex:0 0 130px">' +
           CAT_ICONS.map(function (ic) { return '<option value="' + ic + '"' + ((c.icon || "tool") === ic ? " selected" : "") + ">" + (CAT_ICON_TH[ic] || ic) + "</option>"; }).join("") + "</select>";
-        // แถวกระชับ: ค่าเริ่มต้นหุบรายละเอียดไว้ (กันข้อมูลยาวเกิน) · กดลูกศรกาง/หุบเฉพาะแถวนั้นโดยจอไม่เด้ง
-        return '<div class="row-edit' + (c.hidden ? " is-hidden" : "") + '" draggable="true" data-crow="' + i + '" style="cursor:grab;align-items:center;flex-wrap:wrap;gap:6px;padding-left:' + (8 + depth * 16) + 'px;' + (depth ? "border-left:3px solid var(--dw-yellow-deep,#E8A800);" : "") + '">' +
-          '<span style="color:var(--fg-2);font-size:18px;cursor:grab;padding:0 2px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
-          '<span class="cat-lvl" title="' + esc(lineage) + '" style="flex:0 0 auto;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--ink);min-width:22px">L' + (depth + 1) + '</span>' +
-          '<span style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--bg-1,#f5f5f5);border-radius:6px">' + catPreview(c) + "</span>" +
-          '<input data-cn="' + i + '" list="cat-name-presets" value="' + esc(c.label) + '" placeholder="ชื่อหมวด" style="flex:1;min-width:90px">' +
-          '<label class="f-check" style="white-space:nowrap"><input type="checkbox" data-ch="' + i + '"' + (c.hidden ? " checked" : "") + "> ซ่อน</label>" +
-          '<button type="button" class="btn btn-sm" data-cmore="' + i + '" title="กาง/หุบ ตั้งค่าเพิ่มเติม (หมวดแม่ · ไอคอน · รูป · VAT · BigSeller ID)" style="white-space:nowrap">' + (isOpen ? "▾ ตั้งค่า" : "▸ ตั้งค่า") + "</button>" +
-          '<button type="button" class="btn btn-sm btn-danger" data-cdel="' + i + '">ลบ</button>' +
+        // หัวแถวบรรทัดเดียวคงที่ (row-line) ไม่ห่อ + กล่องรายละเอียด (row-more) เต็มกว้างด้านล่าง
+        // ค่าเริ่มต้นหุบรายละเอียดไว้ · กดลูกศรกาง/หุบเฉพาะแถวนั้นโดยจอไม่เด้ง
+        return '<div class="row-edit row-stack' + (c.hidden ? " is-hidden" : "") + '" draggable="true" data-crow="' + i + '" style="cursor:grab;padding-left:' + (8 + depth * 16) + 'px;' + (depth ? "border-left:3px solid var(--dw-yellow-deep,#E8A800);" : "") + '">' +
+          '<div class="row-line">' +
+            '<span style="flex:0 0 auto;color:var(--fg-2);font-size:18px;cursor:grab;padding:0 2px;user-select:none" title="ลากเพื่อจัดเรียง">⠿</span>' +
+            '<span class="cat-lvl" title="' + esc(lineage) + '" style="flex:0 0 auto;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--ink);min-width:22px">L' + (depth + 1) + '</span>' +
+            '<span style="flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--bg-1,#f5f5f5);border-radius:6px">' + catPreview(c) + "</span>" +
+            '<input class="row-grow" data-cn="' + i + '" list="cat-name-presets" value="' + esc(c.label) + '" placeholder="ชื่อหมวด">' +
+            '<label class="f-check" style="white-space:nowrap"><input type="checkbox" data-ch="' + i + '"' + (c.hidden ? " checked" : "") + "> ซ่อน</label>" +
+            '<button type="button" class="btn btn-sm" data-cmore="' + i + '" title="กาง/หุบ ตั้งค่าเพิ่มเติม (หมวดแม่ · ไอคอน · รูป · VAT · BigSeller ID)" style="white-space:nowrap">' + (isOpen ? "▾ ตั้งค่า" : "▸ ตั้งค่า") + "</button>" +
+            '<button type="button" class="btn btn-sm btn-danger" data-cdel="' + i + '">ลบ</button>' +
+          '</div>' +
           // กล่องรายละเอียด — หุบ/กางตาม catOpen (input อยู่ใน DOM ตลอด ให้ syncCats อ่านได้แม้หุบอยู่)
-          '<div data-cmorebox="' + i + '" style="' + (isOpen ? "" : "display:none;") + 'flex-basis:100%;width:100%;margin-top:6px;padding-top:8px;border-top:1px dashed var(--border-3,#ddd)">' +
+          '<div class="row-more" data-cmorebox="' + i + '" style="' + (isOpen ? "" : "display:none;") + 'margin-top:6px;padding-top:8px;border-top:1px dashed var(--border-3,#ddd)">' +
             '<div style="font-family:var(--font-mono);font-size:11px;color:var(--fg-2);margin-bottom:6px">' + lineage + '</div>' +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
               '<span style="font-size:11px;color:#888">หมวดแม่</span>' + parentSel +
