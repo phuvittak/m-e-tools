@@ -386,15 +386,9 @@
     renderBrands(st.brands);
     renderPromo(st.promo);
     renderFlash(st.flashSale);
-    var typeEl = document.querySelector("[data-hero-type]");
-    if (typeEl) {
-      var phrases = (st.heroPhrases && st.heroPhrases.length) ? st.heroPhrases : ["เช่าก็ได้ ซื้อก็ดี"];
-      // จองความสูงบรรทัดตามวลีที่ "ยาวที่สุด" ก่อน เพื่อไม่ให้หน้าจอขยับตอนพิมพ์/ลบตัวอักษร
-      reserveTypeHeight(typeEl, phrases);
-      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduce) typeEl.textContent = phrases[0];
-      else typewriter(typeEl, phrases);
-    }
+    setupHeroType();
+    // settings จาก cloud อาจมาทีหลัง (heroPhrases เปลี่ยน) → ตั้งค่า + จองแถวใหม่ให้ตรง
+    window.addEventListener("me-store-change", setupHeroType);
 
     function paintHomeProducts() {
       var box = document.querySelector("[data-cats]");
@@ -2756,13 +2750,32 @@
   function setText(sel, txt) { var el = document.querySelector(sel); if (el) el.textContent = txt || ""; }
   // วัดว่าวลีไหนทำให้บรรทัด "สูงที่สุด" (กี่บรรทัดก็ตามความยาวจริง) แล้วล็อกความสูงไว้เท่านั้น
   // → เวลา typewriter พิมพ์/ลบตัวอักษร บรรทัดไม่ยุบ/ไม่ยืด หน้าจอจึงนิ่ง ไม่สั่น
+  // ตั้งค่าตัวอักษรวิ่งบนหน้าปก + จองจำนวนแถวไว้คงที่ตามวลีที่ยาวที่สุด
+  // เรียกซ้ำได้ (เช่นตอน settings จาก cloud มาถึง) — ถ้าวลีไม่เปลี่ยนจะไม่เริ่มใหม่
+  var _heroPhrasesKey = null, _typeGen = 0, _heroResizeBound = false, _heroMeasure = null;
+  function setupHeroType() {
+    var typeEl = document.querySelector("[data-hero-type]");
+    if (!typeEl) return;
+    var st = S.getSettings();
+    var phrases = (st.heroPhrases && st.heroPhrases.length) ? st.heroPhrases : ["เช่าก็ได้ ซื้อก็ดี"];
+    var key = phrases.join("");
+    if (key === _heroPhrasesKey) return;    // วลีเดิม — ไม่ต้องทำซ้ำ
+    _heroPhrasesKey = key;
+    // จองจำนวนแถวตามวลีที่ "สูง/ยาวที่สุด" ก่อนเสมอ — เวลาวิ่งจะได้ไม่ลด/เพิ่มแถว (ลายตา)
+    reserveTypeHeight(typeEl, phrases);
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var gen = ++_typeGen;                    // ยกเลิก typewriter รอบก่อน (กันวิ่งซ้อนกัน)
+    if (reduce) { typeEl.textContent = phrases[0]; return; }
+    typewriter(typeEl, phrases, function () { return gen === _typeGen; });
+  }
+
   function reserveTypeHeight(el, phrases) {
     var line = el.closest ? el.closest(".me-type-line") : null;
     line = line || el.parentNode;
     if (!line) return;
     function measure() {
       var keep = el.textContent;
-      line.style.minHeight = "0px";           // รีเซ็ตก่อนวัดใหม่ (เผื่อจอเปลี่ยนขนาด)
+      line.style.minHeight = "0px";           // รีเซ็ตก่อนวัดใหม่ (เผื่อจอ/ฟอนต์เปลี่ยน)
       var max = 0;
       for (var i = 0; i < phrases.length; i++) {
         el.textContent = phrases[i];
@@ -2772,15 +2785,26 @@
       el.textContent = keep;
       if (max) line.style.minHeight = max + "px";
     }
+    _heroMeasure = measure;                   // ให้ resize/font-load รอบใหม่ใช้วลีล่าสุดเสมอ
     measure();
-    // จอเปลี่ยนขนาด → จำนวนบรรทัดที่ตัดคำเปลี่ยน ต้องวัดใหม่ (หน่วงไว้กันถี่เกิน)
-    var rt;
-    window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(measure, 160); });
+    // วัดใหม่หลังฟอนต์ display โหลดเสร็จ — กันวัดผิด (ฟอนต์ยังไม่มาทำให้ตัดบรรทัดเพี้ยน)
+    if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+      document.fonts.ready.then(function () { if (_heroMeasure) _heroMeasure(); });
+    } else {
+      window.addEventListener("load", function () { if (_heroMeasure) _heroMeasure(); });
+    }
+    // จอเปลี่ยนขนาด → จำนวนบรรทัดที่ตัดคำเปลี่ยน ต้องวัดใหม่ (ผูกครั้งเดียว, หน่วงกันถี่)
+    if (!_heroResizeBound) {
+      _heroResizeBound = true;
+      var rt;
+      window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(function () { if (_heroMeasure) _heroMeasure(); }, 160); });
+    }
   }
 
-  function typewriter(el, phrases) {
+  function typewriter(el, phrases, alive) {
     var pi = 0, ci = 0, deleting = false;
     function tick() {
+      if (alive && !alive()) return;          // ถูกแทนที่ด้วยรอบใหม่แล้ว — หยุด
       var word = phrases[pi] || "";
       if (!deleting) {
         ci++; el.textContent = word.slice(0, ci);
