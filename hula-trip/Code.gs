@@ -37,7 +37,27 @@ function isCode_(v){ v=String(v||'').trim(); return /^[A-Za-z0-9]{6,8}$/.test(v)
 function isId_(v){ return /^\d-\d{4}-\d{5}-\d{2}-\d$/.test(String(v||'').trim()); }
 function parseAmount_(v){ return Number(String(v==null?'':v).replace(/[^0-9.]/g,'')) || 0; }
 function money_(n){ var x=Number(n)||0; return x.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function thaiDisp_(d, raw){ return d ? (d.getDate()+' '+THAI_MONTHS[d.getMonth()]+' '+(d.getFullYear()+543)) : String(raw||''); }
+function thaiDisp_(_d, raw) {
+  if (!_d) return '';
+  var d = new Date(_d);
+  if (isNaN(d.getTime())) return String(_d);
+  
+  // แปลงปี ค.ศ. ให้เป็น พ.ศ. ไทย
+  var thaiYear = d.getFullYear();
+  if (thaiYear < 2100) thaiYear += 543; // ป้องกันกรณีดึงปี ค.ศ. มาแล้วไม่เป็น พ.ศ.
+  
+  // รูปแบบวันที่: "10 พ.ค. 2569"
+  var formattedDate = Utilities.formatDate(d, "GMT+7", "dd MMM ") + thaiYear;
+  
+  // รูปแบบเวลา: "11:39 น."
+  var formattedTime = Utilities.formatDate(d, "GMT+7", "HH:mm") + " น.";
+  
+  // ส่งค่ากลับไปในรูปแบบ Object เพื่อให้ฝั่งหน้าเว็บดึงไปแยกแสดงผลได้ง่ายๆ
+  return {
+    date: formattedDate,
+    time: formattedTime
+  };
+}
 function food_(v){ return FOOD_OPTIONS.indexOf(v)>=0 ? v : FOOD_OPTIONS[0]; }
 
 function parseThaiDate_(v){
